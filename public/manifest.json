@@ -1,0 +1,46 @@
+{
+  "name": "RedZone - Le Sanctuaire du Moteur Thermique",
+  "short_name": "RedZone",
+  "description": "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#DC2626",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["automotive", "shopping", "marketplace"],
+  "lang": "fr-BE",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Vendre",
+      "short_name": "Vendre",
+      "description": "Vendre votre sportive",
+      "url": "/sell",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Rechercher",
+      "short_name": "Rechercher",
+      "description": "Rechercher une sportive",
+      "url": "/search",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
+
