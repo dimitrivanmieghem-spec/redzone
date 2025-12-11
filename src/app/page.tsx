@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import CarCard from "@/components/CarCard";
 import { useVehicules } from "@/hooks/useVehicules";
 import { useModelData } from "@/hooks/useModelData";
+import { VehicleType } from "@/lib/supabase/modelSpecs";
 import { getSiteSettings } from "@/lib/supabase/settings";
 import { getActiveFAQ } from "@/lib/supabase/faq";
 import type { FAQItem } from "@/lib/supabase/faq";
