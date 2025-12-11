@@ -51,13 +51,13 @@ body {
 /* ===== MODERNISATION ULTRA-CLEAN 2025 ===== */
 
 /* Améliorer la lisibilité des inputs et selects */
+/* Note: La couleur du texte est gérée par les classes Tailwind dans les composants */
 input, select, textarea {
-  color: #0f172a !important; /* text-slate-900 - Noir pour le texte */
   transition: all 0.2s ease;
 }
 
+/* Placeholders : couleur adaptative selon le contexte */
 input::placeholder, select::placeholder, textarea::placeholder {
-  color: #475569 !important; /* text-slate-600 - Gris foncé pour les placeholders */
   opacity: 1;
 }
 

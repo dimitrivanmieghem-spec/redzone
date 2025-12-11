@@ -56,7 +56,20 @@ export default function RegisterPage() {
 
       // 1. Appel Supabase avec emailRedirectTo
       const fullName = `${formData.prenom} ${formData.nom}`.trim();
-      const siteUrl = typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || "https://redzone.be";
+      
+      // Déterminer l'URL de redirection : priorité à NEXT_PUBLIC_SITE_URL (production)
+      // Ne jamais utiliser localhost pour les emails de confirmation
+      let siteUrl: string;
+      if (process.env.NEXT_PUBLIC_SITE_URL) {
+        // Utiliser la variable d'environnement de production (Netlify)
+        siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      } else if (typeof window !== "undefined" && window.location.origin && !window.location.origin.includes("localhost")) {
+        // Utiliser window.location.origin seulement si ce n'est PAS localhost
+        siteUrl = window.location.origin;
+      } else {
+        // Fallback vers l'URL de production par défaut
+        siteUrl = "https://redzone2.netlify.app";
+      }
       
       const { data, error: supabaseError } = await supabase.auth.signUp({
         email: formData.email,
@@ -242,7 +255,7 @@ export default function RegisterPage() {
                   placeholder="Jean"
                   required
                   disabled={isLoading}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -263,7 +276,7 @@ export default function RegisterPage() {
                 placeholder="Dupont"
                 required
                 disabled={isLoading}
-                className="w-full px-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
