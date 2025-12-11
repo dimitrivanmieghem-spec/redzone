@@ -2,13 +2,16 @@
 
 import { Loader2, Lock, Mail, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
 import AuthLayout from "@/components/AuthLayout";
 
-export default function LoginPage() {
+// Désactiver le prerendering pour cette page
+export const dynamic = 'force-dynamic';
+
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
@@ -198,5 +201,21 @@ export default function LoginPage() {
         </div>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <Loader2 className="animate-spin text-red-600" size={32} />
+          </div>
+        </div>
+      </AuthLayout>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
