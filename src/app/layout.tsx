@@ -6,6 +6,7 @@ import MobileNav from "@/components/MobileNav";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import BetaBadge from "@/components/BetaBadge";
+import SupportButton from "@/components/SupportButton";
 import { ToastProvider } from "@/components/ui/Toast";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -84,6 +85,7 @@ export default function RootLayout({
                 <Footer />
                 <CookieBanner />
                 <BetaBadge />
+                <SupportButton />
               </FavoritesProvider>
             </ToastProvider>
           </AuthProvider>

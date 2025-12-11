@@ -64,6 +64,7 @@ export default function AdminLayout({
   const navItems = [
     { href: "/admin", label: "Tableau de Bord", icon: LayoutDashboard },
     { href: "/admin/moderation", label: "Modération", icon: ShieldCheck },
+    { href: "/admin/support", label: "Support", icon: MessageSquare },
     { href: "/admin/contenu", label: "Contenu", icon: FileText },
     { href: "/admin/encyclopedie", label: "Encyclopédie", icon: BookOpen },
     { href: "/admin/equipe", label: "Équipe", icon: Users },

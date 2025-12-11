@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
+import { Loader2, Lock, Mail, User, UserPlus, CheckCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,8 @@ export default function RegisterPage() {
   const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
   const [formData, setFormData] = useState({
     prenom: "",
     nom: "",
@@ -52,16 +54,20 @@ export default function RegisterPage() {
         throw new Error("Le mot de passe doit contenir au moins 6 caractères");
       }
 
-      // 1. Appel Supabase
+      // 1. Appel Supabase avec emailRedirectTo
       const fullName = `${formData.prenom} ${formData.nom}`.trim();
+      const siteUrl = typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || "https://redzone.be";
+      
       const { data, error: supabaseError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${siteUrl}/auth/callback`,
           data: {
             first_name: formData.prenom,
             last_name: formData.nom,
             full_name: fullName,
+            role: formData.role,
           },
         },
       });
@@ -85,18 +91,19 @@ export default function RegisterPage() {
         }
       }
 
-      // 4. Succès -> Redirection
-      if (data.session) {
+      // 4. Gestion du succès : Si pas de session, c'est que l'email doit être confirmé
+      if (!data.session) {
+        // Email de confirmation envoyé
+        setUserEmail(formData.email);
+        setPendingVerification(true);
+        showToast("Email de confirmation envoyé ! Vérifiez votre boîte mail.", "success");
+      } else {
+        // Session créée (peu probable si Confirm Email est activé, mais on gère le cas)
         showToast("Compte créé avec succès ! 🎉", "success");
         router.refresh();
         setTimeout(() => {
           router.push("/dashboard");
         }, 500);
-      } else {
-        showToast("Vérifiez vos emails pour confirmer votre compte.", "info");
-        setTimeout(() => {
-          router.push("/login");
-        }, 2000);
       }
     } catch (err: any) {
       console.error("Erreur Inscription:", err);
@@ -121,6 +128,83 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  // Si en attente de vérification, afficher le message de confirmation
+  if (pendingVerification) {
+    return (
+      <AuthLayout>
+        <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+          {/* Icône de succès */}
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 bg-green-600/20 border-2 border-green-500/50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="text-green-400" size={40} />
+            </div>
+            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">
+              Vérifiez votre boîte mail
+            </h2>
+            <p className="text-slate-400 text-lg">
+              Un lien de confirmation a été envoyé à
+            </p>
+            <p className="text-yellow-400 font-bold text-xl mt-2 break-all">
+              {userEmail}
+            </p>
+          </div>
+
+          {/* Message principal */}
+          <div className="bg-gradient-to-r from-yellow-500/10 via-yellow-600/10 to-yellow-500/10 border-2 border-yellow-500/30 rounded-xl p-6 mb-6">
+            <p className="text-white text-center leading-relaxed">
+              Cliquez sur le lien dans l&apos;email pour activer votre compte{" "}
+              <span className="font-bold text-yellow-400">Membre Fondateur</span>.
+            </p>
+          </div>
+
+          {/* Instructions */}
+          <div className="space-y-3 mb-6">
+            <div className="flex items-start gap-3 text-slate-300">
+              <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
+                <span className="text-red-400 text-xs font-bold">1</span>
+              </div>
+              <p className="text-sm">Vérifiez votre boîte de réception (et les spams si nécessaire)</p>
+            </div>
+            <div className="flex items-start gap-3 text-slate-300">
+              <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
+                <span className="text-red-400 text-xs font-bold">2</span>
+              </div>
+              <p className="text-sm">Cliquez sur le lien de confirmation dans l&apos;email</p>
+            </div>
+            <div className="flex items-start gap-3 text-slate-300">
+              <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
+                <span className="text-red-400 text-xs font-bold">3</span>
+              </div>
+              <p className="text-sm">Vous serez automatiquement connecté et redirigé vers votre dashboard</p>
+            </div>
+          </div>
+
+          {/* Bouton Retour à la connexion */}
+          <Link
+            href="/login"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black py-4 px-8 rounded-xl transition-all shadow-lg shadow-red-900/20 hover:shadow-red-900/40 hover:scale-[1.02]"
+          >
+            <ArrowLeft size={20} />
+            Retour à la connexion
+          </Link>
+
+          {/* Message d'aide */}
+          <div className="mt-6 text-center">
+            <p className="text-xs text-slate-500">
+              Vous n&apos;avez pas reçu l&apos;email ? Vérifiez vos spams ou{" "}
+              <button
+                onClick={() => setPendingVerification(false)}
+                className="text-yellow-400 hover:text-yellow-300 underline font-medium"
+              >
+                réessayez
+              </button>
+            </p>
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

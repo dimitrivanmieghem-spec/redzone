@@ -6,9 +6,9 @@ export default async function RecitsPage() {
   const articles = await getPublishedArticles();
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-0 sm:min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-16 px-4">
+      <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-6 sm:py-16 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-600 to-red-700 rounded-3xl mb-6 shadow-2xl shadow-red-600/40">
             <BookOpen size={40} className="text-white" />
@@ -23,9 +23,9 @@ export default async function RecitsPage() {
       </div>
 
       {/* Liste des articles */}
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-12">
         {articles.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl shadow-lg shadow-slate-100/50">
+          <div className="text-center py-6 sm:py-20 bg-white rounded-3xl shadow-lg shadow-slate-100/50">
             <div className="text-6xl mb-4">📖</div>
             <h3 className="text-2xl font-black text-slate-900 mb-2">
               Aucun récit pour le moment

@@ -1,21 +1,34 @@
 "use client";
 
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Loader2, Lock, Mail, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
 import AuthLayout from "@/components/AuthLayout";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+
+  // Gérer les messages d'erreur depuis l'URL (callback d'email)
+  useEffect(() => {
+    const error = searchParams.get("error");
+    const message = searchParams.get("message");
+
+    if (error && message) {
+      showToast(decodeURIComponent(message), "error");
+      // Nettoyer l'URL
+      router.replace("/login");
+    }
+  }, [searchParams, showToast, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -72,6 +85,16 @@ export default function LoginPage() {
 
         {/* Formulaire */}
         <form onSubmit={handleLogin} className="space-y-6">
+          {/* Message d'erreur depuis l'URL (si présent) */}
+          {searchParams.get("error") && searchParams.get("message") && (
+            <div className="bg-red-900/20 border-2 border-red-600/50 rounded-xl p-4 flex items-start gap-3">
+              <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+              <p className="text-red-400 text-sm font-medium">
+                {decodeURIComponent(searchParams.get("message") || "")}
+              </p>
+            </div>
+          )}
+
           {/* Email */}
           <div>
             <label

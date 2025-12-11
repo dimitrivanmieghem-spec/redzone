@@ -700,7 +700,7 @@ export default function SellPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-0 sm:min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 shadow-md">
         <div className="max-w-4xl mx-auto px-6 py-6">
@@ -792,7 +792,7 @@ export default function SellPage() {
       </div>
 
       {/* Contenu du Wizard */}
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-6 sm:py-12">
         <div className="bg-white rounded-3xl shadow-2xl shadow-slate-300/50 p-8 md:p-12">
           {/* ÉTAPE 1 : L'Essentiel */}
           {currentStep === 1 && (

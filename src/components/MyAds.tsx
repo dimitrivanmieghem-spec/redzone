@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 import { Vehicule } from "@/lib/supabase/types";
 import { deleteVehicule } from "@/lib/supabase/vehicules";
+import { deleteVehiculeForUser } from "@/app/actions/vehicules";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -176,7 +177,13 @@ export default function MyAds() {
     setConfirmDeleteId(null);
 
     try {
-      await deleteVehicule(id);
+      // Utiliser la nouvelle Server Action qui supprime aussi les images
+      const result = await deleteVehiculeForUser(id);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Erreur lors de la suppression");
+      }
+      
       // Retirer le véhicule de la liste
       setVehicules((prev) => prev.filter((v) => v.id !== id));
     } catch (err) {
@@ -341,7 +348,7 @@ export default function MyAds() {
                   {/* Actions */}
                   <div className="flex flex-wrap items-center gap-3">
                     <Link
-                      href="#"
+                      href={`/sell?edit=${vehicule.id}`}
                       className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium text-sm rounded-lg transition-all"
                     >
                       <Edit size={16} />

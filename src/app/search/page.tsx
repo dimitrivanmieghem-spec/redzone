@@ -192,9 +192,9 @@ function SearchContent() {
   const filteredVehicules = vehicules;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-0 sm:min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-12 px-4">
+      <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-6 sm:py-12 px-4">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
             🔍 Recherche <span className="text-red-600">RedZone</span>
@@ -206,7 +206,7 @@ function SearchContent() {
       </div>
 
       {/* Contenu principal */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* SIDEBAR DESKTOP - Filtres */}
           <aside className="hidden lg:block w-80 flex-shrink-0">
@@ -313,7 +313,7 @@ function SearchContent() {
                 ))}
               </div>
             ) : filteredVehicules.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-3xl shadow-lg shadow-slate-100/50">
+              <div className="text-center py-6 sm:py-20 bg-white rounded-3xl shadow-lg shadow-slate-100/50">
                 <div className="text-6xl mb-4">🏎️</div>
                 <h3 className="text-2xl font-black text-slate-900 mb-2">
                   Aucun bolide trouvé

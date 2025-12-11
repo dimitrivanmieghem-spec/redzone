@@ -53,6 +53,14 @@ export default function PrivacyPage() {
                 En phase bêta, l&apos;objectif principal est d&apos;améliorer le service et de valider le fonctionnement technique.
               </p>
             </div>
+            <div className="bg-white/50 p-4 rounded-lg mt-3 border-2 border-red-300">
+              <p className="text-red-900 font-bold text-base mb-2">
+                📋 Statut de la Plateforme
+              </p>
+              <p className="text-red-800 text-sm font-semibold">
+                RedZone est une plateforme en phase Beta opérée à titre non-lucratif. Le site agit comme hébergeur d&apos;annonces et n&apos;intervient pas dans les transactions.
+              </p>
+            </div>
           </div>
 
           <div className="bg-red-50 p-6 rounded-2xl mb-8">

@@ -16,9 +16,9 @@ export default function FavoritesPage() {
   );
 
   return (
-    <main className="min-h-screen bg-white text-slate-900 font-sans">
+    <main className="min-h-0 sm:min-h-screen bg-white text-slate-900 font-sans">
       {/* HEADER */}
-      <section className="py-12 px-4 bg-white">
+      <section className="py-6 sm:py-12 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <Link
             href="/"
@@ -49,7 +49,7 @@ export default function FavoritesPage() {
       </section>
 
       {/* CONTENU */}
-      <section className="max-w-6xl mx-auto py-16 px-4">
+      <section className="max-w-6xl mx-auto py-6 sm:py-16 px-4">
         {favoriteVehicules.length === 0 ? (
           // Message si aucun favori
           <div className="text-center py-16">
@@ -75,7 +75,7 @@ export default function FavoritesPage() {
           </div>
         ) : (
           // Grille des favoris
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
             {favoriteVehicules.map((vehicule) => (
               <CarCard key={vehicule.id} car={vehicule} />
             ))}

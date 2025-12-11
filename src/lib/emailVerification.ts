@@ -33,27 +33,57 @@ export function verifyCode(code: string, hash: string): boolean {
 }
 
 /**
- * Envoie un email de vérification (simulation pour l'instant)
- * 
- * TODO: Intégrer Resend ou un autre service d'email
- * Exemple avec Resend:
- * 
- * import { Resend } from 'resend';
- * const resend = new Resend(process.env.RESEND_API_KEY);
- * 
- * await resend.emails.send({
- *   from: 'RedZone <noreply@redzone.be>',
- *   to: email,
- *   subject: 'Vérifiez votre annonce RedZone',
- *   html: `Votre code de vérification: <strong>${code}</strong>`
- * });
+ * Envoie un email de vérification via Resend (si configuré) ou en mode simulation
  */
 export async function sendVerificationEmail(
   email: string,
   code: string,
   vehiculeId: string
 ): Promise<void> {
-  // SIMULATION - À remplacer par un vrai service d'email
+  // Vérifier si Resend est configuré
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (resendApiKey) {
+    // MODE RÉEL : Utiliser Resend
+    try {
+      const { Resend } = await import('resend');
+      const resend = new Resend(resendApiKey);
+      
+      const { error } = await resend.emails.send({
+        from: 'onboarding@resend.dev', // Email par défaut gratuit de Resend
+        to: email,
+        subject: 'Vérifiez votre annonce RedZone',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #dc2626;">Vérifiez votre annonce RedZone</h1>
+            <p>Bonjour,</p>
+            <p>Vous avez déposé une annonce sur RedZone. Pour confirmer votre annonce, veuillez entrer le code suivant :</p>
+            <div style="background: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+              <h2 style="color: #dc2626; font-size: 32px; letter-spacing: 4px; margin: 0;">${code}</h2>
+            </div>
+            <p>Ce code est valide pendant <strong>15 minutes</strong>.</p>
+            <p>Si vous n'avez pas déposé d'annonce, ignorez cet email.</p>
+            <p style="margin-top: 30px; color: #6b7280; font-size: 12px;">
+              L'équipe RedZone
+            </p>
+          </div>
+        `,
+      });
+      
+      if (error) {
+        console.error('Erreur Resend:', error);
+        throw new Error(`Erreur envoi email: ${error.message}`);
+      }
+      
+      console.log(`✅ Email envoyé via Resend à ${email}`);
+      return;
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi via Resend, bascule en mode simulation:', error);
+      // Continuer en mode simulation si Resend échoue
+    }
+  }
+
+  // MODE SIMULATION : Console.log si Resend n'est pas configuré ou en cas d'erreur
   console.log('='.repeat(60));
   console.log('📧 EMAIL DE VÉRIFICATION (SIMULATION)');
   console.log('='.repeat(60));
@@ -77,40 +107,6 @@ export async function sendVerificationEmail(
   console.log('');
   console.log(`L'équipe RedZone`);
   console.log('='.repeat(60));
-  
-  // TODO: Décommenter et configurer Resend quand disponible
-  /*
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY non configuré');
-  }
-  
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  
-  const { error } = await resend.emails.send({
-    from: 'RedZone <noreply@redzone.be>',
-    to: email,
-    subject: 'Vérifiez votre annonce RedZone',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #dc2626;">Vérifiez votre annonce RedZone</h1>
-        <p>Bonjour,</p>
-        <p>Vous avez déposé une annonce sur RedZone. Pour confirmer votre annonce, veuillez entrer le code suivant :</p>
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-          <h2 style="color: #dc2626; font-size: 32px; letter-spacing: 4px; margin: 0;">${code}</h2>
-        </div>
-        <p>Ce code est valide pendant <strong>15 minutes</strong>.</p>
-        <p>Si vous n'avez pas déposé d'annonce, ignorez cet email.</p>
-        <p style="margin-top: 30px; color: #6b7280; font-size: 12px;">
-          L'équipe RedZone
-        </p>
-      </div>
-    `,
-  });
-  
-  if (error) {
-    throw new Error(`Erreur envoi email: ${error.message}`);
-  }
-  */
 }
 
 /**

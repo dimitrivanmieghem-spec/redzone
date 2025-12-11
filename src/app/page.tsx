@@ -114,21 +114,41 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-white text-slate-900 font-sans">
+    <main className="min-h-0 sm:min-h-screen bg-white text-slate-900 font-sans">
       {/* HERO SECTION - PASSION THERMIQUE */}
-      <section className="py-20 px-4 bg-gradient-to-b from-slate-900 via-slate-800 to-white text-center">
+      <section className="py-6 sm:py-20 px-4 bg-gradient-to-b from-slate-900 via-slate-800 to-white text-center">
         <h1 className="text-5xl md:text-7xl font-black mb-6 text-white tracking-tight">
           La mécanique des <span className="text-red-600">puristes</span>.
         </h1>
         <p className="text-slate-300 mb-8 text-xl max-w-3xl mx-auto font-medium">
           Du Youngtimer au Supercar. Ici, seule la passion compte.
         </p>
-        <p className="text-slate-400 text-sm max-w-2xl mx-auto mb-12">
-          🏁 Supercars • Youngtimers • GTI • Roadsters • Le graal des puristes
+        <p className="text-slate-400 text-sm max-w-2xl mx-auto mb-6 sm:mb-12 flex items-center justify-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1">
+            <Car size={16} className="text-red-500" />
+            Supercars
+          </span>
+          <span>•</span>
+          <span className="inline-flex items-center gap-1">
+            <Car size={16} className="text-red-500" />
+            Youngtimers
+          </span>
+          <span>•</span>
+          <span className="inline-flex items-center gap-1">
+            <Car size={16} className="text-red-500" />
+            GTI
+          </span>
+          <span>•</span>
+          <span className="inline-flex items-center gap-1">
+            <Car size={16} className="text-red-500" />
+            Roadsters
+          </span>
+          <span>•</span>
+          <span>Le graal des puristes</span>
         </p>
 
         {/* MOTEUR DE RECHERCHE */}
-        <div className="max-w-5xl mx-auto bg-white p-4 rounded-2xl shadow-xl shadow-xl shadow-slate-100/50 border-0 grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="max-w-5xl mx-auto bg-white p-4 rounded-2xl shadow-xl shadow-xl shadow-slate-100/50 border-0 grid grid-cols-1 md:grid-cols-5 gap-4 sm:gap-4">
           <select
             value={selectedMarque}
             onChange={(e) => handleMarqueChange(e.target.value)}
@@ -186,7 +206,7 @@ export default function Home() {
       </section>
 
       {/* DERNIÈRES ANNONCES */}
-      <section className="max-w-6xl mx-auto py-16 px-4">
+      <section className="max-w-6xl mx-auto py-6 sm:py-16 px-4">
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-2xl font-bold flex items-center gap-2 tracking-tight">
             <Car className="text-red-600" /> Dernières Annonces
@@ -251,7 +271,7 @@ export default function Home() {
 
       {/* SECTION FAQ */}
       {faqItems.length > 0 && (
-        <section className="max-w-6xl mx-auto py-16 px-4 bg-gradient-to-b from-white to-slate-50">
+        <section className="max-w-6xl mx-auto py-6 sm:py-16 px-4 bg-gradient-to-b from-white to-slate-50">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 flex items-center justify-center gap-3">
               <HelpCircle className="text-red-600" size={36} />
@@ -262,7 +282,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {faqItems.map((item) => (
               <div
                 key={item.id}

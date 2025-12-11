@@ -62,9 +62,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const title = `${vehicule.marque || 'Véhicule'} ${vehicule.modele || ''} (${vehicule.annee || 'N/A'}) | RedZone`;
-  const description = `À vendre : ${vehicule.marque || 'Véhicule'} ${vehicule.modele || ''}, ${vehicule.puissance || 'N/A'}ch, ${vehicule.km ? vehicule.km.toLocaleString("fr-BE") : 'N/A'}km. Prix : ${vehicule.prix ? vehicule.prix.toLocaleString("fr-BE") : 'N/A'} €. Annonce certifiée RedZone.`;
-  const imageUrl = vehicule.image || vehicule.images?.[0] || "/og-default.jpg";
+  // Format selon les spécifications : [Marque] [Modèle] - [Prix]€ | RedZone
+  const prixFormatted = vehicule.prix ? vehicule.prix.toLocaleString("fr-BE") : 'N/A';
+  const title = `${vehicule.marque || 'Véhicule'} ${vehicule.modele || ''} - ${prixFormatted}€ | RedZone`;
+  
+  // Description selon les spécifications
+  const description = `Découvrez cette ${vehicule.marque || 'Véhicule'} ${vehicule.modele || ''} de ${vehicule.annee || 'N/A'}, ${vehicule.puissance || 'N/A'}ch. En vente sur RedZone, le sanctuaire du moteur thermique.`;
+  
+  // Image OpenGraph : première photo du véhicule (stockée sur Supabase)
+  // Si images est un tableau, prendre la première, sinon utiliser image
+  let imageUrl = "/og-default.jpg";
+  if (vehicule.images && Array.isArray(vehicule.images) && vehicule.images.length > 0) {
+    imageUrl = vehicule.images[0];
+  } else if (vehicule.image) {
+    imageUrl = vehicule.image;
+  }
+  
   // URL dynamique basée sur la variable d'environnement ou localhost en dev
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://redzone.be";
   const url = `${baseUrl}/cars/${id}`;

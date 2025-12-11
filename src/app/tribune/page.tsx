@@ -40,9 +40,9 @@ function TribuneContent() {
   });
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-0 sm:min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-16 px-4">
+      <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-6 sm:py-16 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-600 to-red-700 rounded-3xl mb-6 shadow-2xl shadow-red-600/40">
             <MessageSquare size={40} className="text-white" />
@@ -121,11 +121,11 @@ function TribuneContent() {
 
         {/* Liste des posts */}
         {isLoading ? (
-          <div className="flex justify-center py-20">
+          <div className="flex justify-center py-6 sm:py-20">
             <Loader2 size={48} className="animate-spin text-red-600" />
           </div>
         ) : filteredArticles.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl shadow-lg shadow-slate-100/50">
+          <div className="text-center py-6 sm:py-20 bg-white rounded-3xl shadow-lg shadow-slate-100/50">
             <div className="text-6xl mb-4">
               {activeFilter === "question" ? "❓" : activeFilter === "presentation" ? "🚗" : "📖"}
             </div>
