@@ -3,6 +3,7 @@
 import { createClient } from "./client";
 import { Vehicule, VehiculeInsert, VehiculeUpdate } from "./types";
 import { validateVehiculeData, sanitizeVehiculeData } from "../validation";
+import { requireAdmin } from "./auth-utils";
 
 /**
  * Créer un nouveau véhicule
@@ -154,6 +155,9 @@ export async function getVehiculeById(id: string): Promise<Vehicule | null> {
  * @param id - ID du véhicule
  */
 export async function approveVehicule(id: string): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
   const supabase = createClient();
   
   const { error } = await supabase
@@ -171,6 +175,9 @@ export async function approveVehicule(id: string): Promise<void> {
  * @param id - ID du véhicule
  */
 export async function rejectVehicule(id: string): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
   const supabase = createClient();
   
   const { error } = await supabase

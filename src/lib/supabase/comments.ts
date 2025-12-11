@@ -1,6 +1,7 @@
 // RedZone - Actions Supabase pour les Commentaires
 
 import { createClient } from "./client";
+import { requireAdmin } from "./auth-utils";
 
 export interface Comment {
   id: string;
@@ -175,6 +176,9 @@ export async function getPendingComments(): Promise<CommentWithAuthor[]> {
  * @param commentId - ID du commentaire
  */
 export async function approveComment(commentId: string): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
   const supabase = createClient();
 
   const { error } = await supabase
@@ -192,6 +196,9 @@ export async function approveComment(commentId: string): Promise<void> {
  * @param commentId - ID du commentaire
  */
 export async function rejectComment(commentId: string): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
   const supabase = createClient();
 
   const { error } = await supabase

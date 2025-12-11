@@ -1,6 +1,7 @@
 // RedZone - Actions Supabase pour la Gestion des Utilisateurs (Admin)
 
 import { createClient } from "./client";
+import { requireAdmin } from "./auth-utils";
 
 export interface UserProfile {
   id: string;
@@ -77,6 +78,9 @@ export async function toggleUserBan(
   userId: string,
   isBanned: boolean
 ): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
   const supabase = createClient();
 
   const { error } = await supabase

@@ -1,6 +1,7 @@
 // RedZone - Actions Supabase pour les Réglages Site
 
 import { createClient } from "./client";
+import { requireAdmin } from "./auth-utils";
 
 export interface SiteSettings {
   id: string;
@@ -51,6 +52,9 @@ export async function getSiteSettings(): Promise<SiteSettings | null> {
 export async function updateSiteSettings(
   updates: SiteSettingsUpdate
 ): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
   const supabase = createClient();
 
   const { error } = await supabase
