@@ -274,9 +274,9 @@ export default function MyAds() {
       {/* Liste des véhicules */}
       <div className="space-y-4">
         {vehicules.map((vehicule) => {
-          // Gérer les alias de statut
-          const statusKey =
-            vehicule.status === "validated" ? "active" : vehicule.status;
+          // Gérer les alias de statut (normaliser "validated" vers "active")
+          const rawStatus = vehicule.status as string;
+          const statusKey = rawStatus === "validated" ? "active" : vehicule.status;
           const status =
             statusConfig[statusKey] || statusConfig.pending;
           const StatusIcon = status.icon;
@@ -378,7 +378,7 @@ export default function MyAds() {
                     )}
 
                     {(vehicule.status === "active" ||
-                      vehicule.status === "validated") && (
+                      (vehicule.status as string) === "validated") && (
                       <Link
                         href={`/cars/${vehicule.id}`}
                         className="flex items-center gap-2 px-4 py-2 text-slate-300 hover:text-white font-medium text-sm transition-all"
