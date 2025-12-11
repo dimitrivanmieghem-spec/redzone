@@ -7,7 +7,7 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "user" | "admin";
+  role: "particulier" | "pro" | "admin";
   is_banned: boolean;
   created_at: string;
   avatar_url: string | null;
@@ -112,5 +112,47 @@ export async function getUserVehicles(userId: string) {
   }
 
   return data || [];
+}
+
+/**
+ * Mettre à jour le rôle d'un utilisateur (admin uniquement)
+ * @param userId - ID de l'utilisateur
+ * @param newRole - Nouveau rôle ('particulier' | 'pro' | 'admin')
+ */
+export async function updateUserRole(
+  userId: string,
+  newRole: "particulier" | "pro" | "admin"
+): Promise<void> {
+  // Vérification admin côté code (défense en profondeur)
+  await requireAdmin();
+  
+  const supabase = createClient();
+  
+  // Vérifier que l'utilisateur n'essaie pas de modifier son propre rôle
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.id === userId) {
+    throw new Error("Vous ne pouvez pas modifier votre propre rôle");
+  }
+
+  // Vérifier qu'on ne modifie pas un autre admin (protection)
+  const { data: targetUser } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+
+  if (targetUser?.role === "admin" && newRole !== "admin") {
+    // Protection : ne pas permettre de dégrader un autre admin
+    throw new Error("Vous ne pouvez pas modifier le rôle d'un autre administrateur");
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role: newRole })
+    .eq("id", userId);
+
+  if (error) {
+    throw new Error(`Erreur modification rôle: ${error.message}`);
+  }
 }
 

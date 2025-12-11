@@ -1,12 +1,11 @@
 "use client";
 
 import { Search, Car, HelpCircle } from "lucide-react";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import CarCard from "@/components/CarCard";
 import { useVehicules } from "@/hooks/useVehicules";
-import { VehicleType } from "@/lib/supabase/modelSpecs";
-import { getBrands, getModels } from "@/lib/supabase/modelSpecs";
+import { useModelData } from "@/hooks/useModelData";
 import { getSiteSettings } from "@/lib/supabase/settings";
 import { getActiveFAQ } from "@/lib/supabase/faq";
 import type { FAQItem } from "@/lib/supabase/faq";
@@ -21,84 +20,15 @@ export default function Home() {
   const [homeTitle, setHomeTitle] = useState<string>("Le sanctuaire du moteur thermique");
   const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
 
-  // Liste des marques selon le type de véhicule (depuis Supabase)
-  const [marques, setMarques] = useState<string[]>([]);
-  const [modeles, setModeles] = useState<string[]>([]);
-  const [loadingMarques, setLoadingMarques] = useState(false);
-  const [loadingModeles, setLoadingModeles] = useState(false);
-  const previousMarquesRef = useRef<string[]>([]); // Cache des marques précédentes
-
-  // Charger les marques au montage
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadBrands = async () => {
-      setLoadingMarques(true);
-      try {
-        const brands = await getBrands(typeVehicule);
-        if (isMounted) {
-          setMarques(brands);
-          previousMarquesRef.current = brands; // Sauvegarder dans le cache
-        }
-      } catch (error) {
-        console.error('Erreur chargement marques:', error);
-        // En cas d'erreur, garder les marques précédentes si disponibles
-        if (isMounted) {
-          if (previousMarquesRef.current.length > 0) {
-            console.warn("Erreur chargement marques, conservation des données précédentes");
-            setMarques(previousMarquesRef.current);
-          } else {
-            setMarques([]);
-          }
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingMarques(false);
-        }
-      }
-    };
-
-    loadBrands();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [typeVehicule]);
+  // Utiliser le hook robuste pour charger les marques et modèles
+  const { brands: marques, loadingBrands: loadingMarques, refetchModels, models: modeles, loadingModels: loadingModeles } = useModelData({ type: typeVehicule });
 
   // Charger les modèles quand la marque change
   useEffect(() => {
-    if (!selectedMarque) {
-      setModeles([]);
-      return;
+    if (selectedMarque) {
+      refetchModels(selectedMarque);
     }
-
-    let isMounted = true;
-    
-    const loadModels = async () => {
-      setLoadingModeles(true);
-      try {
-        const models = await getModels(typeVehicule, selectedMarque);
-        if (isMounted) {
-          setModeles(models);
-        }
-      } catch (error) {
-        console.error('Erreur chargement modèles:', error);
-        if (isMounted) {
-          setModeles([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingModeles(false);
-        }
-      }
-    };
-
-    loadModels();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [typeVehicule, selectedMarque]);
+  }, [selectedMarque, refetchModels]);
 
   // Options de budget prédéfinies
   const budgetOptions = [

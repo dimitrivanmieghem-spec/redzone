@@ -8,13 +8,24 @@ import { requireAdmin } from "./auth-utils";
 /**
  * Créer un nouveau véhicule
  * @param vehicule - Données du véhicule
- * @param userId - ID de l'utilisateur
+ * @param userId - ID de l'utilisateur (optionnel si invité)
+ * @param guestEmail - Email de l'invité (obligatoire si userId est null)
  * @returns ID du véhicule créé
  */
 export async function createVehicule(
-  vehicule: Omit<VehiculeInsert, "id" | "user_id" | "status" | "created_at">,
-  userId: string
+  vehicule: Omit<VehiculeInsert, "id" | "user_id" | "status" | "created_at" | "guest_email">,
+  userId: string | null = null,
+  guestEmail: string | null = null
 ): Promise<string> {
+  // Validation : soit userId soit guestEmail doit être présent
+  if (!userId && !guestEmail) {
+    throw new Error("userId ou guestEmail doit être fourni");
+  }
+
+  if (!userId && (!guestEmail || !guestEmail.includes('@'))) {
+    throw new Error("guestEmail doit être un email valide si userId n'est pas fourni");
+  }
+
   // Validation des données
   const validation = validateVehiculeData({
     marque: vehicule.marque,
@@ -40,12 +51,21 @@ export async function createVehicule(
 
   const supabase = createClient();
 
+  // Déterminer le statut selon le type d'utilisateur
+  // Pour les invités : pending_validation (exigé par la politique RLS)
+  // Pour les utilisateurs connectés : pending (en attente de validation admin)
+  const status = userId ? "pending" : "pending_validation";
+
   const { data, error } = await supabase
     .from("vehicules")
     .insert({
       ...sanitized,
-      user_id: userId,
-      status: "pending", // Toujours en attente par défaut
+      user_id: userId || null,
+      guest_email: guestEmail || null,
+      status: status,
+      // Pour les invités, stocker l'email de contact
+      email_contact: !userId ? guestEmail : null,
+      is_email_verified: false,
     })
     .select("id")
     .single();
@@ -234,5 +254,102 @@ export async function getVehiculesPaginated(
     data: (data as Vehicule[]) || [],
     total: count || 0,
   };
+}
+
+/**
+ * Vérifier le code de vérification email pour un véhicule invité
+ * @param vehiculeId - ID du véhicule
+ * @param code - Code de vérification à 6 chiffres
+ * @returns True si le code est valide
+ */
+export async function verifyEmailCode(
+  vehiculeId: string,
+  code: string
+): Promise<boolean> {
+  const supabase = createClient();
+
+  // Récupérer le véhicule
+  const { data: vehicule, error: fetchError } = await supabase
+    .from("vehicules")
+    .select("verification_code, verification_code_expires_at, is_email_verified")
+    .eq("id", vehiculeId)
+    .single();
+
+  if (fetchError || !vehicule) {
+    throw new Error("Véhicule introuvable");
+  }
+
+  // Vérifier si déjà vérifié
+  if (vehicule.is_email_verified) {
+    return true; // Déjà vérifié
+  }
+
+  // Vérifier si le code existe
+  if (!vehicule.verification_code) {
+    throw new Error("Aucun code de vérification trouvé");
+  }
+
+  // Vérifier l'expiration
+  if (vehicule.verification_code_expires_at) {
+    const expiresAt = new Date(vehicule.verification_code_expires_at);
+    if (expiresAt < new Date()) {
+      throw new Error("Code de vérification expiré");
+    }
+  }
+
+  // Importer la fonction de vérification
+  const { verifyCode } = await import("../emailVerification");
+  
+  // Vérifier le code
+  const isValid = verifyCode(code, vehicule.verification_code);
+
+  if (isValid) {
+    // Mettre à jour le statut : passer à pending_validation (visible par l'admin)
+    const { error: updateError } = await supabase
+      .from("vehicules")
+      .update({
+        is_email_verified: true,
+        status: "pending_validation",
+        verification_code: null, // Supprimer le code après vérification
+        verification_code_expires_at: null,
+      })
+      .eq("id", vehiculeId);
+
+    if (updateError) {
+      throw new Error(`Erreur mise à jour: ${updateError.message}`);
+    }
+  }
+
+  return isValid;
+}
+
+/**
+ * Stocker le code de vérification pour un véhicule
+ * @param vehiculeId - ID du véhicule
+ * @param code - Code de vérification (sera hashé)
+ * @param expiresAt - Date d'expiration
+ */
+export async function storeVerificationCode(
+  vehiculeId: string,
+  code: string,
+  expiresAt: Date
+): Promise<void> {
+  const supabase = createClient();
+
+  // Importer la fonction de hash
+  const { hashVerificationCode } = await import("../emailVerification");
+  const hashedCode = hashVerificationCode(code);
+
+  const { error } = await supabase
+    .from("vehicules")
+    .update({
+      verification_code: hashedCode,
+      verification_code_expires_at: expiresAt.toISOString(),
+    })
+    .eq("id", vehiculeId);
+
+  if (error) {
+    throw new Error(`Erreur stockage code: ${error.message}`);
+  }
 }
 

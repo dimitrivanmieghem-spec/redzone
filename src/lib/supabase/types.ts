@@ -28,7 +28,13 @@ export interface Database {
           image: string;
           images: string[] | null;
           description: string | null;
-          status: "pending" | "active" | "rejected";
+          status: "pending" | "active" | "rejected" | "waiting_email_verification" | "pending_validation";
+          
+          // Vérification email (pour invités)
+          email_contact: string | null; // Email de contact pour les invités
+          is_email_verified: boolean | null; // True si l'email a été vérifié
+          verification_code: string | null; // Code de vérification hashé
+          verification_code_expires_at: string | null; // Date d'expiration du code
           
           // Champs techniques
           architecture_moteur: string | null;
@@ -77,7 +83,11 @@ export interface Database {
           image: string;
           images?: string[] | null;
           description?: string | null;
-          status?: "pending" | "active" | "rejected";
+          status?: "pending" | "active" | "rejected" | "waiting_email_verification" | "pending_validation";
+          email_contact?: string | null;
+          is_email_verified?: boolean | null;
+          verification_code?: string | null;
+          verification_code_expires_at?: string | null;
           architecture_moteur?: string | null;
           admission?: string | null;
           zero_a_cent?: number | null;
@@ -116,7 +126,11 @@ export interface Database {
           image?: string;
           images?: string[] | null;
           description?: string | null;
-          status?: "pending" | "active" | "rejected";
+          status?: "pending" | "active" | "rejected" | "waiting_email_verification" | "pending_validation";
+          email_contact?: string | null;
+          is_email_verified?: boolean | null;
+          verification_code?: string | null;
+          verification_code_expires_at?: string | null;
           architecture_moteur?: string | null;
           admission?: string | null;
           zero_a_cent?: number | null;

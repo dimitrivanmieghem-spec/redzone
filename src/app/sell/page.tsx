@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Car, Bike, Check, AlertTriangle, ChevronRight, ChevronLeft, Upload, Music, Shield, Loader2, Building2, MapPin } from "lucide-react";
+import { ArrowLeft, Car, Bike, Check, AlertTriangle, ChevronRight, ChevronLeft, Upload, Music, Shield, Loader2, Building2, MapPin, Mail } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -11,11 +11,13 @@ import { VehicleType } from "@/lib/supabase/modelSpecs";
 import { getBrands, getModels, getModelSpecs } from "@/lib/supabase/modelSpecs";
 import { checkVehicleModeration, getModerationMessage } from "@/lib/moderationUtils";
 import { uploadImages, uploadAudio } from "@/lib/supabase/uploads";
-import { createVehicule } from "@/lib/supabase/vehicules";
+import { createVehicule, verifyEmailCode, storeVerificationCode } from "@/lib/supabase/vehicules";
 import { logInfo, logError } from "@/lib/supabase/logs";
 import { EXTERIOR_COLORS, INTERIOR_COLORS, CARROSSERIE_TYPES, EXTERIOR_COLOR_HEX, INTERIOR_COLOR_HEX } from "@/lib/vehicleData";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { generateVerificationCode, sendVerificationEmail, getVerificationCodeExpiry } from "@/lib/emailVerification";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 export default function SellPage() {
   const router = useRouter();
@@ -26,6 +28,12 @@ export default function SellPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  
+  // États pour la sécurité (CAPTCHA et vérification email)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [vehiculeIdForVerification, setVehiculeIdForVerification] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   
   // Refs pour les inputs file
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +121,12 @@ export default function SellPage() {
     };
   }, [formData.description]);
 
+  // État pour savoir si le CO2 doit être affiché (basé sur les specs)
+  const [hasCo2Data, setHasCo2Data] = useState<boolean>(false);
+  
+  // État pour gérer les erreurs de validation par champ
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   // Listes dynamiques depuis Supabase
   const [marques, setMarques] = useState<string[]>([]);
   const [modeles, setModeles] = useState<string[]>([]);
@@ -195,11 +209,42 @@ export default function SellPage() {
 
   // Pré-remplissage automatique quand un modèle est sélectionné
   useEffect(() => {
+    // Debug: Log les valeurs pour diagnostic
+    console.log('🔍 useEffect specs - Conditions:', {
+      type: formData.type,
+      marque: formData.marque,
+      modele: formData.modele,
+      isManualModel,
+      shouldFetch: !!(formData.type && formData.marque && formData.modele && !isManualModel)
+    });
+
     if (formData.type && formData.marque && formData.modele && !isManualModel) {
+      console.log('📡 Appel getModelSpecs:', {
+        type: formData.type,
+        brand: formData.marque,
+        model: formData.modele
+      });
+
       getModelSpecs(formData.type as VehicleType, formData.marque, formData.modele)
         .then((specs) => {
+          console.log('✅ Réponse getModelSpecs:', specs);
           if (specs) {
             const extractedArch = extractArchitecture(specs.moteur || "");
+            console.log('📝 Pré-remplissage des champs avec:', {
+              ch: specs.ch,
+              kw: specs.kw,
+              cv_fiscaux: specs.cv_fiscaux,
+              co2: specs.co2,
+              cylindree: specs.cylindree,
+              moteur: specs.moteur,
+              transmission: specs.transmission,
+              architecture: extractedArch
+            });
+            
+            // Mettre à jour l'état hasCo2Data basé sur les specs
+            const co2Exists = specs.co2 !== null && specs.co2 !== undefined;
+            setHasCo2Data(co2Exists);
+            
             setFormData((prev) => ({
               ...prev,
               // Pré-remplir seulement si les champs sont vides (permet de corriger)
@@ -213,13 +258,26 @@ export default function SellPage() {
               transmission: prev.transmission || specs.transmission.toLowerCase(),
               carrosserie: prev.carrosserie || specs.default_carrosserie || "",
             }));
+            console.log('✅ Champs pré-remplis avec succès');
+          } else {
+            console.warn('⚠️ getModelSpecs a retourné null - Aucune spec trouvée');
+            // Si pas de specs, on cache le champ CO2
+            setHasCo2Data(false);
           }
         })
         .catch((error) => {
-          console.error('Erreur récupération specs:', error);
+          console.error('❌ Erreur récupération specs:', error);
+          console.error('Détails erreur:', {
+            message: error.message,
+            code: error.code,
+            details: error
+          });
         });
     } else if (isManualModel) {
       // Si "Autre" est sélectionné, vider les champs techniques
+      console.log('🧹 Mode manuel activé - Vidage des champs techniques');
+      // Cacher le champ CO2 en mode manuel
+      setHasCo2Data(false);
       setFormData((prev) => ({
         ...prev,
         puissance: "",
@@ -278,28 +336,29 @@ export default function SellPage() {
       formData.cvFiscaux &&
       !isNaN(cvFiscauxNum) &&
       cvFiscauxNum > 0 &&
-      formData.co2 &&
-      !isNaN(co2Num) &&
-      co2Num >= 0 &&
+      // CO2 est optionnel : seulement requis si hasCo2Data est true
+      (!hasCo2Data || (formData.co2 && !isNaN(co2Num) && co2Num >= 0)) &&
       // Pour les modèles manuels, cylindrée et moteur sont obligatoires
       (!isManualModel || (formData.cylindree && !isNaN(cylindreeNum) && cylindreeNum > 0)) &&
       (!isManualModel || formData.moteur.trim()) &&
       formData.description.trim().length >= 20 && // Description min 20 caractères
       !descriptionCheck.hasError // Pas de mots interdits dans description
     );
-  }, [formData.prix, formData.annee, formData.km, formData.transmission, formData.puissance, formData.cvFiscaux, formData.co2, formData.cylindree, formData.moteur, formData.description, descriptionCheck.hasError, isManualModel]);
+  }, [formData.prix, formData.annee, formData.km, formData.transmission, formData.puissance, formData.cvFiscaux, formData.co2, formData.cylindree, formData.moteur, formData.description, descriptionCheck.hasError, isManualModel, hasCo2Data]);
 
   // Validation étape 3 : Au moins une photo obligatoire + coordonnées
   const isStep3Valid = useMemo(() => {
     const hasPhotos = formData.photos.length > 0;
+    // Email obligatoire si invité, sinon optionnel (utilisera user.email)
     const hasContactEmail = !!formData.contactEmail && formData.contactEmail.includes('@');
+    const emailRequired = !user; // Email obligatoire pour les invités
     const hasContactMethods = formData.contactMethods.length > 0;
     const needsPhone = formData.contactMethods.includes('whatsapp') || formData.contactMethods.includes('tel');
     const hasPhone = needsPhone ? !!formData.telephone && formData.telephone.length >= 10 : true;
     const hasLocation = !!formData.ville && !!formData.codePostal && formData.codePostal.length === 4;
     
-    return hasPhotos && hasContactEmail && hasContactMethods && hasPhone && hasLocation;
-  }, [formData.photos.length, formData.contactEmail, formData.contactMethods, formData.telephone, formData.ville, formData.codePostal]);
+    return hasPhotos && (!emailRequired || hasContactEmail) && hasContactMethods && hasPhone && hasLocation;
+  }, [formData.photos.length, formData.contactEmail, formData.contactMethods, formData.telephone, formData.ville, formData.codePostal, user]);
 
   // Navigation
   const handleNext = () => {
@@ -324,6 +383,39 @@ export default function SellPage() {
     }
   };
 
+  // Vérification du code email
+  const handleVerifyCode = async () => {
+    if (!vehiculeIdForVerification) {
+      showToast("Erreur : ID véhicule manquant", "error");
+      return;
+    }
+
+    if (!verificationCode || verificationCode.length !== 6) {
+      showToast("Veuillez entrer un code à 6 chiffres", "error");
+      return;
+    }
+
+    setIsVerifyingCode(true);
+
+    try {
+      const isValid = await verifyEmailCode(vehiculeIdForVerification, verificationCode);
+
+      if (isValid) {
+        showToast("Email vérifié avec succès ! Votre annonce est en attente de validation.", "success");
+        router.push("/sell/congrats");
+      } else {
+        showToast("Code incorrect. Veuillez réessayer.", "error");
+        setVerificationCode("");
+      }
+    } catch (error: any) {
+      console.error("Erreur vérification code:", error);
+      showToast(error?.message || "Erreur lors de la vérification", "error");
+      setVerificationCode("");
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
   // Soumission
   const handleSubmit = async () => {
     if (!moderationCheck.isAllowed) {
@@ -331,9 +423,15 @@ export default function SellPage() {
       return;
     }
 
-    if (!user) {
-      showToast("Vous devez être connecté pour publier une annonce", "error");
-      router.push("/login");
+    // Vérifier l'email pour les invités
+    if (!user && (!formData.contactEmail || !formData.contactEmail.includes('@'))) {
+      showToast("Veuillez renseigner un email de contact valide", "error");
+      return;
+    }
+
+    // Vérification CAPTCHA pour les invités
+    if (!user && !turnstileToken) {
+      showToast("Veuillez compléter la vérification anti-robot", "error");
       return;
     }
 
@@ -352,7 +450,13 @@ export default function SellPage() {
     setIsSubmitting(true); // Début du chargement
 
     try {
-      // Créer le véhicule dans Supabase
+      // Déterminer l'email de contact
+      const contactEmail = formData.contactEmail || user?.email || null;
+      if (!contactEmail) {
+        throw new Error("Email de contact requis");
+      }
+
+      // Créer le véhicule dans Supabase (mode hybride : user ou invité)
       const vehiculeId = await createVehicule({
         type: formData.type as "car" | "moto",
         marque: formData.marque,
@@ -383,42 +487,122 @@ export default function SellPage() {
         history: formData.history.length > 0 ? formData.history : null,
         is_manual_model: isManualModel, // Flag pour l'admin
         telephone: formData.telephone || null,
-        contact_email: formData.contactEmail || user.email || null,
+        contact_email: contactEmail,
         contact_methods: formData.contactMethods.length > 0 ? formData.contactMethods : null,
         ville: formData.ville || null,
         code_postal: formData.codePostal || null,
-      }, user.id);
+      }, user?.id || null, user ? null : contactEmail); // userId si connecté, sinon guestEmail
 
-      // Log de succès
-      await logInfo(
-        `Ad [${vehiculeId}] submitted successfully by User [${user.id}]`,
-        user.id,
-        {
-          vehicule_id: vehiculeId,
-          marque: formData.marque,
-          modele: isManualModel ? formData.modeleManuel : formData.modele,
-          prix: parseFloat(formData.prix),
-          is_manual_model: isManualModel,
-        }
-      );
-
-      // Si on est là, c'est que c'est bon
-      showToast("Annonce publiée ! En attente de validation par l'admin.", "success");
-      router.push("/sell/congrats");
+      // Log de succès (seulement si connecté)
+      if (user) {
+        await logInfo(
+          `Ad [${vehiculeId}] submitted successfully by User [${user.id}]`,
+          user.id,
+          {
+            vehicule_id: vehiculeId,
+            marque: formData.marque,
+            modele: isManualModel ? formData.modeleManuel : formData.modele,
+            prix: parseFloat(formData.prix),
+            is_manual_model: isManualModel,
+          }
+        );
+        
+        // Utilisateur connecté : redirection directe
+        showToast("Annonce publiée ! En attente de validation par l'admin.", "success");
+        router.push("/sell/congrats");
+      } else {
+        // Invité : générer et envoyer le code de vérification
+        const code = generateVerificationCode();
+        const expiresAt = getVerificationCodeExpiry();
+        
+        // Stocker le code hashé dans la base
+        await storeVerificationCode(vehiculeId, code, expiresAt);
+        
+        // Envoyer l'email (simulation pour l'instant)
+        await sendVerificationEmail(contactEmail, code, vehiculeId);
+        
+        // Log pour invité
+        await logInfo(
+          `Ad [${vehiculeId}] submitted by Guest [${contactEmail}], waiting email verification`,
+          undefined,
+          {
+            vehicule_id: vehiculeId,
+            marque: formData.marque,
+            modele: isManualModel ? formData.modeleManuel : formData.modele,
+            prix: parseFloat(formData.prix),
+            is_manual_model: isManualModel,
+            guest_email: contactEmail,
+          }
+        );
+        
+        // Passer à l'étape 4 : vérification email
+        setVehiculeIdForVerification(vehiculeId);
+        setCurrentStep(4);
+        showToast("Un email de vérification vous a été envoyé !", "success");
+      }
     } catch (error: any) {
       console.error("Erreur publication:", error);
       
-      // Log de l'erreur
-      await logError(
-        `Submission failed for User [${user.id}]: ${error?.message || error?.error_description || "Unknown error"}`,
-        user.id,
-        {
-          error_message: error?.message || error?.error_description || "Unknown error",
-          error_code: error?.code || null,
-          marque: formData.marque,
-          modele: isManualModel ? formData.modeleManuel : formData.modele,
-        }
-      );
+      // Parser l'erreur pour identifier le champ concerné
+      const errorMessage = error?.message || error?.error_description || "Erreur inconnue";
+      const errors: Record<string, string> = {};
+      
+      // Détecter les erreurs de validation spécifiques
+      if (errorMessage.includes("Car-Pass") || errorMessage.includes("car_pass_url")) {
+        errors.carPassUrl = "L'URL Car-Pass n'est pas valide. Le format attendu est : http://... ou https://...";
+      } else if (errorMessage.includes("email")) {
+        errors.contactEmail = "L'email de contact n'est pas valide";
+      } else if (errorMessage.includes("téléphone") || errorMessage.includes("telephone")) {
+        errors.telephone = "Le numéro de téléphone doit être au format belge (+32XXXXXXXXX)";
+      } else if (errorMessage.includes("marque")) {
+        errors.marque = "La marque n'est pas valide";
+      } else if (errorMessage.includes("modèle") || errorMessage.includes("modele")) {
+        errors.modele = "Le modèle n'est pas valide";
+      } else if (errorMessage.includes("prix")) {
+        errors.prix = "Le prix n'est pas valide";
+      } else if (errorMessage.includes("année") || errorMessage.includes("annee")) {
+        errors.annee = "L'année n'est pas valide";
+      } else if (errorMessage.includes("kilométrage") || errorMessage.includes("km")) {
+        errors.km = "Le kilométrage n'est pas valide";
+      } else if (errorMessage.includes("description")) {
+        errors.description = "La description n'est pas valide";
+      }
+      
+      // Si on a identifié des erreurs spécifiques, les afficher
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        
+        // Scroll vers le premier champ en erreur
+        const firstErrorField = Object.keys(errors)[0];
+        setTimeout(() => {
+          const element = document.querySelector(`[data-field="${firstErrorField}"]`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            // Focus sur l'input si possible
+            const input = element.querySelector("input, textarea");
+            if (input instanceof HTMLElement) {
+              input.focus();
+            }
+          }
+        }, 100);
+      } else {
+        // Erreur générique
+        showToast(errorMessage, "error");
+      }
+      
+      // Log de l'erreur (seulement si connecté)
+      if (user) {
+        await logError(
+          `Submission failed for User [${user.id}]: ${errorMessage}`,
+          user.id,
+          {
+            error_message: errorMessage,
+            error_code: error?.code || null,
+            marque: formData.marque,
+            modele: isManualModel ? formData.modeleManuel : formData.modele,
+          }
+        );
+      }
 
       showToast(
         error?.message || error?.error_description || "Erreur lors de la publication de l'annonce",
@@ -433,12 +617,12 @@ export default function SellPage() {
   // Upload Photos Réel
   const handlePhotoInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !user) return;
+    if (!files || files.length === 0) return;
 
     setIsUploadingPhotos(true);
     try {
       const fileArray = Array.from(files);
-      const uploadedUrls = await uploadImages(fileArray, user.id);
+      const uploadedUrls = await uploadImages(fileArray, user?.id || null);
       
       setFormData(prev => ({
         ...prev,
@@ -462,11 +646,11 @@ export default function SellPage() {
   // Upload Audio Réel
   const handleAudioInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     setIsUploadingAudio(true);
     try {
-      const audioUrl = await uploadAudio(file, user.id);
+      const audioUrl = await uploadAudio(file, user?.id || null);
       
       setFormData(prev => ({
         ...prev,
@@ -506,10 +690,12 @@ export default function SellPage() {
 
   // Réinitialiser marque/modèle si type change
   const handleTypeChange = (type: VehicleType) => {
+    setHasCo2Data(false); // Réinitialiser car on change de type
     setFormData({ ...formData, type, marque: "", modele: "" });
   };
 
   const handleMarqueChange = (marque: string) => {
+    setHasCo2Data(false); // Réinitialiser car on change de marque
     setFormData({ ...formData, marque, modele: "" });
   };
 
@@ -900,23 +1086,25 @@ export default function SellPage() {
                   />
                 </div>
 
-                {/* CO2 */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
-                    Émissions CO2 (g/km) *
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.co2}
-                    onChange={(e) =>
-                      setFormData({ ...formData, co2: e.target.value })
-                    }
-                    placeholder="Ex: 233"
-                    min="0"
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
-                  />
-                </div>
+                {/* CO2 - Affiché uniquement si les specs contiennent des données CO2 */}
+                {hasCo2Data && (
+                  <div>
+                    <label className="block text-sm font-bold text-slate-900 mb-3">
+                      Émissions CO2 (g/km) *
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={formData.co2}
+                      onChange={(e) =>
+                        setFormData({ ...formData, co2: e.target.value })
+                      }
+                      placeholder="Ex: 233"
+                      min="0"
+                      className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    />
+                  </div>
+                )}
 
                 {/* Cylindrée */}
                 <div>
@@ -1386,7 +1574,7 @@ export default function SellPage() {
                     <button
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
-                      disabled={isUploadingPhotos || !user}
+                      disabled={isUploadingPhotos}
                       className="w-full p-12 border-4 border-dashed border-red-400 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed bg-red-50/30"
                     >
                       {isUploadingPhotos ? (
@@ -1469,7 +1657,7 @@ export default function SellPage() {
                   <button
                     type="button"
                     onClick={() => audioInputRef.current?.click()}
-                    disabled={isUploadingAudio || !user}
+                    disabled={isUploadingAudio}
                     className="w-full p-8 border-4 border-dashed border-slate-300 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUploadingAudio ? (
@@ -1514,7 +1702,7 @@ export default function SellPage() {
               </div>
 
               {/* Car-Pass URL */}
-              <div>
+              <div data-field="carPassUrl">
                 <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
                   <Shield size={20} className="text-green-600" />
                   Lien Car-Pass (URL) <span className="text-xs font-normal text-slate-600">(Optionnel)</span>
@@ -1522,15 +1710,39 @@ export default function SellPage() {
                 <input
                   type="url"
                   value={formData.carPassUrl}
-                  onChange={(e) =>
-                    setFormData({ ...formData, carPassUrl: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setFormData({ ...formData, carPassUrl: e.target.value });
+                    // Effacer l'erreur quand l'utilisateur modifie le champ
+                    if (fieldErrors.carPassUrl) {
+                      setFieldErrors((prev) => {
+                        const newErrors = { ...prev };
+                        delete newErrors.carPassUrl;
+                        return newErrors;
+                      });
+                    }
+                  }}
                   placeholder="https://www.car-pass.be/..."
-                  className="w-full p-4 bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                  className={`w-full p-4 bg-white border-2 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium transition-all ${
+                    fieldErrors.carPassUrl
+                      ? "border-red-600 bg-red-50"
+                      : "border-slate-300"
+                  }`}
                 />
-                <p className="text-xs text-slate-600 mt-2">
-                  🔒 Plus sécurisé qu'un upload de fichier. Partagez le lien vers votre Car-Pass en ligne.
-                </p>
+                {fieldErrors.carPassUrl ? (
+                  <div className="mt-2 p-3 bg-red-50 border-2 border-red-600 rounded-xl">
+                    <p className="text-sm font-bold text-red-700 flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-red-600" />
+                      {fieldErrors.carPassUrl}
+                    </p>
+                    <p className="text-xs text-red-600 mt-2 ml-6">
+                      Format attendu : <code className="bg-red-100 px-2 py-1 rounded">https://www.car-pass.be/...</code> ou <code className="bg-red-100 px-2 py-1 rounded">http://www.car-pass.be/...</code>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600 mt-2">
+                    🔒 Plus sécurisé qu'un upload de fichier. Partagez le lien vers votre Car-Pass en ligne.
+                  </p>
+                )}
               </div>
 
               {/* Vos Coordonnées */}
@@ -1542,7 +1754,8 @@ export default function SellPage() {
                 {/* Email de contact */}
                 <div className="mb-6">
                   <label className="block text-sm font-bold text-slate-900 mb-3">
-                    Email de contact *
+                    Email de contact {!user && <span className="text-red-600">*</span>}
+                    {user && <span className="text-xs font-normal text-slate-600">(Optionnel - utilisera {user.email} par défaut)</span>}
                   </label>
                   <input
                     type="email"
@@ -1550,12 +1763,15 @@ export default function SellPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, contactEmail: e.target.value })
                     }
-                    placeholder="votre@email.be"
-                    required
+                    placeholder={user ? user.email : "votre@email.be"}
+                    required={!user}
                     className="w-full p-4 bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
                   />
                   <p className="text-xs text-slate-600 mt-2">
-                    Cet email sera visible par les acheteurs intéressés.
+                    {user 
+                      ? "Cet email sera visible par les acheteurs intéressés. Si vide, votre email de compte sera utilisé."
+                      : "⚠️ Email obligatoire pour les invités. Cet email sera visible par les acheteurs intéressés."
+                    }
                   </p>
                 </div>
 
@@ -1774,6 +1990,128 @@ export default function SellPage() {
                   ))}
                 </div>
               </div>
+
+              {/* CAPTCHA Turnstile - Uniquement pour les invités */}
+              {!user && (
+                <div className="mt-8 pt-8 border-t-2 border-slate-200">
+                  <label className="block text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <Shield size={20} className="text-red-600" />
+                    Vérification anti-robot <span className="text-red-600">*</span>
+                  </label>
+                  <div className="flex justify-center">
+                    <Turnstile
+                      siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"} // Clé de test par défaut
+                      onSuccess={(token) => {
+                        setTurnstileToken(token);
+                      }}
+                      onError={() => {
+                        setTurnstileToken(null);
+                        showToast("Erreur lors de la vérification anti-robot", "error");
+                      }}
+                      onExpire={() => {
+                        setTurnstileToken(null);
+                      }}
+                      options={{
+                        theme: "light",
+                        size: "normal",
+                      }}
+                    />
+                  </div>
+                  {!turnstileToken && (
+                    <p className="text-xs text-red-600 mt-3 text-center font-medium">
+                      ⚠️ Veuillez compléter la vérification anti-robot pour continuer
+                    </p>
+                  )}
+                  {turnstileToken && (
+                    <p className="text-xs text-green-600 mt-3 text-center font-medium flex items-center justify-center gap-2">
+                      <Check size={14} />
+                      Vérification réussie
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ÉTAPE 4 : Vérification Email (Uniquement pour les invités) */}
+          {currentStep === 4 && vehiculeIdForVerification && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight flex items-center gap-2">
+                  <Mail size={28} className="text-red-600" />
+                  Vérification de votre email
+                </h2>
+                <p className="text-slate-600 mb-6">
+                  Un code de vérification à 6 chiffres vous a été envoyé à <strong>{formData.contactEmail}</strong>
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-300 rounded-3xl p-8 shadow-xl">
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-full mb-4">
+                      <Mail size={40} className="text-white" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">
+                      Vérifiez votre boîte email
+                    </h3>
+                    <p className="text-slate-700">
+                      Entrez le code à 6 chiffres reçu par email pour confirmer votre annonce.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-900 mb-3">
+                      Code de vérification <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={verificationCode}
+                      onChange={(e) => {
+                        // Limiter à 6 chiffres
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setVerificationCode(value);
+                      }}
+                      placeholder="123456"
+                      maxLength={6}
+                      className="w-full p-6 text-center text-3xl font-black tracking-widest bg-white border-4 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900"
+                      autoFocus
+                    />
+                    <p className="text-xs text-slate-600 mt-3 text-center">
+                      {verificationCode.length}/6 chiffres
+                    </p>
+                  </div>
+
+                  <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4">
+                    <p className="text-sm text-amber-900 font-medium">
+                      ⚠️ <strong>Code expiré ?</strong> Le code est valide pendant 15 minutes. Si vous ne l'avez pas reçu, vérifiez vos spams ou contactez le support.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={isVerifyingCode || verificationCode.length !== 6}
+                    className={`w-full py-4 rounded-full font-black text-lg transition-all shadow-2xl ${
+                      isVerifyingCode || verificationCode.length !== 6
+                        ? "bg-slate-400 cursor-not-allowed text-white opacity-60"
+                        : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105 shadow-red-600/50 active:scale-95"
+                    }`}
+                  >
+                    {isVerifyingCode ? (
+                      <>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white inline-block mr-2" />
+                        Vérification...
+                      </>
+                    ) : (
+                      <>
+                        ✓ Vérifier le code
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1816,7 +2154,7 @@ export default function SellPage() {
                 Suivant
                 <ChevronRight size={24} />
               </button>
-            ) : (
+            ) : currentStep === 3 ? (
               <>
                 {/* Note BETA - Publication gratuite */}
                 <div className="w-full mb-4">
@@ -1831,13 +2169,27 @@ export default function SellPage() {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !moderationCheck.isAllowed || !isStep3Valid}
+                  disabled={
+                    isSubmitting || 
+                    !moderationCheck.isAllowed || 
+                    !isStep3Valid || 
+                    (!user && !turnstileToken) // CAPTCHA requis pour les invités
+                  }
                   className={`flex items-center gap-2 px-8 py-4 rounded-full font-black text-lg transition-all shadow-2xl ${
-                    isSubmitting || !moderationCheck.isAllowed || !isStep3Valid
+                    isSubmitting || 
+                    !moderationCheck.isAllowed || 
+                    !isStep3Valid || 
+                    (!user && !turnstileToken)
                       ? "bg-slate-400 cursor-not-allowed text-white opacity-60"
                       : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105 shadow-red-600/50 active:scale-95"
                   }`}
-                  title={!isStep3Valid ? "Une annonce de sportive doit avoir au moins une photo pour être validée." : ""}
+                  title={
+                    !isStep3Valid 
+                      ? "Une annonce de sportive doit avoir au moins une photo pour être validée." 
+                      : (!user && !turnstileToken)
+                      ? "Veuillez compléter la vérification anti-robot"
+                      : ""
+                  }
                 >
                 {isSubmitting ? (
                   <>
@@ -1851,7 +2203,7 @@ export default function SellPage() {
                 )}
               </button>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

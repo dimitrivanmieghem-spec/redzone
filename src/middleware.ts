@@ -28,7 +28,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Routes protégées nécessitant une authentification
-  const protectedRoutes = ["/dashboard", "/sell", "/favorites"];
+  // /sell est maintenant publique (mode hybride)
+  const protectedRoutes = ["/dashboard", "/favorites"];
 
   // Routes admin nécessitant le rôle admin
   const adminRoutes = ["/admin"];

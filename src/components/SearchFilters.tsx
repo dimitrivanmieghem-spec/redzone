@@ -1,8 +1,8 @@
 "use client";
 
 import { SlidersHorizontal, X, Check } from "lucide-react";
-import { useMemo, useState, useEffect, useRef } from "react";
-import { getBrands, getModels } from "@/lib/supabase/modelSpecs";
+import { useMemo, useState, useEffect } from "react";
+import { useAllModelData } from "@/hooks/useModelData";
 import { EXTERIOR_COLORS, INTERIOR_COLORS, CARROSSERIE_TYPES, EXTERIOR_COLOR_HEX } from "@/lib/vehicleData";
 
 export interface FiltersState {
@@ -72,64 +72,16 @@ export default function SearchFilters({
     );
   };
 
-  // États pour les marques et modèles depuis Supabase
-  const [marquesVoitures, setMarquesVoitures] = useState<string[]>([]);
-  const [marquesMotos, setMarquesMotos] = useState<string[]>([]);
+  // Utiliser le hook robuste pour charger les marques et modèles
+  const { brands: toutesMarques, loadingBrands: loadingMarques, loadModelsForBrand } = useAllModelData(true);
   const [modeles, setModeles] = useState<string[]>([]);
-  const [loadingMarques, setLoadingMarques] = useState(false);
   const [loadingModeles, setLoadingModeles] = useState(false);
-  const previousMarquesVoituresRef = useRef<string[]>([]);
-  const previousMarquesMotosRef = useRef<string[]>([]);
-
-  // Charger les marques au montage du composant
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadBrands = async () => {
-      setLoadingMarques(true);
-      try {
-        const [carBrands, motoBrands] = await Promise.all([
-          getBrands('car'),
-          getBrands('moto')
-        ]);
-        
-        if (isMounted) {
-          setMarquesVoitures(carBrands);
-          setMarquesMotos(motoBrands);
-          previousMarquesVoituresRef.current = carBrands;
-          previousMarquesMotosRef.current = motoBrands;
-        }
-      } catch (error) {
-        console.error('Erreur chargement marques:', error);
-        if (isMounted) {
-          // En cas d'erreur, garder les données précédentes si disponibles
-          if (previousMarquesVoituresRef.current.length > 0 || previousMarquesMotosRef.current.length > 0) {
-            console.warn("Erreur chargement marques, conservation des données précédentes");
-            setMarquesVoitures(previousMarquesVoituresRef.current);
-            setMarquesMotos(previousMarquesMotosRef.current);
-          } else {
-            setMarquesVoitures([]);
-            setMarquesMotos([]);
-          }
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingMarques(false);
-        }
-      }
-    };
-
-    loadBrands();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   // Charger les modèles quand la marque change
   useEffect(() => {
     if (!filters.marque) {
       setModeles([]);
+      setLoadingModeles(false);
       return;
     }
 
@@ -138,15 +90,8 @@ export default function SearchFilters({
     const loadModels = async () => {
       setLoadingModeles(true);
       try {
-        // Essayer d'abord les voitures, puis les motos
-        const [carModels, motoModels] = await Promise.all([
-          getModels('car', filters.marque),
-          getModels('moto', filters.marque)
-        ]);
-        
+        const models = await loadModelsForBrand(filters.marque);
         if (isMounted) {
-          // Priorité aux voitures, sinon motos
-          const models = carModels.length > 0 ? carModels : motoModels;
           setModeles(models);
         }
       } catch (error) {
@@ -166,14 +111,7 @@ export default function SearchFilters({
     return () => {
       isMounted = false;
     };
-  }, [filters.marque]);
-
-  // Toutes les marques (voitures + motos) - DÉDOUBLONNÉES
-  const toutesMarques = useMemo(() => {
-    const allMarques = [...marquesVoitures, ...marquesMotos];
-    // Dédoublonnage strict pour éviter les clés React dupliquées
-    return Array.from(new Set(allMarques)).sort();
-  }, [marquesVoitures, marquesMotos]);
+  }, [filters.marque, loadModelsForBrand]);
 
   const handleTagToggle = (key: keyof FiltersState, value: string) => {
     const currentValues = filters[key] as string[];

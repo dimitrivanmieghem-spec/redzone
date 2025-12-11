@@ -150,6 +150,7 @@ export default function CarCard({ car, vehicule, allVehicules = [] }: CarCardPro
               src={vehicle.image}
               alt={`${vehicle.marque || 'Véhicule'} ${vehicle.modele || ''}`}
               fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="object-cover group-hover:scale-110 transition-transform duration-500"
               onError={(e) => {
                 // Fallback si l'image ne charge pas

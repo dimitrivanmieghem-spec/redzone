@@ -186,6 +186,7 @@ export default function AdminCarsPage() {
                                 src={vehicule.image}
                                 alt={`${vehicule.marque} ${vehicule.modele}`}
                                 fill
+                                sizes="80px"
                                 className="object-cover"
                               />
                             </div>

@@ -9,16 +9,9 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
     }
   ],
   "categories": ["automotive", "shopping", "marketplace"],
@@ -31,15 +24,13 @@
       "name": "Vendre",
       "short_name": "Vendre",
       "description": "Vendre votre sportive",
-      "url": "/sell",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "url": "/sell"
     },
     {
       "name": "Rechercher",
       "short_name": "Rechercher",
       "description": "Rechercher une sportive",
-      "url": "/search",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "url": "/search"
     }
   ]
 }

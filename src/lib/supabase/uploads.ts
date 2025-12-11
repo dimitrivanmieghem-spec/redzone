@@ -5,15 +5,17 @@ import { createClient } from "./client";
 /**
  * Upload une image vers Supabase Storage
  * @param file - Fichier image
- * @param userId - ID de l'utilisateur
+ * @param userId - ID de l'utilisateur (optionnel pour les invités)
  * @returns URL publique de l'image
  */
-export async function uploadImage(file: File, userId: string): Promise<string> {
+export async function uploadImage(file: File, userId?: string | null): Promise<string> {
   const supabase = createClient();
 
   // Générer un nom unique
+  // Pour les invités, utiliser un UUID temporaire basé sur timestamp
+  const folderId = userId || `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const fileExt = file.name.split(".").pop();
-  const fileName = `${userId}/${Date.now()}.${fileExt}`;
+  const fileName = `${folderId}/${Date.now()}.${fileExt}`;
   const filePath = `images/${fileName}`;
 
   // Upload
@@ -25,6 +27,23 @@ export async function uploadImage(file: File, userId: string): Promise<string> {
     });
 
   if (error) {
+    // Log détaillé pour diagnostic
+    console.error('❌ [uploadImage] Erreur upload:', {
+      error: error.message,
+      name: error.name || 'N/A',
+      path: filePath,
+      userId: userId || 'guest',
+      bucket: 'files',
+      details: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    });
+    
+    // Détection spécifique des erreurs RLS
+    if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+      console.error('🔒 [uploadImage] BLOQUAGE RLS DÉTECTÉ');
+      console.error('   → Vérifiez que la politique "guest_upload_files" existe sur storage.objects');
+      console.error('   → Le path doit commencer par "images/guest_" ou "audio/guest_"');
+    }
+    
     throw new Error(`Erreur upload image: ${error.message}`);
   }
 
@@ -39,12 +58,12 @@ export async function uploadImage(file: File, userId: string): Promise<string> {
 /**
  * Upload plusieurs images
  * @param files - Liste de fichiers
- * @param userId - ID de l'utilisateur
+ * @param userId - ID de l'utilisateur (optionnel pour les invités)
  * @returns Liste des URLs
  */
 export async function uploadImages(
   files: File[],
-  userId: string
+  userId?: string | null
 ): Promise<string[]> {
   const uploads = files.map((file) => uploadImage(file, userId));
   return Promise.all(uploads);
@@ -53,14 +72,16 @@ export async function uploadImages(
 /**
  * Upload un fichier audio vers Supabase Storage
  * @param file - Fichier audio
- * @param userId - ID de l'utilisateur
+ * @param userId - ID de l'utilisateur (optionnel pour les invités)
  * @returns URL publique de l'audio
  */
-export async function uploadAudio(file: File, userId: string): Promise<string> {
+export async function uploadAudio(file: File, userId?: string | null): Promise<string> {
   const supabase = createClient();
 
+  // Pour les invités, utiliser un UUID temporaire basé sur timestamp
+  const folderId = userId || `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const fileExt = file.name.split(".").pop();
-  const fileName = `${userId}/${Date.now()}.${fileExt}`;
+  const fileName = `${folderId}/${Date.now()}.${fileExt}`;
   const filePath = `audio/${fileName}`;
 
   const { data, error } = await supabase.storage
@@ -71,6 +92,23 @@ export async function uploadAudio(file: File, userId: string): Promise<string> {
     });
 
   if (error) {
+    // Log détaillé pour diagnostic
+    console.error('❌ [uploadAudio] Erreur upload:', {
+      error: error.message,
+      name: error.name || 'N/A',
+      path: filePath,
+      userId: userId || 'guest',
+      bucket: 'files',
+      details: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    });
+    
+    // Détection spécifique des erreurs RLS
+    if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+      console.error('🔒 [uploadAudio] BLOQUAGE RLS DÉTECTÉ');
+      console.error('   → Vérifiez que la politique "guest_upload_files" existe sur storage.objects');
+      console.error('   → Le path doit commencer par "images/guest_" ou "audio/guest_"');
+    }
+    
     throw new Error(`Erreur upload audio: ${error.message}`);
   }
 

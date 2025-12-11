@@ -38,9 +38,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error,
         } = await supabase.auth.getUser();
 
+        // Gérer gracieusement les erreurs de session manquante (normal si non connecté)
         if (error) {
+          // Si c'est une erreur de session manquante, c'est normal (utilisateur non connecté)
+          if (
+            error.name === "AuthSessionMissingError" ||
+            error.message?.includes("session") ||
+            error.message?.includes("Auth session missing")
+          ) {
+            console.log("ℹ️ [AuthContext] Aucune session active (utilisateur non connecté)");
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+          // Pour les autres erreurs, on les log
           console.error("Erreur récupération utilisateur:", error);
           setUser(null);
+          setIsLoading(false);
           return;
         }
 
@@ -49,9 +63,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUser(null);
         }
-      } catch (error) {
-        console.error("Erreur chargement utilisateur:", error);
-        setUser(null);
+      } catch (error: any) {
+        // Gérer gracieusement les exceptions de session manquante
+        if (
+          error?.name === "AuthSessionMissingError" ||
+          error?.message?.includes("session") ||
+          error?.message?.includes("Auth session missing")
+        ) {
+          console.log("ℹ️ [AuthContext] Aucune session active (utilisateur non connecté)");
+          setUser(null);
+        } else {
+          console.error("Erreur chargement utilisateur:", error);
+          setUser(null);
+        }
       } finally {
         setIsLoading(false);
       }
