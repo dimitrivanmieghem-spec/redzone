@@ -16,6 +16,73 @@ BEGIN
   END IF;
 
   RAISE NOTICE '🚀 Début de l''enrichissement de la base de données...';
+  
+  -- Ajouter les colonnes manquantes si elles n'existent pas
+  -- 1. Vitesse maximale (km/h)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'model_specs_db' 
+      AND column_name = 'top_speed'
+  ) THEN
+    ALTER TABLE model_specs_db ADD COLUMN top_speed INTEGER;
+    RAISE NOTICE '✅ Colonne top_speed ajoutée';
+  END IF;
+
+  -- 2. Type de transmission (Drivetrain)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'model_specs_db' 
+      AND column_name = 'drivetrain'
+  ) THEN
+    ALTER TABLE model_specs_db ADD COLUMN drivetrain TEXT CHECK (drivetrain IN ('RWD', 'FWD', 'AWD', '4WD'));
+    RAISE NOTICE '✅ Colonne drivetrain ajoutée';
+  END IF;
+
+  -- 3. CO2 WLTP
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'model_specs_db' 
+      AND column_name = 'co2_wltp'
+  ) THEN
+    ALTER TABLE model_specs_db ADD COLUMN co2_wltp NUMERIC(6, 2);
+    RAISE NOTICE '✅ Colonne co2_wltp ajoutée';
+  END IF;
+
+  -- 4. Carrosserie par défaut
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'model_specs_db' 
+      AND column_name = 'default_carrosserie'
+  ) THEN
+    ALTER TABLE model_specs_db ADD COLUMN default_carrosserie TEXT;
+    RAISE NOTICE '✅ Colonne default_carrosserie ajoutée';
+  END IF;
+
+  -- 5. Couleur extérieure standard
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'model_specs_db' 
+      AND column_name = 'default_color'
+  ) THEN
+    ALTER TABLE model_specs_db ADD COLUMN default_color TEXT;
+    RAISE NOTICE '✅ Colonne default_color ajoutée';
+  END IF;
+
+  -- 6. Nombre de places standard
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'model_specs_db' 
+      AND column_name = 'default_seats'
+  ) THEN
+    ALTER TABLE model_specs_db ADD COLUMN default_seats INTEGER;
+    RAISE NOTICE '✅ Colonne default_seats ajoutée';
+  END IF;
 END $$;
 
 -- ========================================
