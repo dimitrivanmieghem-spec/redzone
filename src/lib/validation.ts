@@ -179,40 +179,51 @@ export function validateVehiculeData(data: {
   telephone?: string;
   contact_methods?: string[];
 }): VehiculeValidationResult {
+  // IMPORTANT: price, year, mileage sont OBLIGATOIRES pour éviter les données incomplètes
   const errors: string[] = [];
 
-  // Validation marque
-  if (data.marque) {
+  // Validation marque (obligatoire)
+  if (!data.marque || data.marque.trim().length === 0) {
+    errors.push("La marque est obligatoire");
+  } else {
     const sanitized = sanitizeString(data.marque, 100);
     if (sanitized.length < 2 || sanitized.length > 100) {
       errors.push("La marque doit contenir entre 2 et 100 caractères");
     }
   }
 
-  // Validation modèle
-  if (data.modele) {
+  // Validation modèle (obligatoire)
+  if (!data.modele || data.modele.trim().length === 0) {
+    errors.push("Le modèle est obligatoire");
+  } else {
     const sanitized = sanitizeString(data.modele, 100);
     if (sanitized.length < 1 || sanitized.length > 100) {
       errors.push("Le modèle doit contenir entre 1 et 100 caractères");
     }
   }
 
-  // Validation prix
-  if (data.prix !== undefined) {
+  // Validation prix (OBLIGATOIRE)
+  if (data.prix === undefined || data.prix === null || data.prix === "") {
+    errors.push("Le prix est obligatoire");
+  } else {
     if (!validatePositiveNumber(data.prix, 1, 10000000)) {
       errors.push("Le prix doit être un nombre positif entre 1 et 10.000.000 €");
     }
   }
 
-  // Validation année
-  if (data.annee !== undefined) {
+  // Validation année (OBLIGATOIRE)
+  if (data.annee === undefined || data.annee === null || data.annee === "") {
+    errors.push("L'année est obligatoire");
+  } else {
     if (!validateYear(data.annee)) {
       errors.push("L'année doit être entre 1900 et l'année prochaine");
     }
   }
 
-  // Validation kilométrage
-  if (data.km !== undefined) {
+  // Validation kilométrage (OBLIGATOIRE)
+  if (data.km === undefined || data.km === null || data.km === "") {
+    errors.push("Le kilométrage est obligatoire");
+  } else {
     if (!validatePositiveNumber(data.km, 0, 10000000)) {
       errors.push("Le kilométrage doit être un nombre positif entre 0 et 10.000.000 km");
     }

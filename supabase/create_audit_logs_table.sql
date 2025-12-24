@@ -94,13 +94,36 @@ CREATE POLICY "System can create audit logs"
 
 -- Fonction pour nettoyer les anciens logs (conformité RGPD)
 -- Les logs sont conservés 2 ans maximum (durée légale en Belgique)
+-- IMPORTANT: Cette fonction doit retourner TABLE(deleted_count BIGINT) pour être compatible
+-- avec cleanup_all_expired_data() dans cleanup_expired_data.sql
+-- Si la fonction existe déjà avec un type de retour différent, on la supprime d'abord
+DO $$
+BEGIN
+  -- Supprimer la fonction si elle existe avec un type de retour différent
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND p.proname = 'cleanup_old_audit_logs'
+    AND pg_get_function_result(p.oid) != 'TABLE(deleted_count bigint)'
+  ) THEN
+    DROP FUNCTION IF EXISTS cleanup_old_audit_logs();
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION cleanup_old_audit_logs()
-RETURNS void AS $$
+RETURNS TABLE(deleted_count BIGINT) AS $$
+DECLARE
+  deleted_count_var BIGINT;
 BEGIN
   DELETE FROM audit_logs
   WHERE created_at < NOW() - INTERVAL '2 years';
   
-  RAISE NOTICE 'Nettoyage des logs d''audit de plus de 2 ans effectué';
+  GET DIAGNOSTICS deleted_count_var = ROW_COUNT;
+  
+  RAISE NOTICE 'Nettoyage des logs d''audit : % enregistrements supprimés', deleted_count_var;
+  
+  RETURN QUERY SELECT deleted_count_var;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

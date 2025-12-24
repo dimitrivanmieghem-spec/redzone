@@ -63,11 +63,21 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
 
     if (error) {
       // Ne pas throw pour éviter les boucles infinies
-      console.error("[Audit] Erreur lors de l'écriture du log:", error);
+      // Si la table n'existe pas (PGRST116), afficher un message informatif
+      if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+        console.warn(
+          "[Audit] Table audit_logs n'existe pas. " +
+          "Veuillez exécuter le script SQL dans supabase/create_audit_logs_table.sql " +
+          "pour créer la table. Voir SETUP_AUDIT_LOGS.md pour les instructions."
+        );
+      } else {
+        console.error("[Audit] Erreur lors de l'écriture du log:", error);
+      }
     }
   } catch (error) {
-    // Fallback silencieux
-    console.error("[Audit] Erreur critique lors du logging:", error);
+    // Fallback silencieux pour éviter les crashes
+    // Les erreurs de table manquante sont normales si la table n'a pas encore été créée
+    console.warn("[Audit] Erreur lors du logging (table peut-être absente):", error);
   }
 }
 

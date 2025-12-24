@@ -95,15 +95,36 @@ export function useVehicules(filters?: {
         // Utiliser directement les données avec colonnes anglaises (pas de mapping)
         // S'assurer que les valeurs numériques sont bien des nombres
         const dataArray = Array.isArray(data) ? data : [];
-        const newVehicules = (dataArray.map((v: any) => ({
-          ...v,
-          price: parseNumber(v.price),
-          year: parseNumber(v.year),
-          mileage: parseNumber(v.mileage),
-          power_hp: parseNumber(v.power_hp),
-          fiscal_horsepower: parseNumber(v.fiscal_horsepower),
-          seats_count: parseNumber(v.seats_count),
-        })) as Vehicule[]);
+        const newVehicules = (dataArray
+          .map((v: any) => ({
+            ...v,
+            price: parseNumber(v.price),
+            year: parseNumber(v.year),
+            mileage: parseNumber(v.mileage),
+            power_hp: parseNumber(v.power_hp),
+            fiscal_horsepower: parseNumber(v.fiscal_horsepower),
+            seats_count: parseNumber(v.seats_count),
+          }))
+          // Filtrer les véhicules avec données incomplètes (price, year, mileage obligatoires)
+          .filter((v: any) => {
+            const hasRequiredData = 
+              v.price !== null && 
+              v.year !== null && 
+              v.mileage !== null &&
+              !isNaN(v.price) &&
+              !isNaN(v.year) &&
+              !isNaN(v.mileage);
+            
+            if (!hasRequiredData) {
+              console.warn('Véhicule filtré (données incomplètes):', v.id, {
+                price: v.price,
+                year: v.year,
+                mileage: v.mileage,
+              });
+            }
+            
+            return hasRequiredData;
+          }) as Vehicule[]);
         setVehicules(newVehicules);
         previousDataRef.current = newVehicules; // Sauvegarder les données réussies
       } catch (err) {
@@ -132,17 +153,21 @@ export function useVehicules(filters?: {
       }
     }
 
-    // Timeout de sécurité : forcer isLoading à false après 15 secondes (réduit pour éviter les blocages)
+    // Timeout de sécurité : forcer isLoading à false après 20 secondes
+    // Augmenté pour permettre aux connexions lentes de se terminer
     const timeoutId = setTimeout(() => {
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
-        console.warn("Timeout de chargement des véhicules - arrêt de la requête");
+        // Ne pas afficher de warning si on a déjà des données précédentes
+        if (previousDataRef.current.length === 0) {
+          console.warn("Timeout de chargement des véhicules - arrêt de la requête");
+        }
         abortControllerRef.current.abort();
         setIsLoading(false);
         if (previousDataRef.current.length === 0) {
           setError("Le chargement prend trop de temps. Veuillez réessayer.");
         }
       }
-    }, 15000); // 15 secondes (réduit de 30s)
+    }, 20000); // 20 secondes (augmenté pour connexions lentes)
 
     fetchVehicules();
 

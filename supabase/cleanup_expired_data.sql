@@ -8,12 +8,25 @@
 -- ========================================
 -- 1. NETTOYER LES LOGS D'AUDIT DE PLUS DE 2 ANS
 -- ========================================
+-- IMPORTANT: Cette fonction nécessite que la table audit_logs existe
+-- Exécutez d'abord create_audit_logs_table.sql si la table n'existe pas
 
 CREATE OR REPLACE FUNCTION cleanup_old_audit_logs()
 RETURNS TABLE(deleted_count BIGINT) AS $$
 DECLARE
   deleted_count_var BIGINT;
 BEGIN
+  -- Vérifier que la table existe
+  IF NOT EXISTS (
+    SELECT FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'audit_logs'
+  ) THEN
+    RAISE WARNING 'Table audit_logs n''existe pas. Exécutez d''abord create_audit_logs_table.sql';
+    RETURN QUERY SELECT 0::BIGINT;
+    RETURN;
+  END IF;
+
   DELETE FROM audit_logs
   WHERE created_at < NOW() - INTERVAL '2 years';
   
