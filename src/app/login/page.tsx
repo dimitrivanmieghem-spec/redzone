@@ -89,7 +89,7 @@ function LoginContent() {
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error("La connexion prend trop de temps. Vérifiez votre connexion et réessayez."));
-          }, 5000); // 5 secondes max
+          }, 10000); // 10 secondes max (augmenté pour connexions lentes)
         });
 
         try {

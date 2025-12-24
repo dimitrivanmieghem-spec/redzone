@@ -98,6 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Démarrer le monitoring de connexion (côté client uniquement)
+    // DÉSACTIVÉ TEMPORAIREMENT : peut causer des conflits avec les requêtes de login
+    // TODO: Réactiver une fois les problèmes de timeout résolus
+    /*
     if (typeof window !== "undefined") {
       import("@/lib/supabase/connection-monitor").then(({ startConnectionMonitoring }) => {
         startConnectionMonitoring();
@@ -105,13 +108,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn("Impossible de démarrer le monitoring de connexion:", err);
       });
     }
+    */
 
     return () => {
       subscription.unsubscribe();
+      // DÉSACTIVÉ TEMPORAIREMENT : voir commentaire ci-dessus
+      /*
       if (typeof window !== "undefined") {
         const { stopConnectionMonitoring } = require("@/lib/supabase/connection-monitor");
         stopConnectionMonitoring();
       }
+      */
     };
   }, [supabase.auth]);
 

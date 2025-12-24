@@ -18,10 +18,11 @@ export async function checkConnectionHealth(): Promise<boolean> {
     const supabase = createClient();
     
     // Faire une requête simple pour vérifier la connexion
+    // Timeout augmenté à 8 secondes pour éviter les faux positifs
     const queryResult = await Promise.race([
       supabase.from("profiles").select("id").limit(1),
       new Promise<{ error: any }>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout")), 5000);
+        setTimeout(() => reject(new Error("Timeout")), 8000);
       }),
     ]) as any;
     
