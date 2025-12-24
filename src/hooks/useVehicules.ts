@@ -125,10 +125,23 @@ export function useVehicules(filters?: {
       }
     }
 
+    // Timeout de sécurité : forcer isLoading à false après 30 secondes
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        console.warn("Timeout de chargement des véhicules - arrêt de la requête");
+        abortControllerRef.current.abort();
+        setIsLoading(false);
+        if (previousDataRef.current.length === 0) {
+          setError("Le chargement prend trop de temps. Veuillez réessayer.");
+        }
+      }
+    }, 30000); // 30 secondes
+
     fetchVehicules();
 
     // Cleanup: annuler la requête si le composant est démonté ou si les dépendances changent
     return () => {
+      clearTimeout(timeoutId);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

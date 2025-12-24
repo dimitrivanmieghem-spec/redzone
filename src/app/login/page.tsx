@@ -94,7 +94,7 @@ function LoginContent() {
       showToast("Connexion réussie !", "success");
 
       // Attendre un peu pour que les cookies soient bien mis à jour et que les contextes soient initialisés
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Utiliser router.push au lieu de window.location.assign pour éviter les problèmes avec les extensions
       // et permettre une navigation plus fluide avec Next.js
@@ -102,15 +102,24 @@ function LoginContent() {
       
       // Valider que l'URL de redirection est sécurisée (commence par /)
       if (redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")) {
-        // Utiliser router.push pour une navigation Next.js native
-        router.push(redirectUrl);
-        // Forcer un refresh pour s'assurer que la session est bien chargée
-        router.refresh();
+        try {
+          // Utiliser router.push pour une navigation Next.js native
+          await router.push(redirectUrl);
+          // Forcer un refresh après un court délai pour s'assurer que la session est bien chargée
+          setTimeout(() => {
+            router.refresh();
+          }, 100);
+        } catch (navError) {
+          console.error("Erreur navigation:", navError);
+          // En cas d'erreur, rediriger vers le dashboard
+          router.push("/dashboard");
+        }
       } else {
         // En cas d'URL invalide, rediriger vers le dashboard par défaut
         router.push("/dashboard");
-        router.refresh();
       }
+      
+      setIsLoading(false);
     } catch (error: any) {
       console.error("Erreur de connexion:", error);
       const errorMessage = error?.message || "Erreur de connexion";

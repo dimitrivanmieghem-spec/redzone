@@ -44,6 +44,7 @@ import {
   Edit,
   BarChart3,
   Filter,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
@@ -57,6 +58,9 @@ import { logInfo, logError } from "@/lib/supabase/logs";
 import { getAllUsers, getUserWithVehicles, getUserVehicles, type UserProfile, type UserWithVehicles } from "@/lib/supabase/users";
 import { banUser, unbanUser, deleteUser } from "@/lib/supabase/server-actions/users";
 import { getVehiculesPaginated, deleteVehicule, getVehiculeById } from "@/lib/supabase/vehicules";
+import { createAdminConversation } from "@/app/actions/admin-messages";
+import { getOrCreateConversation } from "@/lib/supabase/conversations";
+import { sendMessageWithNotification } from "@/app/actions/messages";
 import { getPendingComments, CommentWithAuthor } from "@/lib/supabase/comments";
 import { approveComment, rejectComment } from "@/lib/supabase/server-actions/comments";
 import { getTickets, resolveTicket, deleteTicket, reassignTicket, closeTicket, setTicketInProgress, addAdminReply } from "@/app/actions/tickets";
@@ -1442,13 +1446,17 @@ function ModerationTab({ user }: { user: any }) {
 
 // Composant Vehicles Tab (simplifié - intégration du code existant)
 function VehiclesTab({ user }: { user: any }) {
+  const router = useRouter();
   const { showToast } = useToast();
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
+  const [owners, setOwners] = useState<Map<string, UserProfile>>(new Map());
   const [isLoadingVehicules, setIsLoadingVehicules] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(20);
   const [statusFilter, setStatusFilter] = useState<"pending" | "active" | "rejected" | "all">("all");
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [contactingIds, setContactingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadVehicules = async () => {
@@ -1459,6 +1467,27 @@ function VehiclesTab({ user }: { user: any }) {
           const result = await getVehiculesPaginated(currentPage, pageSize, filters);
           setVehicules(result.data);
           setTotal(result.total);
+
+          // Charger les profils des propriétaires
+          const ownerIds = result.data
+            .map(v => v.owner_id)
+            .filter((id): id is string => id !== null && id !== undefined);
+          
+          if (ownerIds.length > 0) {
+            const supabase = createClient();
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("id, email, full_name, avatar_url")
+              .in("id", ownerIds);
+            
+            if (profiles) {
+              const ownersMap = new Map<string, UserProfile>();
+              profiles.forEach(profile => {
+                ownersMap.set(profile.id, profile as UserProfile);
+              });
+              setOwners(ownersMap);
+            }
+          }
         } catch (error) {
           console.error("Erreur chargement véhicules:", error);
           showToast("Erreur lors du chargement des véhicules", "error");
@@ -1469,6 +1498,64 @@ function VehiclesTab({ user }: { user: any }) {
     };
     loadVehicules();
   }, [user, currentPage, statusFilter, pageSize, showToast]);
+
+  const handleDelete = async (vehiculeId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.")) {
+      return;
+    }
+
+    setDeletingIds(prev => new Set(prev).add(vehiculeId));
+    try {
+      await deleteVehicule(vehiculeId);
+      setVehicules(prev => prev.filter(v => v.id !== vehiculeId));
+      showToast("Annonce supprimée avec succès", "success");
+    } catch (error) {
+      console.error("Erreur suppression:", error);
+      showToast("Erreur lors de la suppression", "error");
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.delete(vehiculeId);
+        return next;
+      });
+    }
+  };
+
+  const handleContact = async (vehicule: Vehicule) => {
+    if (!vehicule.owner_id) {
+      showToast("Cette annonce n'a pas de propriétaire (invité)", "error");
+      return;
+    }
+
+    setContactingIds(prev => new Set(prev).add(vehicule.id));
+    try {
+      const senderRole = user.role === "admin" ? "Administrateur" : "Modérateur";
+      const vehicleName = `${vehicule.brand || ''} ${vehicule.model || ''}`.trim() || "ce véhicule";
+      const initialMessage = `Bonjour,\n\nJe vous contacte en tant que ${senderRole} de RedZone concernant votre annonce "${vehicleName}".\n\nComment pouvons-nous vous aider ?\n\nCordialement,\nL'équipe RedZone`;
+
+      const result = await createAdminConversation(
+        vehicule.id,
+        vehicule.owner_id,
+        initialMessage
+      );
+
+      if (result.success && result.conversationId) {
+        showToast("Conversation créée avec notification envoyée", "success");
+        router.push(`/dashboard?tab=messages&conversation=${result.conversationId}`);
+      } else {
+        showToast(result.error || "Erreur lors de la création de la conversation", "error");
+      }
+    } catch (error) {
+      console.error("Erreur contact:", error);
+      showToast("Erreur lors du contact", "error");
+    } finally {
+      setContactingIds(prev => {
+        const next = new Set(prev);
+        next.delete(vehicule.id);
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -1503,40 +1590,119 @@ function VehiclesTab({ user }: { user: any }) {
           </div>
         ) : (
           <div className="space-y-4">
-            {vehicules.map((vehicule) => (
-              <div key={vehicule.id} className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-                <div className="flex items-center gap-6">
-                  <div className="w-20 h-16 bg-slate-200 rounded-xl overflow-hidden relative">
-                    <Image
-                      src={vehicule.image}
-                      alt={`${vehicule.brand || 'Véhicule'} ${vehicule.model || ''}`}
-                      fill
-                      sizes="80px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-slate-900">
-                      {vehicule.brand || 'N/A'} {vehicule.model || ''}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {vehicule.year || "N/A"} • {vehicule.mileage ? vehicule.mileage.toLocaleString("fr-BE") : "N/A"} km
-            </p>
-          </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-slate-900">
-                      {vehicule.price ? vehicule.price.toLocaleString("fr-BE") : "N/A"} €
-                    </p>
-        </div>
-                  <Link
-                    href={`/cars/${vehicule.id}`}
-                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded-xl transition-all"
-                  >
-                    Voir
-                  </Link>
-                </div>
+            {vehicules.length === 0 ? (
+              <div className="text-center py-12">
+                <Car className="mx-auto text-slate-300 mb-4" size={48} />
+                <p className="text-slate-600 font-medium">Aucun véhicule trouvé</p>
               </div>
-            ))}
+            ) : (
+              vehicules.map((vehicule) => {
+                const owner = vehicule.owner_id ? owners.get(vehicule.owner_id) : null;
+                const isDeleting = deletingIds.has(vehicule.id);
+                const isContacting = contactingIds.has(vehicule.id);
+
+                return (
+                  <div key={vehicule.id} className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+                    <div className="flex items-start gap-6">
+                      <div className="w-20 h-16 bg-slate-200 rounded-xl overflow-hidden relative flex-shrink-0">
+                        <Image
+                          src={vehicule.image}
+                          alt={`${vehicule.brand || 'Véhicule'} ${vehicule.model || ''}`}
+                          fill
+                          sizes="80px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-900 truncate">
+                              {vehicule.brand || 'N/A'} {vehicule.model || ''}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {vehicule.year || "N/A"} • {vehicule.mileage ? vehicule.mileage.toLocaleString("fr-BE") : "N/A"} km
+                            </p>
+                            {owner && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <User size={14} className="text-slate-400" />
+                                <span className="text-xs text-slate-600">
+                                  {owner.full_name || owner.email || "Propriétaire inconnu"}
+                                </span>
+                              </div>
+                            )}
+                            {!vehicule.owner_id && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <Mail size={14} className="text-slate-400" />
+                                <span className="text-xs text-slate-600">
+                                  Invité {vehicule.guest_email ? `(${vehicule.guest_email})` : ""}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-bold text-slate-900">
+                              {vehicule.price ? vehicule.price.toLocaleString("fr-BE") : "N/A"} €
+                            </p>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                              vehicule.status === "active" ? "bg-green-100 text-green-700" :
+                              vehicule.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                              "bg-red-100 text-red-700"
+                            }`}>
+                              {vehicule.status === "active" ? "Actif" : vehicule.status === "pending" ? "En attente" : "Rejeté"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-4">
+                          <Link
+                            href={`/cars/${vehicule.id}`}
+                            className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-900 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                          >
+                            <Eye size={14} />
+                            Voir
+                          </Link>
+                          {vehicule.owner_id && (
+                            <button
+                              onClick={() => handleContact(vehicule)}
+                              disabled={isContacting}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                            >
+                              {isContacting ? (
+                                <>
+                                  <Loader2 size={14} className="animate-spin" />
+                                  Contact...
+                                </>
+                              ) : (
+                                <>
+                                  <MessageSquare size={14} />
+                                  Contacter
+                                </>
+                              )}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(vehicule.id)}
+                            disabled={isDeleting}
+                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                          >
+                            {isDeleting ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                Suppression...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 size={14} />
+                                Supprimer
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
