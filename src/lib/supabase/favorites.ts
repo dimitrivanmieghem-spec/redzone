@@ -114,7 +114,7 @@ export async function getUserFavorites(): Promise<string[]> {
       return [];
     }
 
-    return data.map((f) => f.vehicle_id);
+    return data.map((f: any) => f.vehicle_id);
   } catch (error) {
     return [];
   }
@@ -157,7 +157,7 @@ export async function migrateFavoritesFromLocalStorage(): Promise<{ success: boo
       .eq("user_id", user.id)
       .in("vehicle_id", favoriteIds);
 
-    const existingIds = new Set(existingFavorites?.map((f) => f.vehicle_id) || []);
+    const existingIds = new Set(existingFavorites?.map((f: any) => f.vehicle_id) || []);
     const newFavorites = favoriteIds.filter((id) => !existingIds.has(id));
 
     if (newFavorites.length === 0) {

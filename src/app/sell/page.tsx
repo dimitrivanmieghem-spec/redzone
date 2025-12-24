@@ -298,8 +298,14 @@ function SellPageContent() {
         setLoadingBrands(true);
         setErrorBrands(null);
         
-        // Utiliser getBrands qui utilise déjà le client browser
-        const brands = await getBrands(formData.type as VehicleType);
+        // Ajouter un timeout pour éviter les blocages
+        const brandsPromise = getBrands(formData.type as VehicleType);
+        const timeoutPromise = new Promise<string[]>((_, reject) => {
+          setTimeout(() => reject(new Error("Timeout: Le chargement des marques prend trop de temps")), 12000);
+        });
+        
+        // Utiliser getBrands qui utilise déjà le client browser avec timeout
+        const brands = await Promise.race([brandsPromise, timeoutPromise]);
         
         if (brands.length === 0) {
           setErrorBrands("Impossible de charger les marques. Réessayez.");
@@ -310,9 +316,12 @@ function SellPageContent() {
         }
       } catch (error: any) {
         console.error('❌ [Sell] Erreur chargement marques:', error);
-        setErrorBrands("Impossible de charger les marques. Réessayez.");
+        const errorMessage = error?.message?.includes("Timeout") 
+          ? "Le chargement prend trop de temps. Vérifiez votre connexion."
+          : "Impossible de charger les marques. Réessayez.";
+        setErrorBrands(errorMessage);
         setMarques([]);
-        showToast("Erreur lors du chargement des marques. Veuillez réessayer.", "error");
+        showToast(errorMessage, "error");
       } finally {
         setLoadingBrands(false);
       }
@@ -332,7 +341,13 @@ function SellPageContent() {
     setLoadingModels(true);
     setErrorModels(null);
     
-    getModels(formData.type as VehicleType, formData.marque)
+    // Ajouter un timeout pour éviter les blocages
+    const modelsPromise = getModels(formData.type as VehicleType, formData.marque);
+    const timeoutPromise = new Promise<string[]>((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout: Le chargement des modèles prend trop de temps")), 12000);
+    });
+    
+    Promise.race([modelsPromise, timeoutPromise])
       .then((models) => {
         if (models.length === 0) {
           setErrorModels("Aucun modèle trouvé pour cette marque");
@@ -343,9 +358,12 @@ function SellPageContent() {
       })
       .catch((error) => {
         console.error('❌ [Sell] Erreur chargement modèles:', error);
-        setErrorModels("Impossible de charger les modèles. Réessayez.");
+        const errorMessage = error?.message?.includes("Timeout")
+          ? "Le chargement prend trop de temps. Vérifiez votre connexion."
+          : "Impossible de charger les modèles. Réessayez.";
+        setErrorModels(errorMessage);
         setModeles([]);
-        showToast("Erreur lors du chargement des modèles.", "error");
+        showToast(errorMessage, "error");
       })
       .finally(() => {
         setLoadingModels(false);

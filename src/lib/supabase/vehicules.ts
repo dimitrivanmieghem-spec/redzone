@@ -243,7 +243,7 @@ export async function getVehicules(filters?: {
 
   // Utiliser directement les colonnes anglaises (pas de mapping)
   // S'assurer que les valeurs numériques sont bien des nombres
-  return ((data || []).map(v => ({
+  return ((data || []).map((v: any) => ({
     ...v,
     price: parseNumber(v.price),
     year: parseNumber(v.year),
@@ -376,7 +376,7 @@ export async function getVehiculesPaginated(
 
   // Convertir les colonnes anglaises en français pour le type TypeScript
   return {
-    data: ((data || []).map(v => ({
+    data: ((data || []).map((v: any) => ({
       ...v,
       price: parseNumber(v.price),
       year: parseNumber(v.year),

@@ -75,7 +75,13 @@ export function useVehicules(filters?: {
           query = query.lte("price", filters.prixMax);
         }
 
-        const { data, error: fetchError } = await query;
+        // Utiliser retry pour les requêtes réseau
+        const { supabaseQueryWithRetry } = await import("@/lib/supabase/retry-utils");
+        const result = await supabaseQueryWithRetry(
+          () => query,
+          { maxRetries: 2, initialDelay: 1000 }
+        );
+        const { data, error: fetchError } = result;
 
         // Vérifier si la requête a été annulée
         if (abortController.signal.aborted) {
@@ -88,7 +94,8 @@ export function useVehicules(filters?: {
 
         // Utiliser directement les données avec colonnes anglaises (pas de mapping)
         // S'assurer que les valeurs numériques sont bien des nombres
-        const newVehicules = ((data || []).map(v => ({
+        const dataArray = Array.isArray(data) ? data : [];
+        const newVehicules = (dataArray.map((v: any) => ({
           ...v,
           price: parseNumber(v.price),
           year: parseNumber(v.year),
@@ -96,7 +103,7 @@ export function useVehicules(filters?: {
           power_hp: parseNumber(v.power_hp),
           fiscal_horsepower: parseNumber(v.fiscal_horsepower),
           seats_count: parseNumber(v.seats_count),
-        })) as Vehicule[]) || [];
+        })) as Vehicule[]);
         setVehicules(newVehicules);
         previousDataRef.current = newVehicules; // Sauvegarder les données réussies
       } catch (err) {
@@ -125,7 +132,7 @@ export function useVehicules(filters?: {
       }
     }
 
-    // Timeout de sécurité : forcer isLoading à false après 30 secondes
+    // Timeout de sécurité : forcer isLoading à false après 15 secondes (réduit pour éviter les blocages)
     const timeoutId = setTimeout(() => {
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         console.warn("Timeout de chargement des véhicules - arrêt de la requête");
@@ -135,7 +142,7 @@ export function useVehicules(filters?: {
           setError("Le chargement prend trop de temps. Veuillez réessayer.");
         }
       }
-    }, 30000); // 30 secondes
+    }, 15000); // 15 secondes (réduit de 30s)
 
     fetchVehicules();
 

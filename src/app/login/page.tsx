@@ -55,10 +55,18 @@ function LoginContent() {
     try {
       const supabase = createClient();
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Ajouter un timeout pour éviter les blocages
+      const loginPromise = supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
+
+      // Timeout de 15 secondes pour la connexion
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("La connexion prend trop de temps. Veuillez réessayer.")), 15000);
+      });
+
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
 
       if (error) {
         // Logger la tentative de connexion échouée

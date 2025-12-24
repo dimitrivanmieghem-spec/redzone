@@ -61,7 +61,7 @@ export async function getPublicProfiles(userIds: string[]): Promise<Map<string, 
   }
 
   const profilesMap = new Map<string, PublicProfile>();
-  data.forEach((profile) => {
+  data.forEach((profile: any) => {
     profilesMap.set(profile.id, profile as PublicProfile);
   });
 

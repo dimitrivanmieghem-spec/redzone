@@ -58,20 +58,23 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
     }
 
     // Récupérer les profils des expéditeurs séparément
-    const senderIds = [...new Set(messages.map(m => m.sender_id))];
+    const senderIds = [...new Set(messages.map((m: any) => m.sender_id))];
     const { data: profiles } = await supabase
       .from("profiles")
       .select("id, full_name, avatar_url")
       .in("id", senderIds);
 
     // Créer un map pour accès rapide
-    const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
+    const profilesMap = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
 
     // Combiner les données
-    return messages.map(msg => ({
-      ...msg,
-      sender: profilesMap.get(msg.sender_id),
-    })) as Message[];
+    return messages.map((msg: any) => {
+      const profile = profilesMap.get(msg.sender_id);
+      return {
+        ...msg,
+        sender: profile,
+      };
+    }) as Message[];
   } catch (error) {
     console.error("Erreur getMessages:", error);
     return [];

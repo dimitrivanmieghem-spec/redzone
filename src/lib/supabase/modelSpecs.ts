@@ -79,45 +79,48 @@ export async function getBrands(type: VehicleType = 'car', retries = 2): Promise
   
   const supabase = createClient();
   
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      
-      const { data, error } = await supabase
-        .from(table)
-        .select('marque')
-        .eq('type', type)
-        .eq('is_active', true);
-
-      if (error) {
-        logError(context, table, operation, error, { type, attempt: attempt + 1 });
-        throw error;
-      }
-
-      if (!data) {
-        console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null)`);
-        return [];
-      }
-
-      // Extraire les marques uniques et trier
-      const uniqueBrands = Array.from(new Set(data.map(item => item.marque).filter(Boolean)));
-      const sortedBrands = uniqueBrands.sort();
-      
-      return sortedBrands;
-    } catch (err) {
-      logError(context, table, operation, err, { type, attempt: attempt + 1 });
-      
-      if (attempt === retries) {
-        console.error(`❌ [${context}] Toutes les tentatives ont échoué, retour tableau vide`);
-        return [];
-      }
-      
-      // Attendre avant de réessayer (backoff exponentiel)
-      const delay = 1000 * Math.pow(2, attempt);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
+  // Utiliser le système de retry avec timeout
+  const { supabaseQueryWithRetry } = await import("./retry-utils");
   
-  return [];
+  try {
+    const { data, error } = await supabaseQueryWithRetry(
+      async () => {
+        const query = supabase
+          .from(table)
+          .select('marque')
+          .eq('type', type)
+          .eq('is_active', true);
+        
+        // Ajouter un timeout de 8 secondes (réduit pour éviter les blocages)
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 8000);
+        });
+        
+        const queryPromise = query;
+        return await Promise.race([queryPromise, timeoutPromise]);
+      },
+      { maxRetries: retries, initialDelay: 1000 }
+    );
+
+    if (error) {
+      logError(context, table, operation, error, { type });
+      return [];
+    }
+
+    if (!data || !Array.isArray(data)) {
+      console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null ou pas un tableau)`);
+      return [];
+    }
+
+    // Extraire les marques uniques et trier
+    const uniqueBrands = Array.from(new Set(data.map((item: any) => item.marque).filter(Boolean)));
+    const sortedBrands = uniqueBrands.sort();
+    
+    return sortedBrands;
+  } catch (err) {
+    logError(context, table, operation, err, { type });
+    return [];
+  }
 }
 
 /**
@@ -138,43 +141,47 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
 
   const supabase = createClient();
   
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      
-      const { data, error } = await supabase
-        .from(table)
-        .select('modele')
-        .eq('type', type)
-        .eq('marque', brand)
-        .eq('is_active', true)
-        .order('modele');
-
-      if (error) {
-        logError(context, table, operation, error, { type, brand, attempt: attempt + 1 });
-        throw error;
-      }
-
-      if (!data) {
-        console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null)`);
-        return [];
-      }
-
-      const models = data.map(item => item.modele).filter(Boolean);
-      return models;
-    } catch (err) {
-      logError(context, table, operation, err, { type, brand, attempt: attempt + 1 });
-      
-      if (attempt === retries) {
-        console.error(`❌ [${context}] Toutes les tentatives ont échoué, retour tableau vide`);
-        return [];
-      }
-      
-      const delay = 1000 * Math.pow(2, attempt);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
+  // Utiliser le système de retry avec timeout
+  const { supabaseQueryWithRetry } = await import("./retry-utils");
   
-  return [];
+  try {
+    const { data, error } = await supabaseQueryWithRetry(
+      async () => {
+        const query = supabase
+          .from(table)
+          .select('modele')
+          .eq('type', type)
+          .eq('marque', brand)
+          .eq('is_active', true)
+          .order('modele');
+        
+        // Ajouter un timeout de 8 secondes (réduit pour éviter les blocages)
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 8000);
+        });
+        
+        const queryPromise = query;
+        return await Promise.race([queryPromise, timeoutPromise]);
+      },
+      { maxRetries: retries, initialDelay: 1000 }
+    );
+
+    if (error) {
+      logError(context, table, operation, error, { type, brand });
+      return [];
+    }
+
+    if (!data || !Array.isArray(data)) {
+      console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null ou pas un tableau)`);
+      return [];
+    }
+
+    const models = data.map((item: any) => item.modele).filter(Boolean);
+    return models;
+  } catch (err) {
+    logError(context, table, operation, err, { type, brand });
+    return [];
+  }
 }
 
 /**
@@ -213,7 +220,7 @@ export async function searchBrands(type: VehicleType, searchTerm: string): Promi
       return [];
     }
 
-    const uniqueBrands = Array.from(new Set(data.map(item => item.marque).filter(Boolean)));
+    const uniqueBrands = Array.from(new Set(data.map((item: any) => item.marque).filter(Boolean))) as string[];
     const sortedBrands = uniqueBrands.sort();
     return sortedBrands;
   } catch (err) {
@@ -269,7 +276,7 @@ export async function searchModels(
       return [];
     }
 
-    const models = data.map(item => item.modele).filter(Boolean);
+    const models = data.map((item: any) => item.modele).filter(Boolean) as string[];
     return models;
   } catch (err) {
     logError(context, table, operation, err, { type, brand, searchTerm });
@@ -374,7 +381,7 @@ export async function getModelSpecs(
       
       if (!errorPartial && dataPartial && dataPartial.length > 0) {
         // Chercher le meilleur match
-        const bestMatch = dataPartial.find(item => {
+        const bestMatch = dataPartial.find((item: any) => {
           const itemModelNormalized = item.modele?.replace(/\s+/g, '').toLowerCase() || '';
           const itemMarqueNormalized = item.marque?.replace(/\s+/g, '').toLowerCase() || '';
           const brandNormalized = brand.replace(/\s+/g, '').toLowerCase();

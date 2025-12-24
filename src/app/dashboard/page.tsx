@@ -1338,7 +1338,7 @@ function SupportTab({ user }: { user: any }) {
           table: 'tickets',
           filter: `user_id=eq.${user.id}`, // Seulement les tickets de cet utilisateur
         },
-        (payload) => {
+        (payload: any) => {
           console.log('🔄 [User Tickets] Changement détecté:', payload.eventType, payload.new || payload.old);
           
           // Recharger les tickets après un changement

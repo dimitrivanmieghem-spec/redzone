@@ -890,7 +890,7 @@ function ModerationTab({ user }: { user: any }) {
 
         if (error) throw error;
         
-        const mappedVehicules = ((data || []).map(v => ({
+        const mappedVehicules = ((data || []).map((v: any) => ({
           ...v,
           price: parseNumber(v.price),
           year: parseNumber(v.year),
@@ -924,7 +924,7 @@ function ModerationTab({ user }: { user: any }) {
           schema: "public",
           table: "vehicles",
         },
-        (payload) => {
+        (payload: any) => {
           const newStatus = (payload.new as any)?.status;
           const oldStatus = (payload.old as any)?.status;
           const pendingStatuses = ["pending", "pending_validation", "waiting_email_verification"];
@@ -1486,7 +1486,7 @@ function VehiclesTab({ user }: { user: any }) {
             
             if (profiles) {
               const ownersMap = new Map<string, UserProfile>();
-              profiles.forEach(profile => {
+              profiles.forEach((profile: any) => {
                 ownersMap.set(profile.id, profile as UserProfile);
               });
               setOwners(ownersMap);
@@ -2614,7 +2614,7 @@ function SupportTab({ user }: { user: any }) {
           schema: 'public',
           table: 'tickets',
         },
-        (payload) => {
+        (payload: any) => {
           console.log('🔄 [Admin Tickets] Changement détecté:', payload.eventType, payload.new || payload.old);
           
           // Recharger les tickets après un changement

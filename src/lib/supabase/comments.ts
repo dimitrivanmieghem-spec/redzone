@@ -50,7 +50,7 @@ export async function getApprovedComments(articleId: string): Promise<CommentWit
   }
 
   // Récupérer les profils des utilisateurs
-  const userIds = [...new Set(comments.map((c) => c.user_id))];
+  const userIds = [...new Set(comments.map((c: any) => c.user_id))];
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, email, full_name, avatar_url")
@@ -62,16 +62,19 @@ export async function getApprovedComments(articleId: string): Promise<CommentWit
   }
 
   // Combiner les données
-  const profilesMap = new Map((profiles || []).map((p) => [p.id, p]));
+  const profilesMap = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
 
-  return comments.map((comment) => ({
-    ...comment,
-    author: profilesMap.get(comment.user_id) ? {
-      email: profilesMap.get(comment.user_id)!.email || "",
-      full_name: profilesMap.get(comment.user_id)!.full_name,
-      avatar_url: profilesMap.get(comment.user_id)!.avatar_url,
-    } : undefined,
-  })) as CommentWithAuthor[];
+  return comments.map((comment: any) => {
+    const profile = profilesMap.get(comment.user_id);
+    return {
+      ...comment,
+      author: profile ? {
+        email: profile.email || "",
+        full_name: profile.full_name,
+        avatar_url: profile.avatar_url,
+      } : undefined,
+    };
+  }) as CommentWithAuthor[];
 }
 
 /**
@@ -130,8 +133,8 @@ export async function getPendingComments(): Promise<CommentWithAuthor[]> {
   }
 
   // Récupérer les profils et articles
-  const userIds = [...new Set(comments.map((c) => c.user_id))];
-  const articleIds = [...new Set(comments.map((c) => c.article_id))];
+  const userIds = [...new Set(comments.map((c: any) => c.user_id))];
+  const articleIds = [...new Set(comments.map((c: any) => c.article_id))];
 
   const [profilesResult, articlesResult] = await Promise.all([
     supabase
@@ -152,23 +155,27 @@ export async function getPendingComments(): Promise<CommentWithAuthor[]> {
   }
 
   // Créer des maps pour un accès rapide
-  const profilesMap = new Map((profilesResult.data || []).map((p) => [p.id, p]));
-  const articlesMap = new Map((articlesResult.data || []).map((a) => [a.id, a]));
+  const profilesMap = new Map<string, any>((profilesResult.data || []).map((p: any) => [p.id, p]));
+  const articlesMap = new Map<string, any>((articlesResult.data || []).map((a: any) => [a.id, a]));
 
   // Combiner les données
-  return comments.map((comment) => ({
-    ...comment,
-    author: profilesMap.get(comment.user_id) ? {
-      email: profilesMap.get(comment.user_id)!.email || "",
-      full_name: profilesMap.get(comment.user_id)!.full_name,
-      avatar_url: profilesMap.get(comment.user_id)!.avatar_url,
-    } : undefined,
-    article: articlesMap.get(comment.article_id) ? {
-      id: articlesMap.get(comment.article_id)!.id,
-      title: articlesMap.get(comment.article_id)!.title,
-      slug: articlesMap.get(comment.article_id)!.slug,
-    } : undefined,
-  })) as CommentWithAuthor[];
+  return comments.map((comment: any) => {
+    const profile: any = profilesMap.get(comment.user_id);
+    const article: any = articlesMap.get(comment.article_id);
+    return {
+      ...comment,
+      author: profile ? {
+        email: profile.email || "",
+        full_name: profile.full_name,
+        avatar_url: profile.avatar_url,
+      } : undefined,
+      article: article ? {
+        id: article.id,
+        title: article.title,
+        slug: article.slug,
+      } : undefined,
+    };
+  }) as CommentWithAuthor[];
 }
 
 /**

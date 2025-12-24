@@ -30,6 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Utiliser le singleton pour éviter les problèmes de connexion
   const supabase = createClient();
 
   // Charger l'utilisateur au démarrage
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Écouter les changements d'auth
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
       if (session?.user) {
         await updateUserFromSession(session.user);
       } else {
@@ -96,8 +97,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Démarrer le monitoring de connexion (côté client uniquement)
+    if (typeof window !== "undefined") {
+      import("@/lib/supabase/connection-monitor").then(({ startConnectionMonitoring }) => {
+        startConnectionMonitoring();
+      }).catch((err) => {
+        console.warn("Impossible de démarrer le monitoring de connexion:", err);
+      });
+    }
+
     return () => {
       subscription.unsubscribe();
+      if (typeof window !== "undefined") {
+        const { stopConnectionMonitoring } = require("@/lib/supabase/connection-monitor");
+        stopConnectionMonitoring();
+      }
     };
   }, [supabase.auth]);
 

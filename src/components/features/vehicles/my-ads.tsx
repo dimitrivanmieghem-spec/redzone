@@ -166,7 +166,7 @@ export default function MyAds() {
 
         // Utiliser directement les colonnes anglaises (pas de mapping)
         // S'assurer que les valeurs numériques sont bien des nombres
-        const mappedVehicules = ((data || []).map(v => ({
+        const mappedVehicules = ((data || []).map((v: any) => ({
           ...v,
           price: parseNumber(v.price),
           year: parseNumber(v.year),

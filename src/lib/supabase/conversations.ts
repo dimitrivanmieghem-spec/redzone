@@ -125,10 +125,10 @@ export async function getUserConversations(): Promise<Conversation[]> {
     }
 
     // Récupérer les véhicules et profils séparément pour éviter les erreurs de relations
-    const vehicleIds = [...new Set(conversations.map(c => c.vehicle_id))];
+    const vehicleIds = [...new Set(conversations.map((c: any) => c.vehicle_id))];
     const userIds = [...new Set([
-      ...conversations.map(c => c.buyer_id),
-      ...conversations.map(c => c.seller_id),
+      ...conversations.map((c: any) => c.buyer_id),
+      ...conversations.map((c: any) => c.seller_id),
     ])];
 
     // Récupérer les véhicules
@@ -144,12 +144,12 @@ export async function getUserConversations(): Promise<Conversation[]> {
       .in("id", userIds);
 
     // Créer des maps pour accès rapide
-    const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
-    const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
+    const vehiclesMap = new Map((vehicles || []).map((v: any) => [v.id, v]));
+    const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
     // Pour chaque conversation, récupérer le dernier message et le nombre de non-lus
     const conversationsWithDetails = await Promise.all(
-      conversations.map(async (conv) => {
+      conversations.map(async (conv: any) => {
         // Récupérer le dernier message
         const { data: lastMessage } = await supabase
           .from("messages")
