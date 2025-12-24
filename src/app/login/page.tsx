@@ -55,49 +55,73 @@ function LoginContent() {
     try {
       const supabase = createClient();
 
-      // Ajouter un timeout pour éviter les blocages
-      const loginPromise = supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      // Fonction de connexion avec retry
+      const attemptLogin = async (attempt: number = 1): Promise<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>> => {
+        const loginPromise = supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
 
-      // Timeout de 15 secondes pour la connexion
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("La connexion prend trop de temps. Veuillez réessayer.")), 15000);
-      });
+        // Timeout réduit à 8 secondes (compatible avec Netlify gratuit qui a un timeout de 10s)
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("La connexion prend trop de temps. Vérifiez votre connexion et réessayez.")), 8000);
+        });
 
-      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
+        try {
+          const result = await Promise.race([loginPromise, timeoutPromise]);
+          return result;
+        } catch (error: any) {
+          // Si c'est une erreur réseau et qu'on peut réessayer
+          const isNetworkError = error?.message?.includes("timeout") || 
+                                 error?.message?.includes("network") ||
+                                 error?.message?.includes("fetch");
+          
+          if (isNetworkError && attempt < 2) {
+            console.warn(`Tentative de connexion ${attempt} échouée, nouvelle tentative...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Backoff simple
+            return attemptLogin(attempt + 1);
+          }
+          throw error;
+        }
+      };
+
+      const { data, error } = await attemptLogin();
 
       if (error) {
-        // Logger la tentative de connexion échouée
-        try {
-          const { logFailedLogin } = await import("@/lib/supabase/audit-logs-client");
-          await logFailedLogin(formData.email, error.message);
-        } catch (logError) {
-          // Ne pas bloquer l'erreur de connexion en cas d'erreur de logging
-          console.error("Erreur lors du logging d'audit:", logError);
+        // Logger la tentative de connexion échouée (asynchrone, ne bloque pas)
+        import("@/lib/supabase/audit-logs-client")
+          .then(({ logFailedLogin }) => logFailedLogin(formData.email, error.message))
+          .catch((logError) => console.error("Erreur lors du logging d'audit:", logError));
+
+        // Messages d'erreur plus clairs
+        let errorMessage = "Erreur de connexion";
+        if (error.message?.includes("Invalid login credentials")) {
+          errorMessage = "Email ou mot de passe incorrect";
+        } else if (error.message?.includes("timeout") || error.message?.includes("trop de temps")) {
+          errorMessage = "La connexion prend trop de temps. Vérifiez votre connexion internet et réessayez.";
+        } else if (error.message?.includes("network") || error.message?.includes("fetch")) {
+          errorMessage = "Problème de connexion réseau. Vérifiez votre connexion et réessayez.";
+        } else {
+          errorMessage = error.message || "Erreur de connexion";
         }
-        throw error;
+        
+        throw new Error(errorMessage);
       }
 
       if (!data?.user || !data?.session) {
         throw new Error("Erreur de connexion : session non créée");
       }
 
-      // Logger la connexion réussie
-      try {
-        const { logAuditEvent } = await import("@/lib/supabase/audit-logs-client");
-        await logAuditEvent({
+      // Logger la connexion réussie (asynchrone, ne bloque pas)
+      import("@/lib/supabase/audit-logs-client")
+        .then(({ logAuditEvent }) => logAuditEvent({
           action_type: "login_attempt",
           user_id: data.user.id,
           user_email: data.user.email || undefined,
           description: "Connexion réussie",
           status: "success",
-        });
-      } catch (logError) {
-        // Ne pas bloquer la connexion en cas d'erreur de logging
-        console.error("Erreur lors du logging d'audit:", logError);
-      }
+        }))
+        .catch((logError) => console.error("Erreur lors du logging d'audit:", logError));
 
       showToast("Connexion réussie !", "success");
 

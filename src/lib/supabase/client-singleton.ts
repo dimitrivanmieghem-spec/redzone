@@ -28,11 +28,11 @@ export function createClient() {
       flowType: "pkce",
     },
     global: {
-      // Timeout de 20 secondes pour éviter les blocages
+      // Timeout réduit à 10 secondes (compatible avec Netlify gratuit)
       fetch: (url, options = {}) => {
         return fetch(url, {
           ...options,
-          signal: AbortSignal.timeout(20000), // 20 secondes max
+          signal: AbortSignal.timeout(10000), // 10 secondes max (Netlify gratuit = 10s)
         });
       },
     },
