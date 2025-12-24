@@ -55,35 +55,86 @@ function LoginContent() {
     try {
       const supabase = createClient();
 
-      // Fonction de connexion avec retry
+      // Vérifier la connexion avant de tenter le login (optionnel)
+      const checkConnection = async (): Promise<boolean> => {
+        try {
+          const { env } = await import("@/lib/env");
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 secondes pour la vérification
+          
+          const testResponse = await fetch(env.NEXT_PUBLIC_SUPABASE_URL + '/rest/v1/', {
+            method: 'HEAD',
+            signal: controller.signal,
+            headers: {
+              'apikey': env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            },
+          }).finally(() => clearTimeout(timeoutId));
+          
+          return testResponse.ok || testResponse.status === 404; // 404 est OK (endpoint non trouvé mais serveur répond)
+        } catch {
+          return false;
+        }
+      };
+
+      // Fonction de connexion avec retry amélioré
       const attemptLogin = async (attempt: number = 1): Promise<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>> => {
+        const startTime = Date.now();
+        
+        // Timeout de 5 secondes avec Promise.race (plus simple et fiable)
         const loginPromise = supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
 
-        // Timeout réduit à 8 secondes (compatible avec Netlify gratuit qui a un timeout de 10s)
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("La connexion prend trop de temps. Vérifiez votre connexion et réessayez.")), 8000);
+          setTimeout(() => {
+            reject(new Error("La connexion prend trop de temps. Vérifiez votre connexion et réessayez."));
+          }, 5000); // 5 secondes max
         });
 
         try {
           const result = await Promise.race([loginPromise, timeoutPromise]);
+          const duration = Date.now() - startTime;
+          console.log(`[Login] Connexion réussie en ${duration}ms (tentative ${attempt})`);
           return result;
         } catch (error: any) {
-          // Si c'est une erreur réseau et qu'on peut réessayer
-          const isNetworkError = error?.message?.includes("timeout") || 
-                                 error?.message?.includes("network") ||
-                                 error?.message?.includes("fetch");
+          const duration = Date.now() - startTime;
           
-          if (isNetworkError && attempt < 2) {
-            console.warn(`Tentative de connexion ${attempt} échouée, nouvelle tentative...`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Backoff simple
+          // Détecter les erreurs réseau/timeout
+          const isNetworkError = 
+            error?.name === 'AbortError' ||
+            error?.message?.includes("timeout") || 
+            error?.message?.includes("trop de temps") ||
+            error?.message?.includes("network") ||
+            error?.message?.includes("fetch") ||
+            error?.message?.includes("aborted") ||
+            error?.code === 'ECONNABORTED' ||
+            error?.code === 'ETIMEDOUT' ||
+            error?.message?.includes("Failed to fetch");
+          
+          console.warn(`[Login] Tentative ${attempt} échouée après ${duration}ms:`, error?.message || error);
+          
+          // Retry si erreur réseau et qu'on n'a pas atteint le max (3 tentatives)
+          if (isNetworkError && attempt < 3) {
+            const backoffDelay = Math.min(500 * attempt, 2000); // Backoff: 500ms, 1000ms, 2000ms max
+            console.warn(`[Login] Nouvelle tentative dans ${backoffDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
             return attemptLogin(attempt + 1);
           }
+          
           throw error;
         }
       };
+
+      // Vérifier la connexion d'abord (optionnel, ne bloque pas si échoue)
+      try {
+        const isConnected = await checkConnection();
+        if (!isConnected) {
+          console.warn("[Login] Vérification de connexion échouée, tentative de login quand même...");
+        }
+      } catch {
+        // Continuer même si la vérification échoue
+      }
 
       const { data, error } = await attemptLogin();
 

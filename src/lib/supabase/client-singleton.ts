@@ -28,11 +28,26 @@ export function createClient() {
       flowType: "pkce",
     },
     global: {
-      // Timeout réduit à 10 secondes (compatible avec Netlify gratuit)
+      // Timeout réduit à 6 secondes pour éviter les blocages
+      // Utiliser AbortController pour un meilleur contrôle
       fetch: (url, options = {}) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 secondes max
+        
         return fetch(url, {
           ...options,
-          signal: AbortSignal.timeout(10000), // 10 secondes max (Netlify gratuit = 10s)
+          signal: options.signal 
+            ? (() => {
+                // Si un signal est déjà fourni, créer un signal combiné
+                const combinedController = new AbortController();
+                const abort = () => combinedController.abort();
+                options.signal?.addEventListener('abort', abort);
+                controller.signal.addEventListener('abort', abort);
+                return combinedController.signal;
+              })()
+            : controller.signal,
+        }).finally(() => {
+          clearTimeout(timeoutId);
         });
       },
     },
