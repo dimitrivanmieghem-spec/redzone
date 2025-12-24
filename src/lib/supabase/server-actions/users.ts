@@ -233,3 +233,116 @@ export async function checkExpiredBans() {
   return { success: true };
 }
 
+/**
+ * Créer un utilisateur manuellement (admin uniquement)
+ * @param email - Email de l'utilisateur
+ * @param password - Mot de passe
+ * @param fullName - Nom complet
+ * @param role - Rôle à attribuer
+ * @returns ID de l'utilisateur créé
+ */
+export async function createUserManually(
+  email: string,
+  password: string,
+  fullName: string,
+  role: "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer"
+): Promise<{ success: boolean; userId: string | null; error?: string }> {
+  try {
+    // Vérification admin avec le client serveur
+    const supabase = await createServerClient();
+    await requireAdmin(supabase);
+
+    // Validation des données
+    if (!email || !email.includes("@")) {
+      return { success: false, userId: null, error: "Email invalide" };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, userId: null, error: "Le mot de passe doit contenir au moins 6 caractères" };
+    }
+    if (!fullName || fullName.trim().length === 0) {
+      return { success: false, userId: null, error: "Le nom complet est obligatoire" };
+    }
+    // Vérifier que le rôle est valide (pour l'instant, on accepte les rôles actuels + les nouveaux proposés)
+    const validRoles = ["particulier", "pro", "admin", "moderator", "support", "editor", "viewer"];
+    if (!validRoles.includes(role)) {
+      return { success: false, userId: null, error: "Rôle invalide" };
+    }
+
+    // Utiliser le client admin pour créer l'utilisateur auth
+    const serviceClient = createAdminClient();
+
+    // Créer l'utilisateur dans Supabase Auth
+    const { data: authData, error: authError } = await serviceClient.auth.admin.createUser({
+      email: email.trim().toLowerCase(),
+      password: password,
+      email_confirm: true, // Auto-confirmer l'email
+      user_metadata: {
+        full_name: fullName.trim(),
+        role: role,
+      },
+    });
+
+    if (authError || !authData.user) {
+      return { success: false, userId: null, error: authError?.message || "Erreur lors de la création de l'utilisateur" };
+    }
+
+    const userId = authData.user.id;
+
+    // Créer ou mettre à jour le profil dans la table profiles
+    const { error: profileError } = await serviceClient
+      .from("profiles")
+      .upsert({
+        id: userId,
+        email: email.trim().toLowerCase(),
+        full_name: fullName.trim(),
+        role: role,
+      }, {
+        onConflict: "id",
+      });
+
+    if (profileError) {
+      // Si l'erreur est due à un profil déjà existant (créé par trigger), on le met à jour
+      const { error: updateError } = await serviceClient
+        .from("profiles")
+        .update({
+          email: email.trim().toLowerCase(),
+          full_name: fullName.trim(),
+          role: role,
+        })
+        .eq("id", userId);
+
+      if (updateError) {
+        console.error("Erreur mise à jour profil:", updateError);
+        // Ne pas échouer si le profil existe déjà (créé par trigger)
+      }
+    }
+
+    // Logger la création
+    try {
+      const { logAuditEventServer } = await import("@/lib/supabase/audit-logs");
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      await logAuditEventServer({
+        action_type: "data_modification",
+        user_id: currentUser?.id || null,
+        user_email: currentUser?.email || undefined,
+        resource_type: "user",
+        resource_id: userId,
+        description: `Création manuelle d'utilisateur: ${email} avec rôle ${role}`,
+        status: "success",
+        metadata: { created_user_email: email, created_user_role: role },
+      });
+    } catch (logError) {
+      console.error("Erreur lors du logging d'audit:", logError);
+    }
+
+    // Invalider le cache
+    revalidatePath("/admin/users");
+    revalidatePath("/admin/dashboard");
+
+    return { success: true, userId };
+  } catch (error) {
+    console.error("Erreur createUserManually:", error);
+    return { success: false, userId: null, error: error instanceof Error ? error.message : "Erreur inconnue" };
+  }
+}
+

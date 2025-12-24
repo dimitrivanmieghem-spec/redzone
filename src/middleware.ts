@@ -129,22 +129,22 @@ export async function middleware(request: NextRequest) {
 
       // Si route admin, vérifier le rôle
       if (isAdminRoute) {
-        const userRole = profile?.role;
+        const userRole = profile?.role as "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer" | undefined;
         
         // Routes admin strictes : uniquement admin
         if (isAdminOnlyRoute) {
           if (userRole !== "admin") {
-            // Rediriger vers le dashboard admin si modérateur, sinon vers l'accueil
-            if (userRole === "moderator") {
+            // Rediriger vers le dashboard admin selon le rôle
+            if (userRole === "moderator" || userRole === "support" || userRole === "editor" || userRole === "viewer") {
               return NextResponse.redirect(new URL("/admin?tab=dashboard", request.url));
             }
             return NextResponse.redirect(new URL("/", request.url));
           }
         } else {
-          // Routes admin générales : admin OU moderator
-          // Les autres rôles (pro, particulier, user) n'ont pas accès
-          if (userRole !== "admin" && userRole !== "moderator") {
-            // Rediriger vers la page d'accueil si pas admin ni moderator
+          // Routes admin générales : admin, moderator, support, editor, viewer
+          // Les autres rôles (pro, particulier) n'ont pas accès
+          if (!userRole || !["admin", "moderator", "support", "editor", "viewer"].includes(userRole)) {
+            // Rediriger vers la page d'accueil si pas autorisé
             return NextResponse.redirect(new URL("/", request.url));
           }
         }

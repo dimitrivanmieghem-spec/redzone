@@ -56,7 +56,7 @@ import { Vehicule } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { logInfo, logError } from "@/lib/supabase/logs";
 import { getAllUsers, getUserWithVehicles, getUserVehicles, type UserProfile, type UserWithVehicles } from "@/lib/supabase/users";
-import { banUser, unbanUser, deleteUser } from "@/lib/supabase/server-actions/users";
+import { banUser, unbanUser, deleteUser, createUserManually } from "@/lib/supabase/server-actions/users";
 import { getVehiculesPaginated, deleteVehicule, getVehiculeById } from "@/lib/supabase/vehicules";
 import { createAdminConversation } from "@/app/actions/admin-messages";
 import { getOrCreateConversation } from "@/lib/supabase/conversations";
@@ -79,10 +79,10 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [isPending, startTransition] = useTransition();
 
-  // Protection : Rediriger si non admin ni moderator
+  // Protection : Rediriger si pas autorisé (admin, moderator, support, editor, viewer)
   useEffect(() => {
-    if (!isLoading && (!user || (user.role !== "admin" && user.role !== "moderator"))) {
-      showToast("Accès refusé - Administrateur ou Modérateur requis", "error");
+    if (!isLoading && (!user || !["admin", "moderator", "support", "editor", "viewer"].includes(user.role))) {
+      showToast("Accès refusé - Rôle autorisé requis", "error");
       router.push("/");
     }
   }, [user, isLoading, router, showToast]);
@@ -133,20 +133,24 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+  if (!user || !["admin", "moderator", "support", "editor", "viewer"].includes(user.role)) {
     return null;
   }
 
-  const tabs = [
-    { id: "dashboard" as TabType, label: "Tableau de Bord", icon: LayoutDashboard, adminOnly: false },
-    { id: "moderation" as TabType, label: "Modération", icon: FileCheck, adminOnly: false },
-    { id: "vehicles" as TabType, label: "Gestion Véhicules", icon: Car, adminOnly: false },
-    { id: "users" as TabType, label: "Utilisateurs", icon: Users, adminOnly: true },
-    { id: "settings" as TabType, label: "Paramètres", icon: Settings, adminOnly: true },
-    { id: "support" as TabType, label: "Support", icon: MessageSquare, adminOnly: false },
-    { id: "content" as TabType, label: "FAQ", icon: FileText, adminOnly: true },
-    { id: "articles" as TabType, label: "Articles", icon: BookOpen, adminOnly: true },
-  ].filter(tab => !tab.adminOnly || user.role === "admin");
+  // Définir les tabs avec leurs permissions
+  const allTabs = [
+    { id: "dashboard" as TabType, label: "Tableau de Bord", icon: LayoutDashboard, allowedRoles: ["admin", "moderator", "support", "editor", "viewer"] },
+    { id: "moderation" as TabType, label: "Modération", icon: FileCheck, allowedRoles: ["admin", "moderator"] },
+    { id: "vehicles" as TabType, label: "Gestion Véhicules", icon: Car, allowedRoles: ["admin", "moderator"] },
+    { id: "users" as TabType, label: "Utilisateurs", icon: Users, allowedRoles: ["admin"] },
+    { id: "settings" as TabType, label: "Paramètres", icon: Settings, allowedRoles: ["admin"] },
+    { id: "support" as TabType, label: "Support", icon: MessageSquare, allowedRoles: ["admin", "support"] },
+    { id: "content" as TabType, label: "FAQ", icon: FileText, allowedRoles: ["admin", "editor"] },
+    { id: "articles" as TabType, label: "Articles", icon: BookOpen, allowedRoles: ["admin", "editor"] },
+  ];
+
+  // Filtrer les tabs selon le rôle de l'utilisateur
+  const tabs = allTabs.filter(tab => tab.allowedRoles.includes(user.role));
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] flex">
@@ -257,13 +261,13 @@ export default function AdminPage() {
       <div className="flex-1 flex flex-col min-h-screen">
         <main className="flex-1 overflow-y-auto">
           {activeTab === "dashboard" && <DashboardTab user={user} />}
-          {activeTab === "moderation" && <ModerationTab user={user} />}
-          {activeTab === "vehicles" && <VehiclesTab user={user} />}
+          {activeTab === "moderation" && (user.role === "admin" || user.role === "moderator") && <ModerationTab user={user} />}
+          {activeTab === "vehicles" && (user.role === "admin" || user.role === "moderator") && <VehiclesTab user={user} />}
           {activeTab === "users" && user.role === "admin" && <UsersTab />}
           {activeTab === "settings" && user.role === "admin" && <SettingsTab />}
-          {activeTab === "support" && <SupportTab user={user} />}
-          {activeTab === "content" && user.role === "admin" && <ContentTab />}
-          {activeTab === "articles" && user.role === "admin" && <ArticlesTab />}
+          {activeTab === "support" && (user.role === "admin" || user.role === "support") && <SupportTab user={user} />}
+          {activeTab === "content" && (user.role === "admin" || user.role === "editor") && <ContentTab />}
+          {activeTab === "articles" && (user.role === "admin" || user.role === "editor") && <ArticlesTab />}
         </main>
       </div>
     </div>
@@ -1529,7 +1533,11 @@ function VehiclesTab({ user }: { user: any }) {
 
     setContactingIds(prev => new Set(prev).add(vehicule.id));
     try {
-      const senderRole = user.role === "admin" ? "Administrateur" : "Modérateur";
+      const senderRole = user.role === "admin" ? "Administrateur" : 
+                         user.role === "moderator" ? "Modérateur" :
+                         user.role === "support" ? "Support" :
+                         user.role === "editor" ? "Éditeur" :
+                         "RedZone";
       const vehicleName = `${vehicule.brand || ''} ${vehicule.model || ''}`.trim() || "ce véhicule";
       const initialMessage = `Bonjour,\n\nJe vous contacte en tant que ${senderRole} de RedZone concernant votre annonce "${vehicleName}".\n\nComment pouvons-nous vous aider ?\n\nCordialement,\nL'équipe RedZone`;
 
@@ -1750,6 +1758,14 @@ function UsersTab() {
   const [isPermanentBan, setIsPermanentBan] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    fullName: "",
+    role: "particulier" as "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer",
+  });
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -1888,10 +1904,28 @@ function UsersTab() {
   return (
     <div className="min-h-screen bg-white">
       <header className="bg-white border-b border-slate-200 px-8 py-6">
-        <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3 tracking-tight">
-          <Users className="text-red-600" size={28} />
-          Gestion des Utilisateurs
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3 tracking-tight">
+            <Users className="text-red-600" size={28} />
+            Gestion des Utilisateurs
+          </h2>
+          <button
+            onClick={() => {
+              setCreateUserModalOpen(true);
+              setNewUserData({
+                email: "",
+                password: "",
+                confirmPassword: "",
+                fullName: "",
+                role: "particulier",
+              });
+            }}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg hover:shadow-xl"
+          >
+            <Plus size={20} />
+            Créer un utilisateur
+          </button>
+        </div>
       </header>
 
       <div className="p-8">
@@ -1928,6 +1962,30 @@ function UsersTab() {
                               <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
                                 <Shield size={12} />
                                 Admin
+                              </span>
+                            )}
+                            {u.role === "moderator" && (
+                              <span className="px-2 py-1 bg-orange-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                <Shield size={12} />
+                                Modérateur
+                              </span>
+                            )}
+                            {u.role === "support" && (
+                              <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                <MessageSquare size={12} />
+                                Support
+                              </span>
+                            )}
+                            {u.role === "editor" && (
+                              <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                <FileText size={12} />
+                                Éditeur
+                              </span>
+                            )}
+                            {u.role === "viewer" && (
+                              <span className="px-2 py-1 bg-gray-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                <Eye size={12} />
+                                Lecteur
                               </span>
                             )}
                             {u.is_banned && (
@@ -2129,6 +2187,143 @@ function UsersTab() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modale de Création d'Utilisateur */}
+        {createUserModalOpen && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Plus className="text-red-600" size={24} />
+                  Créer un utilisateur
+                </h3>
+                <button onClick={() => { setCreateUserModalOpen(false); setNewUserData({ email: "", password: "", confirmPassword: "", fullName: "", role: "particulier" }); }} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (newUserData.password !== newUserData.confirmPassword) {
+                    showToast("Les mots de passe ne correspondent pas", "error");
+                    return;
+                  }
+                  if (newUserData.password.length < 6) {
+                    showToast("Le mot de passe doit contenir au moins 6 caractères", "error");
+                    return;
+                  }
+                  try {
+                    setIsProcessing(true);
+                    const result = await createUserManually(
+                      newUserData.email,
+                      newUserData.password,
+                      newUserData.fullName,
+                      newUserData.role
+                    );
+                    if (result.success) {
+                      showToast("Utilisateur créé avec succès", "success");
+                      setCreateUserModalOpen(false);
+                      setNewUserData({ email: "", password: "", confirmPassword: "", fullName: "", role: "particulier" });
+                      const allUsers = await getAllUsers();
+                      setUsers(allUsers);
+                      startTransition(() => {
+                        router.refresh();
+                      });
+                    } else {
+                      showToast(result.error || "Erreur lors de la création", "error");
+                    }
+                  } catch (error) {
+                    console.error("Erreur création:", error);
+                    showToast(error instanceof Error ? error.message : "Erreur lors de la création", "error");
+                  } finally {
+                    setIsProcessing(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">Email <span className="text-red-600">*</span></label>
+                  <input
+                    type="email"
+                    value={newUserData.email}
+                    onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                    placeholder="utilisateur@exemple.com"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-slate-900 focus:border-red-600 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">Nom complet <span className="text-red-600">*</span></label>
+                  <input
+                    type="text"
+                    value={newUserData.fullName}
+                    onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
+                    placeholder="Prénom Nom"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-slate-900 focus:border-red-600 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">Mot de passe <span className="text-red-600">*</span></label>
+                  <input
+                    type="password"
+                    value={newUserData.password}
+                    onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                    placeholder="Minimum 6 caractères"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-slate-900 focus:border-red-600 focus:outline-none"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">Confirmer le mot de passe <span className="text-red-600">*</span></label>
+                  <input
+                    type="password"
+                    value={newUserData.confirmPassword}
+                    onChange={(e) => setNewUserData({ ...newUserData, confirmPassword: e.target.value })}
+                    placeholder="Répétez le mot de passe"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-slate-900 focus:border-red-600 focus:outline-none"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">Rôle <span className="text-red-600">*</span></label>
+                  <select
+                    value={newUserData.role}
+                    onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value as typeof newUserData.role })}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-slate-900 focus:border-red-600 focus:outline-none"
+                    required
+                  >
+                    <option value="particulier">Particulier</option>
+                    <option value="pro">Professionnel</option>
+                    <option value="moderator">Modérateur</option>
+                    <option value="admin">Administrateur</option>
+                    <option value="support">Support</option>
+                    <option value="editor">Éditeur</option>
+                    <option value="viewer">Lecteur/Auditeur</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={isProcessing || !newUserData.email || !newUserData.password || !newUserData.fullName}
+                    className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black transition-all disabled:opacity-50"
+                  >
+                    {isProcessing ? "Création..." : "Créer l'utilisateur"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCreateUserModalOpen(false); setNewUserData({ email: "", password: "", confirmPassword: "", fullName: "", role: "particulier" }); }}
+                    className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-xl font-black transition-all"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

@@ -8,7 +8,7 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "particulier" | "pro" | "admin" | "moderator";
+  role: "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer";
   is_banned: boolean;
   ban_reason: string | null;
   ban_until: string | null;

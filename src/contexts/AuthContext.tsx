@@ -9,7 +9,7 @@ interface User {
   email: string;
   name: string;
   avatar: string;
-  role: "particulier" | "pro" | "admin" | "moderator";
+  role: "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer";
   is_banned?: boolean;
   ban_reason?: string | null;
   is_founder?: boolean;
