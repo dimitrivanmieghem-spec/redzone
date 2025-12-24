@@ -20,12 +20,49 @@ export function createClient() {
   const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Créer le client avec options optimisées
+  // Configuration spécifique pour Chrome (gestion des cookies et extensions)
   clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: "pkce",
+      // Configuration spécifique pour Chrome
+      storage: typeof window !== "undefined" ? {
+        getItem: (key: string) => {
+          try {
+            // Essayer localStorage d'abord
+            return localStorage.getItem(key);
+          } catch (e) {
+            // Fallback sur sessionStorage si localStorage bloqué (extensions Chrome)
+            try {
+              return sessionStorage.getItem(key);
+            } catch {
+              return null;
+            }
+          }
+        },
+        setItem: (key: string, value: string) => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (e) {
+            // Fallback sur sessionStorage si localStorage bloqué
+            try {
+              sessionStorage.setItem(key, value);
+            } catch {
+              console.warn("[Supabase] Impossible de stocker la session (extensions Chrome?)");
+            }
+          }
+        },
+        removeItem: (key: string) => {
+          try {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+          } catch {
+            // Ignorer les erreurs de suppression
+          }
+        },
+      } : undefined,
     },
     global: {
       // Timeout augmenté à 12 secondes pour gérer les connexions lentes

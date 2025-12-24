@@ -50,6 +50,24 @@ function LoginContent() {
       return;
     }
 
+    // Détecter Chrome et vérifier les extensions problématiques
+    if (typeof window !== "undefined") {
+      const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+      if (isChrome) {
+        // Vérifier si localStorage est bloqué (signe d'extension)
+        try {
+          const testKey = "__chrome_test__";
+          localStorage.setItem(testKey, "test");
+          localStorage.removeItem(testKey);
+        } catch (e) {
+          console.warn("[Login] localStorage bloqué - possible extension Chrome");
+          showToast("⚠️ Extension Chrome détectée. Désactivez temporairement les extensions (AdBlock, Privacy, etc.) et réessayez.", "error");
+          setIsLoading(false);
+          return;
+        }
+      }
+    }
+
     setIsLoading(true);
 
     try {
