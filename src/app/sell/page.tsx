@@ -407,7 +407,16 @@ function SellPageContent() {
   // Pré-remplissage automatique quand un modèle est sélectionné
   useEffect(() => {
     if (formData.type && formData.marque && formData.modele && !isManualModel) {
-      getModelSpecs(formData.type as VehicleType, formData.marque, formData.modele)
+      // Ajouter un timeout pour éviter les blocages
+      const specsPromise = getModelSpecs(formData.type as VehicleType, formData.marque, formData.modele);
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          console.warn('⚠️ [Sell] Timeout lors de la récupération des specs');
+          resolve(null);
+        }, 10000); // 10 secondes max
+      });
+
+      Promise.race([specsPromise, timeoutPromise])
         .then((specs) => {
           if (specs) {
             const extractedArch = extractArchitecture(specs.moteur || "");
@@ -418,30 +427,37 @@ function SellPageContent() {
             
             setFormData((prev) => ({
               ...prev,
-              // Pré-remplir seulement si les champs sont vides (permet de corriger)
-              puissance: prev.puissance || specs.ch.toString(),
-              puissanceKw: prev.puissanceKw || specs.kw.toString(),
-              cvFiscaux: prev.cvFiscaux || specs.cv_fiscaux.toString(),
-              co2: prev.co2 || (specs.co2 ? specs.co2.toString() : ""),
-              cylindree: prev.cylindree || specs.cylindree.toString(),
-              moteur: prev.moteur || specs.moteur,
-              architectureMoteur: prev.architectureMoteur || extractedArch,
-              transmission: prev.transmission || specs.transmission.toLowerCase(),
-              carrosserie: prev.carrosserie || specs.default_carrosserie || "",
+              // Pré-remplir TOUJOURS (même si les champs sont remplis) pour forcer la mise à jour
+              // Cela garantit que les données sont toujours à jour quand on change de modèle
+              puissance: specs.ch.toString(),
+              puissanceKw: specs.kw.toString(),
+              cvFiscaux: specs.cv_fiscaux.toString(),
+              co2: specs.co2 ? specs.co2.toString() : "",
+              cylindree: specs.cylindree.toString(),
+              moteur: specs.moteur,
+              architectureMoteur: extractedArch,
+              transmission: specs.transmission.toLowerCase(),
+              carrosserie: specs.default_carrosserie || prev.carrosserie || "",
               // Nouveaux champs pré-remplis si disponibles
-              co2Wltp: prev.co2Wltp || (specs.co2_wltp ? specs.co2_wltp.toString() : ""),
-              drivetrain: prev.drivetrain || specs.drivetrain || "",
-              topSpeed: prev.topSpeed || (specs.top_speed ? specs.top_speed.toString() : ""),
-              couleurExterieure: prev.couleurExterieure || specs.default_color || "",
-              nombrePlaces: prev.nombrePlaces || (specs.default_seats ? specs.default_seats.toString() : ""),
+              co2Wltp: specs.co2_wltp ? specs.co2_wltp.toString() : prev.co2Wltp || "",
+              drivetrain: specs.drivetrain || prev.drivetrain || "",
+              topSpeed: specs.top_speed ? specs.top_speed.toString() : prev.topSpeed || "",
+              couleurExterieure: specs.default_color || prev.couleurExterieure || "",
+              nombrePlaces: specs.default_seats ? specs.default_seats.toString() : prev.nombrePlaces || "",
             }));
+            
+            // Afficher un message de succès pour informer l'utilisateur
+            showToast("Données constructeur pré-remplies automatiquement", "success");
           } else {
             // Si pas de specs, on cache le champ CO2
             setHasCo2Data(false);
+            console.warn(`⚠️ [Sell] Aucune spec trouvée pour ${formData.marque} ${formData.modele}`);
           }
         })
         .catch((error) => {
-          console.error('Erreur récupération specs:', error);
+          console.error('❌ [Sell] Erreur récupération specs:', error);
+          // Ne pas afficher d'erreur à l'utilisateur car c'est optionnel
+          // L'utilisateur peut toujours remplir manuellement
         });
     } else if (isManualModel) {
       // Si "Autre" est sélectionné, vider les champs techniques
@@ -462,7 +478,7 @@ function SellPageContent() {
         topSpeed: "",
       }));
     }
-  }, [formData.type, formData.marque, formData.modele, isManualModel]);
+  }, [formData.type, formData.marque, formData.modele, isManualModel, showToast]);
 
   // Constantes pour validation carburant (thermique uniquement)
   const VALID_CARBURANTS = ["essence", "e85", "lpg"] as const;
@@ -846,7 +862,30 @@ function SellPageContent() {
     setIsUploadingPhotos(true);
     try {
       const fileArray = Array.from(files);
-      const uploadedUrls = await uploadImages(fileArray, user?.id || null);
+      
+      // Valider les fichiers avant upload
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+      
+      for (const file of fileArray) {
+        if (file.size === 0) {
+          throw new Error(`Le fichier "${file.name}" est vide.`);
+        }
+        if (file.size > maxSize) {
+          throw new Error(`Le fichier "${file.name}" est trop volumineux (max 10MB). Taille actuelle: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+        }
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`Le fichier "${file.name}" n'est pas un format d'image valide. Formats acceptés: JPEG, PNG, WebP, GIF`);
+        }
+      }
+
+      // Ajouter un timeout pour éviter les blocages
+      const uploadPromise = uploadImages(fileArray, user?.id || null);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("L'upload prend trop de temps. Vérifiez votre connexion et réessayez.")), 30000);
+      });
+
+      const uploadedUrls = await Promise.race([uploadPromise, timeoutPromise]);
       
       setFormData(prev => ({
         ...prev,
@@ -855,9 +894,10 @@ function SellPageContent() {
       }));
       
       showToast(`${uploadedUrls.length} photo(s) uploadée(s) avec succès !`, "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur upload photos:", error);
-      showToast("Erreur lors de l'upload des photos", "error");
+      const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload des photos. Vérifiez votre connexion et réessayez.";
+      showToast(errorMessage, "error");
     } finally {
       setIsUploadingPhotos(false);
       // Reset input
@@ -874,7 +914,27 @@ function SellPageContent() {
 
     setIsUploadingAudio(true);
     try {
-      const audioUrl = await uploadAudio(file, user?.id || null);
+      // Valider le fichier avant upload
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      const allowedTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/webm"];
+      
+      if (file.size === 0) {
+        throw new Error(`Le fichier "${file.name}" est vide.`);
+      }
+      if (file.size > maxSize) {
+        throw new Error(`Le fichier "${file.name}" est trop volumineux (max 5MB). Taille actuelle: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      }
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error(`Le fichier "${file.name}" n'est pas un format audio valide. Formats acceptés: MP3, WAV, OGG, WebM`);
+      }
+
+      // Ajouter un timeout pour éviter les blocages
+      const uploadPromise = uploadAudio(file, user?.id || null);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("L'upload prend trop de temps. Vérifiez votre connexion et réessayez.")), 30000);
+      });
+
+      const audioUrl = await Promise.race([uploadPromise, timeoutPromise]);
       
       setFormData(prev => ({
         ...prev,
@@ -883,9 +943,10 @@ function SellPageContent() {
       }));
       
       showToast("Son uploadé avec succès !", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur upload audio:", error);
-      showToast("Erreur lors de l'upload du son", "error");
+      const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload du son. Vérifiez votre connexion et réessayez.";
+      showToast(errorMessage, "error");
     } finally {
       setIsUploadingAudio(false);
       // Reset input
@@ -1175,7 +1236,7 @@ function SellPageContent() {
                     <label className="block text-sm font-bold text-white mb-3">
                       Carburant *
                     </label>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
                         { value: "essence", label: "Essence", emoji: "⛽" },
                         { value: "e85", label: "E85", emoji: "🌽" },
@@ -1256,7 +1317,7 @@ function SellPageContent() {
                     <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
                   </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {/* Prix */}
                 <div>
                   <label className="block text-sm font-bold text-white mb-3">
@@ -1433,9 +1494,10 @@ function SellPageContent() {
 
                   {/* Note de pré-remplissage */}
                   {!isManualModel && formData.modele && formData.puissance && (
-                    <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                      <p className="text-sm text-gray-700 font-light">
-                        <span className="font-bold">ℹ️ Données constructeur pré-remplies.</span> Vous pouvez les modifier si votre véhicule est différent (ex: Stage 1, préparation).
+                    <div className="mt-4 p-4 bg-green-900/20 border-2 border-green-600/40 rounded-xl">
+                      <p className="text-sm text-green-300 font-medium flex items-center gap-2">
+                        <Check size={16} className="text-green-500" />
+                        <span className="font-bold">Données constructeur pré-remplies automatiquement.</span> Vous pouvez les modifier si votre véhicule est différent (ex: Stage 1, préparation).
                       </p>
                     </div>
                   )}
@@ -1445,7 +1507,7 @@ function SellPageContent() {
                 <label className="block text-sm font-bold text-white mb-3">
                   Transmission *
                 </label>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     { value: "manuelle", label: "Manuelle", emoji: "🎯" },
                     { value: "automatique", label: "Automatique", emoji: "⚡" },
@@ -1511,7 +1573,7 @@ function SellPageContent() {
                       <label className="block text-sm font-bold text-white mb-3">
                         Type de transmission
                       </label>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {[
                           { value: "RWD", label: "RWD", subtitle: "Propulsion" },
                           { value: "FWD", label: "FWD", subtitle: "Traction" },

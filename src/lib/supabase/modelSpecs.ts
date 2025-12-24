@@ -307,130 +307,122 @@ export async function getModelSpecs(
 
   const supabase = createClient();
   
+  // Utiliser le système de retry avec timeout
+  const { supabaseQueryWithRetry } = await import("./retry-utils");
   
-  // Tentative 1 : Recherche avec ILIKE (plus tolérant pour les espaces et caractères spéciaux)
-  // On évite .eq() qui peut causer des erreurs 400 avec les espaces dans les valeurs
-  // Inclure les nouveaux champs pour pré-remplissage amélioré
-  let { data, error } = await supabase
-    .from(table)
-    .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
-    .eq('type', type)
-    .ilike('marque', brand.trim())
-    .ilike('modele', model.trim())
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-
-  // Si pas trouvé avec ILIKE, essayer avec recherche exacte (mais seulement si pas d'erreur 400)
-  if (error) {
-    // Si c'est une erreur 400 (Bad Request), c'est probablement dû à un problème d'encodage
-    // On détecte ça via le message ou le code
-    const isBadRequest = 
-      error.message?.includes('400') || 
-      error.message?.includes('Bad Request') ||
-      error.code === 'PGRST204' ||
-      error.code === '22P02'; // Invalid text representation (PostgreSQL)
-    
-    if (isBadRequest) {
-      error = null; // Réinitialiser l'erreur pour continuer
-    } else {
-      // Pour les autres erreurs, on log et on continue quand même
-      console.warn(`⚠️ [${context}] Erreur lors de la recherche ILIKE:`, error.message);
-      error = null; // Réinitialiser pour essayer les autres méthodes
-    }
-  }
-
-  if (!error && !data) {
-    
-    // Essayer avec .eq() mais seulement si les valeurs ne contiennent pas d'espaces problématiques
-    const hasSpaces = model.includes(' ') || brand.includes(' ');
-    
-    if (!hasSpaces) {
-      const { data: dataExact, error: errorExact } = await supabase
-        .from(table)
-        .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
-        .eq('type', type)
-        .eq('marque', brand.trim())
-        .eq('modele', model.trim())
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (!errorExact && dataExact) {
-        data = dataExact;
-        error = null;
-      }
-    }
-    
-    // Si toujours pas trouvé, essayer recherche partielle
-    if (!data) {
-      const modelNormalized = model.replace(/\s+/g, '').toLowerCase();
-      const brandNormalized = brand.replace(/\s+/g, '').toLowerCase();
-      
-      // Pour la recherche partielle, on évite ILIKE avec % qui peut causer des erreurs 400
-      // On filtre d'abord par marque exacte (plus rapide), puis on filtre le modèle côté client
-      // Si la marque contient des espaces, on essaie quand même .eq() qui devrait fonctionner
-      let queryPartial = supabase
-        .from(table)
-        .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, marque, modele')
-        .eq('type', type)
-        .eq('is_active', true);
-      
-      // Essayer de filtrer par marque si possible (même avec espaces, .eq() devrait fonctionner)
-      // Si ça échoue, on récupère tout et on filtre côté client
-      const { data: dataPartial, error: errorPartial } = await queryPartial.eq('marque', brand.trim());
-      
-      if (!errorPartial && dataPartial && dataPartial.length > 0) {
-        // Chercher le meilleur match
-        const bestMatch = dataPartial.find((item: any) => {
-          const itemModelNormalized = item.modele?.replace(/\s+/g, '').toLowerCase() || '';
-          const itemMarqueNormalized = item.marque?.replace(/\s+/g, '').toLowerCase() || '';
-          const brandNormalized = brand.replace(/\s+/g, '').toLowerCase();
-          
-          // Match sur le modèle ET la marque
-          const modelMatch = itemModelNormalized.includes(modelNormalized) || modelNormalized.includes(itemModelNormalized);
-          const brandMatch = itemMarqueNormalized.includes(brandNormalized) || brandNormalized.includes(itemMarqueNormalized);
-          
-          return modelMatch && brandMatch;
+  try {
+    const { data: initialData, error } = await supabaseQueryWithRetry(
+      async () => {
+        // Tentative 1 : Recherche avec ILIKE (plus tolérant pour les espaces et caractères spéciaux)
+        // On évite .eq() qui peut causer des erreurs 400 avec les espaces dans les valeurs
+        // Inclure les nouveaux champs pour pré-remplissage amélioré
+        const query = supabase
+          .from(table)
+          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
+          .eq('type', type)
+          .ilike('marque', brand.trim())
+          .ilike('modele', model.trim())
+          .eq('is_active', true)
+          .limit(1);
+        
+        // Ajouter un timeout de 8 secondes
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 8000);
         });
         
-        if (bestMatch) {
-          data = bestMatch;
-          error = null;
+        const queryPromise = query.maybeSingle();
+        return await Promise.race([queryPromise, timeoutPromise]);
+      },
+      { maxRetries: 2, initialDelay: 1000 }
+    );
+
+    if (error) {
+      logError(context, table, operation, error, { type, brand, model });
+      return null;
+    }
+
+    let data = initialData;
+
+    if (!data) {
+      // Si pas trouvé avec ILIKE, essayer avec recherche exacte
+      const hasSpaces = model.includes(' ') || brand.includes(' ');
+      
+      if (!hasSpaces) {
+        const { data: dataExact, error: errorExact } = await supabase
+          .from(table)
+          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
+          .eq('type', type)
+          .eq('marque', brand.trim())
+          .eq('modele', model.trim())
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (!errorExact && dataExact) {
+          data = dataExact;
         }
       }
+      
+      // Si toujours pas trouvé, essayer recherche partielle
+      if (!data) {
+        const { data: dataPartial, error: errorPartial } = await supabase
+          .from(table)
+          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, marque, modele')
+          .eq('type', type)
+          .eq('is_active', true)
+          .ilike('marque', `%${brand.trim()}%`);
+        
+        if (!errorPartial && dataPartial && dataPartial.length > 0) {
+          // Chercher le meilleur match
+          const modelNormalized = model.replace(/\s+/g, '').toLowerCase();
+          const brandNormalized = brand.replace(/\s+/g, '').toLowerCase();
+          
+          const bestMatch = dataPartial.find((item: any) => {
+            const itemModelNormalized = item.modele?.replace(/\s+/g, '').toLowerCase() || '';
+            const itemMarqueNormalized = item.marque?.replace(/\s+/g, '').toLowerCase() || '';
+            
+            const modelMatch = itemModelNormalized.includes(modelNormalized) || modelNormalized.includes(itemModelNormalized);
+            const brandMatch = itemMarqueNormalized.includes(brandNormalized) || brandNormalized.includes(itemMarqueNormalized);
+            
+            return modelMatch && brandMatch;
+          });
+          
+          if (bestMatch) {
+            data = bestMatch;
+          }
+        }
+      }
+      
+      if (!data) {
+        console.warn(`⚠️ [${context}] Aucune spec trouvée pour ${brand} ${model} (${type})`);
+        return null;
+      }
     }
-  }
 
-  if (error) {
-    logError(context, table, operation, error, { type, brand, model });
+    // Validation des données requises
+    if (!data || typeof data !== 'object' || typeof (data as any).kw !== 'number' || typeof (data as any).ch !== 'number' || typeof (data as any).cv_fiscaux !== 'number') {
+      console.error(`❌ [${context}] Données invalides retournées:`, data);
+      return null;
+    }
+
+    const specData = data as any;
+
+    return {
+      kw: specData.kw,
+      ch: specData.ch,
+      cv_fiscaux: specData.cv_fiscaux,
+      co2: specData.co2,
+      cylindree: specData.cylindree,
+      moteur: specData.moteur,
+      transmission: specData.transmission as 'Manuelle' | 'Automatique' | 'Séquentielle',
+      default_carrosserie: specData.default_carrosserie || null,
+      top_speed: specData.top_speed ? parseInt(String(specData.top_speed)) : null,
+      drivetrain: (specData.drivetrain as 'RWD' | 'FWD' | 'AWD' | '4WD') || null,
+      co2_wltp: specData.co2_wltp ? parseFloat(String(specData.co2_wltp)) : null,
+      default_color: specData.default_color || null,
+      default_seats: specData.default_seats ? parseInt(String(specData.default_seats)) : null,
+    };
+  } catch (err) {
+    logError(context, table, operation, err, { type, brand, model });
     return null;
   }
-
-  if (!data) {
-    console.warn(`⚠️ [${context}] Aucune spec trouvée pour ${brand} ${model} (${type})`);
-    return null;
-  }
-
-  // Validation des données requises
-  if (typeof data.kw !== 'number' || typeof data.ch !== 'number' || typeof data.cv_fiscaux !== 'number') {
-    console.error(`❌ [${context}] Données invalides retournées:`, data);
-    return null;
-  }
-
-
-  return {
-    kw: data.kw,
-    ch: data.ch,
-    cv_fiscaux: data.cv_fiscaux,
-    co2: data.co2,
-    cylindree: data.cylindree,
-    moteur: data.moteur,
-    transmission: data.transmission as 'Manuelle' | 'Automatique' | 'Séquentielle',
-    default_carrosserie: data.default_carrosserie || null,
-    top_speed: data.top_speed ? parseInt(String(data.top_speed)) : null,
-    drivetrain: (data.drivetrain as 'RWD' | 'FWD' | 'AWD' | '4WD') || null,
-    co2_wltp: data.co2_wltp ? parseFloat(String(data.co2_wltp)) : null,
-    default_color: data.default_color || null,
-    default_seats: data.default_seats ? parseInt(String(data.default_seats)) : null,
-  };
 }

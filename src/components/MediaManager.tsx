@@ -81,12 +81,29 @@ export default function MediaManager({
 
     setIsUploadingPhotos(true);
     try {
+      // Valider les fichiers avant upload
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+      
+      for (const file of files) {
+        if (file.size === 0) {
+          throw new Error(`Le fichier "${file.name}" est vide.`);
+        }
+        if (file.size > maxSize) {
+          throw new Error(`Le fichier "${file.name}" est trop volumineux (max 10MB). Taille actuelle: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+        }
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`Le fichier "${file.name}" n'est pas un format d'image valide. Formats acceptés: JPEG, PNG, WebP, GIF`);
+        }
+      }
+
       const uploadedUrls = await uploadImages(files, userId || null);
       onPhotosChange([...photos, ...uploadedUrls]);
       showToast(`${uploadedUrls.length} photo(s) ajoutée(s) avec succès !`, "success");
     } catch (error: any) {
       console.error("Erreur upload photos:", error);
-      showToast("Erreur lors de l'upload des photos", "error");
+      const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload des photos. Vérifiez votre connexion et réessayez.";
+      showToast(errorMessage, "error");
     } finally {
       setIsUploadingPhotos(false);
       if (photoInputRef.current) {
@@ -99,12 +116,33 @@ export default function MediaManager({
   const handleAudioUpload = async (file: File) => {
     setIsUploadingAudio(true);
     try {
-      const uploadedUrl = await uploadAudio(file, userId || null);
+      // Valider le fichier avant upload
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      const allowedTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/webm"];
+      
+      if (file.size === 0) {
+        throw new Error(`Le fichier "${file.name}" est vide.`);
+      }
+      if (file.size > maxSize) {
+        throw new Error(`Le fichier "${file.name}" est trop volumineux (max 5MB). Taille actuelle: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      }
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error(`Le fichier "${file.name}" n'est pas un format audio valide. Formats acceptés: MP3, WAV, OGG, WebM`);
+      }
+
+      // Ajouter un timeout pour éviter les blocages
+      const uploadPromise = uploadAudio(file, userId || null);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("L'upload prend trop de temps. Vérifiez votre connexion et réessayez.")), 30000);
+      });
+
+      const uploadedUrl = await Promise.race([uploadPromise, timeoutPromise]);
       onAudioChange(uploadedUrl);
       showToast("Son uploadé avec succès !", "success");
     } catch (error: any) {
       console.error("Erreur upload audio:", error);
-      showToast("Erreur lors de l'upload du son", "error");
+      const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload du son. Vérifiez votre connexion et réessayez.";
+      showToast(errorMessage, "error");
     } finally {
       setIsUploadingAudio(false);
       if (audioInputRef.current) {

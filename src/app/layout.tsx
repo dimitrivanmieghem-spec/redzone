@@ -10,7 +10,6 @@ import SupportButton from "@/components/SupportButton";
 import { ToastProvider } from "@/components/ui/Toast";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { startConnectionMonitoring } from "@/lib/supabase/connection-monitor";
 import { CookieConsentProvider } from "@/contexts/CookieConsentContext";
 import { BanSimulationProvider } from "@/contexts/BanSimulationContext";
 import BanSimulationBanner from "@/components/BanSimulationBanner";
