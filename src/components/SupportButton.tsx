@@ -11,7 +11,7 @@ export default function SupportButton() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     email: user?.email || "",
-    subject: "question" as "bug" | "question" | "signalement" | "autre",
+    category: "Commercial" as "Technique" | "Contenu" | "Commercial",
     message: "",
   });
   const [submitStatus, setSubmitStatus] = useState<{
@@ -34,7 +34,7 @@ export default function SupportButton() {
     try {
       const result = await createTicket({
         email: formData.email,
-        subject: formData.subject,
+        category: formData.category,
         message: formData.message,
       });
 
@@ -46,7 +46,7 @@ export default function SupportButton() {
         // Réinitialiser le formulaire
         setFormData({
           email: user?.email || "",
-          subject: "question",
+          category: "Commercial",
           message: "",
         });
         // Fermer la modale après 2 secondes
@@ -75,7 +75,7 @@ export default function SupportButton() {
       {/* Bouton flottant */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 group"
+        className="fixed bottom-28 right-4 md:bottom-6 md:right-6 z-30 w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 group"
         aria-label="Contacter le support"
       >
         <HelpCircle size={24} className="group-hover:rotate-12 transition-transform" />
@@ -83,7 +83,7 @@ export default function SupportButton() {
 
       {/* Modale */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
@@ -93,7 +93,7 @@ export default function SupportButton() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900">Contacter le Support</h2>
-                  <p className="text-sm text-slate-600">Signaler un bug ou poser une question</p>
+                  <p className="text-sm text-slate-600">Votre demande sera automatiquement routée vers la bonne personne</p>
                 </div>
               </div>
               <button
@@ -130,28 +130,32 @@ export default function SupportButton() {
                 )}
               </div>
 
-              {/* Sujet */}
+              {/* Catégorie */}
               <div>
-                <label htmlFor="subject" className="block text-sm font-bold text-slate-900 mb-2">
-                  Sujet <span className="text-red-600">*</span>
+                <label htmlFor="category" className="block text-sm font-bold text-slate-900 mb-2">
+                  Catégorie <span className="text-red-600">*</span>
                 </label>
                 <select
-                  id="subject"
+                  id="category"
                   required
-                  value={formData.subject}
+                  value={formData.category}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      subject: e.target.value as "bug" | "question" | "signalement" | "autre",
+                      category: e.target.value as "Technique" | "Contenu" | "Commercial",
                     }))
                   }
                   className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:border-red-600 focus:outline-none transition-colors"
                 >
-                  <option value="question">❓ Question</option>
-                  <option value="bug">🐛 Bug</option>
-                  <option value="signalement">⚠️ Signalement</option>
-                  <option value="autre">📧 Autre</option>
+                  <option value="Technique">🔧 Technique (Bug, Problème technique)</option>
+                  <option value="Contenu">📝 Contenu (Signalement annonce/utilisateur)</option>
+                  <option value="Commercial">💼 Commercial (Question, Facturation)</option>
                 </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  {formData.category === "Technique" && "→ Routé vers l'Admin (Dimitri)"}
+                  {formData.category === "Contenu" && "→ Routé vers le Modérateur (Antoine)"}
+                  {formData.category === "Commercial" && "→ Routé vers l'Admin (Dimitri)"}
+                </p>
               </div>
 
               {/* Message */}

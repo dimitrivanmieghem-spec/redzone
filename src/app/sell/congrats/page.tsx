@@ -16,13 +16,13 @@ export default function CongratsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-white flex items-center justify-center px-4">
+    <main className="min-h-screen bg-neutral-950 flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">
         {/* Animation de validation */}
         <div className="mb-8 flex justify-center">
           <div className="relative">
             <div
-              className={`w-24 h-24 bg-green-100 rounded-full flex items-center justify-center transition-all duration-700 ${
+              className={`w-24 h-24 bg-green-900/30 rounded-full flex items-center justify-center transition-all duration-700 ${
                 isAnimated
                   ? "scale-100 opacity-100"
                   : "scale-0 opacity-0"
@@ -53,7 +53,7 @@ export default function CongratsPage() {
 
         {/* Titre */}
         <h1
-          className={`text-3xl md:text-4xl font-extrabold text-slate-900 mb-4 transition-all duration-500 ${
+          className={`text-3xl md:text-4xl font-extrabold text-white mb-4 transition-all duration-500 ${
             isAnimated
               ? "translate-y-0 opacity-100"
               : "translate-y-4 opacity-0"
@@ -65,7 +65,7 @@ export default function CongratsPage() {
 
         {/* Texte rassurant */}
         <p
-          className={`text-slate-900 text-lg mb-4 leading-relaxed transition-all duration-500 ${
+          className={`text-slate-300 text-lg mb-4 leading-relaxed transition-all duration-500 ${
             isAnimated
               ? "translate-y-0 opacity-100"
               : "translate-y-4 opacity-0"
@@ -77,14 +77,14 @@ export default function CongratsPage() {
 
         {/* Message de modération */}
         <div
-          className={`bg-red-50 border border-red-200 rounded-2xl p-4 mb-8 transition-all duration-500 ${
+          className={`bg-red-900/20 border border-red-500/50 rounded-2xl p-4 mb-8 transition-all duration-500 ${
             isAnimated
               ? "translate-y-0 opacity-100"
               : "translate-y-4 opacity-0"
           }`}
           style={{ transitionDelay: isAnimated ? "0.7s" : "0s" }}
         >
-          <p className="text-sm text-red-800">
+          <p className="text-sm text-red-300">
             <span className="font-semibold">🕐 En attente de validation</span>
             <br />
             Votre annonce sera visible en ligne après vérification par notre équipe. 

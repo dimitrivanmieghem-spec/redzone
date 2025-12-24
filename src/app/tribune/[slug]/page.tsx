@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, HelpCircle, Car, FileText } from "lucide-react";
 import Link from "next/link";
 import { getArticleBySlug } from "@/lib/supabase/articles-server";
 import ArticleComments from "@/components/ArticleComments";
+import { sanitizeHTML } from "@/lib/validation";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -11,7 +12,7 @@ interface PageProps {
 function getPostTypeIcon(postType?: string | null) {
   switch (postType) {
     case "question":
-      return <HelpCircle size={24} className="text-blue-600" />;
+      return <HelpCircle size={24} className="text-red-600" />;
     case "presentation":
       return <Car size={24} className="text-green-600" />;
     default:
@@ -39,9 +40,9 @@ export default async function TribunePostPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-neutral-950 text-white">
       {/* Header avec image */}
-      <div className="relative bg-gradient-to-b from-slate-900 to-slate-800 text-white">
+      <div className="relative bg-gradient-to-b from-neutral-950 via-red-950/20 to-neutral-950 text-white">
         {article.main_image_url ? (
           <div className="relative w-full h-96 overflow-hidden">
             <img
@@ -49,7 +50,7 @@ export default async function TribunePostPage({ params }: PageProps) {
               alt={article.title}
               className="absolute inset-0 w-full h-full object-cover opacity-50"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/50 to-transparent" />
           </div>
         ) : (
           <div className="w-full h-64 bg-gradient-to-br from-red-600 to-red-700" />
@@ -58,7 +59,7 @@ export default async function TribunePostPage({ params }: PageProps) {
           <div className="max-w-4xl mx-auto">
             <Link
               href="/tribune"
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors font-medium"
+              className="inline-flex items-center gap-2 text-white/80 hover:text-red-500 mb-6 transition-colors font-medium"
             >
               <ArrowLeft size={20} />
               Retour à la Tribune
@@ -89,10 +90,10 @@ export default async function TribunePostPage({ params }: PageProps) {
       {/* Contenu */}
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="prose prose-lg max-w-none">
-          <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12">
+          <div className="bg-neutral-900/50 backdrop-blur-sm rounded-3xl shadow-xl border border-white/10 p-8 md:p-12">
             <div
-              className="text-slate-700 leading-relaxed whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: article.content.replace(/\n/g, "<br />") }}
+              className="text-neutral-200 leading-relaxed whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content.replace(/\n/g, "<br />")) }}
             />
           </div>
         </div>

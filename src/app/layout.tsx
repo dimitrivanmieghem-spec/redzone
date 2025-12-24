@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import { Navbar } from "@/components/layout/navbar";
 import MobileNav from "@/components/MobileNav";
-import Footer from "@/components/Footer";
+import { Footer } from "@/components/layout/footer";
 import CookieBanner from "@/components/CookieBanner";
 import BetaBadge from "@/components/BetaBadge";
 import SupportButton from "@/components/SupportButton";
@@ -11,6 +11,8 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CookieConsentProvider } from "@/contexts/CookieConsentContext";
+import { BanSimulationProvider } from "@/contexts/BanSimulationContext";
+import BanSimulationBanner from "@/components/BanSimulationBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +25,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RedZone - Le Sanctuaire du Moteur Thermique",
+  title: "RedZone | La mécanique des puristes",
   description: "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -34,14 +36,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "fr_BE",
-    url: "https://redzone.be",
+    url: process.env.NEXT_PUBLIC_SITE_URL || "https://redzone.be",
     siteName: "RedZone",
-    title: "RedZone - Le Sanctuaire du Moteur Thermique",
+    title: "RedZone | La mécanique des puristes",
     description: "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "RedZone - Le Sanctuaire du Moteur Thermique",
+    title: "RedZone | La mécanique des puristes",
     description: "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
   },
 };
@@ -73,21 +75,24 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon.ico" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-neutral-950 text-white`}
       >
         <CookieConsentProvider>
           <AuthProvider>
-            <ToastProvider>
-              <FavoritesProvider>
-                <Navbar />
-                <div className="flex-1 pb-20 md:pb-0">{children}</div>
-                <MobileNav />
-                <Footer />
-                <CookieBanner />
-                <BetaBadge />
-                <SupportButton />
-              </FavoritesProvider>
-            </ToastProvider>
+            <BanSimulationProvider>
+              <ToastProvider>
+                <FavoritesProvider>
+                  <BanSimulationBanner />
+                  <Navbar />
+                  <div className="flex-1 pb-24 md:pb-0">{children}</div>
+                  <MobileNav />
+                  <Footer />
+                  <CookieBanner />
+                  <BetaBadge />
+                  <SupportButton />
+                </FavoritesProvider>
+              </ToastProvider>
+            </BanSimulationProvider>
           </AuthProvider>
         </CookieConsentProvider>
       </body>

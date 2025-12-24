@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
       setIsLoading(false);
       showToast("Connexion réussie 🔐", "success");
       setTimeout(() => {
-        router.push("/admin/dashboard");
+        router.push("/admin?tab=dashboard");
       }, 500);
     } catch {
       setIsLoading(false);

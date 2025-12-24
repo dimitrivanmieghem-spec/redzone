@@ -68,7 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Ne rendre le conteneur que s'il y a des toasts pour éviter l'erreur d'hydratation */}
       {toasts.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md w-full">
+        <div className="fixed bottom-4 right-4 z-[95] flex flex-col gap-2 max-w-md w-full">
           {toasts.map((toast) => (
             <div
               key={toast.id}

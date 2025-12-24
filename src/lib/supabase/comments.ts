@@ -1,7 +1,7 @@
 // RedZone - Actions Supabase pour les Commentaires
 
 import { createClient } from "./client";
-import { requireAdmin } from "./auth-utils";
+// ⚠️ Les fonctions admin (approveComment, rejectComment) sont dans server-actions/comments.ts
 
 export interface Comment {
   id: string;
@@ -57,7 +57,7 @@ export async function getApprovedComments(articleId: string): Promise<CommentWit
     .in("id", userIds);
 
   if (profilesError) {
-    console.warn("Erreur récupération profils:", profilesError);
+    // Erreur récupération profils
     // Continuer sans les profils si erreur
   }
 
@@ -173,41 +173,17 @@ export async function getPendingComments(): Promise<CommentWithAuthor[]> {
 
 /**
  * Approuver un commentaire (admin uniquement)
- * @param commentId - ID du commentaire
+ * ⚠️ DEPRECATED - Utilisez approveComment depuis server-actions/comments.ts
  */
 export async function approveComment(commentId: string): Promise<void> {
-  // Vérification admin côté code (défense en profondeur)
-  await requireAdmin();
-  
-  const supabase = createClient();
-
-  const { error } = await supabase
-    .from("comments")
-    .update({ status: "approved" })
-    .eq("id", commentId);
-
-  if (error) {
-    throw new Error(`Erreur approbation commentaire: ${error.message}`);
-  }
+  throw new Error("Cette fonction est dépréciée. Utilisez approveComment depuis server-actions/comments.ts");
 }
 
 /**
  * Rejeter un commentaire (admin uniquement)
- * @param commentId - ID du commentaire
+ * ⚠️ DEPRECATED - Utilisez rejectComment depuis server-actions/comments.ts
  */
 export async function rejectComment(commentId: string): Promise<void> {
-  // Vérification admin côté code (défense en profondeur)
-  await requireAdmin();
-  
-  const supabase = createClient();
-
-  const { error } = await supabase
-    .from("comments")
-    .update({ status: "rejected" })
-    .eq("id", commentId);
-
-  if (error) {
-    throw new Error(`Erreur rejet commentaire: ${error.message}`);
-  }
+  throw new Error("Cette fonction est dépréciée. Utilisez rejectComment depuis server-actions/comments.ts");
 }
 

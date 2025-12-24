@@ -11,7 +11,10 @@
     "deploy": "bash scripts/deploy.sh",
     "auto-deploy": "tsx scripts/auto-deploy.ts",
     "setup-vercel": "bash scripts/setup-vercel.sh",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "verify-env": "node scripts/verify-env.js",
+    "pre-deploy": "npm run verify-env && npm run build",
+    "deploy-netlify": "node scripts/deploy-to-netlify.js"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.4.0",
@@ -21,7 +24,8 @@
     "next": "16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "resend": "^6.6.0"
+    "resend": "^6.6.0",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

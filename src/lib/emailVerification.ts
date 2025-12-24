@@ -75,7 +75,6 @@ export async function sendVerificationEmail(
         throw new Error(`Erreur envoi email: ${error.message}`);
       }
       
-      console.log(`✅ Email envoyé via Resend à ${email}`);
       return;
     } catch (error) {
       console.error('Erreur lors de l\'envoi via Resend, bascule en mode simulation:', error);
@@ -83,30 +82,7 @@ export async function sendVerificationEmail(
     }
   }
 
-  // MODE SIMULATION : Console.log si Resend n'est pas configuré ou en cas d'erreur
-  console.log('='.repeat(60));
-  console.log('📧 EMAIL DE VÉRIFICATION (SIMULATION)');
-  console.log('='.repeat(60));
-  console.log(`Destinataire: ${email}`);
-  console.log(`Code de vérification: ${code}`);
-  console.log(`ID Véhicule: ${vehiculeId}`);
-  console.log('');
-  console.log('--- CONTENU EMAIL ---');
-  console.log(`Sujet: Vérifiez votre annonce RedZone`);
-  console.log('');
-  console.log(`Bonjour,`);
-  console.log('');
-  console.log(`Vous avez déposé une annonce sur RedZone.`);
-  console.log(`Pour confirmer votre annonce, veuillez entrer le code suivant:`);
-  console.log('');
-  console.log(`  ${code}`);
-  console.log('');
-  console.log(`Ce code est valide pendant 15 minutes.`);
-  console.log('');
-  console.log(`Si vous n'avez pas déposé d'annonce, ignorez cet email.`);
-  console.log('');
-  console.log(`L'équipe RedZone`);
-  console.log('='.repeat(60));
+  // MODE SIMULATION : En développement, les emails sont simulés (pas de logs en production)
 }
 
 /**

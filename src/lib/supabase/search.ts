@@ -40,37 +40,37 @@ export async function searchVehicules(
     try {
       // Construire la requête de base
       let query = supabase
-        .from("vehicules")
+        .from("vehicles")
         .select("*")
         .eq("status", "active"); // Seulement les actifs
 
       // Appliquer les filtres simples
       if (filters.marque) {
-        query = query.eq("marque", filters.marque); // Exact match pour la marque
+        query = query.eq("brand", filters.marque); // Exact match pour la marque
       }
 
       if (filters.modele) {
-        query = query.ilike("modele", `%${filters.modele}%`);
+        query = query.ilike("model", `%${filters.modele}%`);
       }
 
       if (filters.prixMin !== undefined) {
-        query = query.gte("prix", filters.prixMin);
+        query = query.gte("price", filters.prixMin);
       }
 
       if (filters.prixMax !== undefined) {
-        query = query.lte("prix", filters.prixMax);
+        query = query.lte("price", filters.prixMax);
       }
 
       if (filters.anneeMin !== undefined) {
-        query = query.gte("annee", filters.anneeMin);
+        query = query.gte("year", filters.anneeMin);
       }
 
       if (filters.anneeMax !== undefined) {
-        query = query.lte("annee", filters.anneeMax);
+        query = query.lte("year", filters.anneeMax);
       }
 
       if (filters.kmMax !== undefined) {
-        query = query.lte("km", filters.kmMax);
+        query = query.lte("mileage", filters.kmMax);
       }
 
       // Filtres avec IN (tableaux)
@@ -79,7 +79,7 @@ export async function searchVehicules(
       }
 
       if (filters.carburants && filters.carburants.length > 0) {
-        query = query.in("carburant", filters.carburants);
+        query = query.in("fuel_type", filters.carburants);
       }
 
       if (filters.transmissions && filters.transmissions.length > 0) {
@@ -87,11 +87,11 @@ export async function searchVehicules(
       }
 
       if (filters.carrosseries && filters.carrosseries.length > 0) {
-        query = query.in("carrosserie", filters.carrosseries);
+        query = query.in("body_type", filters.carrosseries);
       }
 
       if (filters.normeEuro) {
-        query = query.eq("norme_euro", filters.normeEuro);
+        query = query.eq("euro_standard", filters.normeEuro);
       }
 
       if (filters.carPassOnly) {
@@ -124,16 +124,16 @@ export async function searchVehicules(
       // Appliquer le tri
       switch (sortBy) {
         case "prix_asc":
-          query = query.order("prix", { ascending: true });
+          query = query.order("price", { ascending: true });
           break;
         case "prix_desc":
-          query = query.order("prix", { ascending: false });
+          query = query.order("price", { ascending: false });
           break;
         case "annee_desc":
-          query = query.order("annee", { ascending: false });
+          query = query.order("year", { ascending: false });
           break;
         case "km_asc":
-          query = query.order("km", { ascending: true });
+          query = query.order("mileage", { ascending: true });
           break;
         default:
           query = query.order("created_at", { ascending: false });

@@ -11,10 +11,10 @@ import { Vehicule } from "./supabase/types";
  */
 export function calculatePowerToWeightRatio(
   poids_kg?: number,
-  puissance?: number
+  power_hp?: number
 ): string | null {
-  if (!poids_kg || !puissance || puissance === 0) return null;
-  const ratio = poids_kg / puissance;
+  if (!poids_kg || !power_hp || power_hp === 0) return null;
+  const ratio = poids_kg / power_hp;
   return ratio.toFixed(2);
 }
 

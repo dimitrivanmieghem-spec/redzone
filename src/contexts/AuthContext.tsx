@@ -9,7 +9,11 @@ interface User {
   email: string;
   name: string;
   avatar: string;
-  role: "particulier" | "pro" | "admin";
+  role: "particulier" | "pro" | "admin" | "moderator";
+  is_banned?: boolean;
+  ban_reason?: string | null;
+  is_founder?: boolean;
+  ban_until?: string | null;
 }
 
 interface AuthContextType {
@@ -46,7 +50,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             error.message?.includes("session") ||
             error.message?.includes("Auth session missing")
           ) {
-            console.log("ℹ️ [AuthContext] Aucune session active (utilisateur non connecté)");
             setUser(null);
             setIsLoading(false);
             return;
@@ -70,7 +73,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error?.message?.includes("session") ||
           error?.message?.includes("Auth session missing")
         ) {
-          console.log("ℹ️ [AuthContext] Aucune session active (utilisateur non connecté)");
           setUser(null);
         } else {
           console.error("Erreur chargement utilisateur:", error);
@@ -109,11 +111,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq("id", supabaseUser.id)
         .single();
 
-      // Si l'utilisateur est banni, déconnecter
-      if (profile?.is_banned) {
-        await logout();
-        throw new Error("Votre compte a été banni. Contactez l'administrateur.");
+      // Logger l'accès au profil (RGPD - accès aux données personnelles)
+      if (profile) {
+        try {
+          const { logDataAccess } = await import("@/lib/supabase/audit-logs-client");
+          await logDataAccess("profile", supabaseUser.id, "Accès au profil utilisateur");
+        } catch (logError) {
+          // Ne pas bloquer le chargement en cas d'erreur de logging
+          console.error("Erreur lors du logging d'audit:", logError);
+        }
       }
+
+      // Vérifier si le ban a expiré
+      if (profile?.is_banned && profile?.ban_until) {
+        const banUntilDate = new Date(profile.ban_until);
+        if (banUntilDate < new Date()) {
+          // Ban expiré, débannir automatiquement
+          await supabase
+            .from("profiles")
+            .update({
+              is_banned: false,
+              ban_reason: null,
+              ban_until: null,
+            })
+            .eq("id", supabaseUser.id);
+          profile.is_banned = false;
+          profile.ban_reason = null;
+          profile.ban_until = null;
+        }
+      }
+
+      // Vérifier si l'utilisateur est fondateur (depuis user_metadata ou simulation)
+      const isFounder = Boolean(
+        supabaseUser.user_metadata?.is_founder === true ||
+        supabaseUser.user_metadata?.isFounder === true ||
+        // Simulation : les 500 premiers utilisateurs (basé sur l'ID ou la date de création)
+        (supabaseUser.created_at && new Date(supabaseUser.created_at) < new Date("2025-02-01"))
+      );
 
       setUser({
         id: supabaseUser.id,
@@ -124,6 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profile?.full_name || supabaseUser.email?.split("@")[0] || "U"
           )}&background=DC2626&color=fff&bold=true`,
         role: (profile?.role as "particulier" | "pro" | "admin") || "particulier",
+        is_banned: profile?.is_banned || false,
+        ban_reason: profile?.ban_reason || null,
+        ban_until: profile?.ban_until || null,
+        is_founder: isFounder,
       });
     } catch (error) {
       console.error("Erreur chargement profil:", error);

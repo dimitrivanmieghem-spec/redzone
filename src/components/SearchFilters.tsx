@@ -174,24 +174,37 @@ export default function SearchFilters({
           </select>
         </div>
 
-        {filters.marque && modeles.length > 0 && (
+        {filters.marque && (
           <div>
             <label htmlFor="modele" className="block text-sm font-bold text-slate-900 mb-3">
               Modèle
             </label>
-            <select
-              id="modele"
-              value={filters.modele}
-              onChange={(e) => onFilterChange("modele", e.target.value)}
-              className="w-full p-4 bg-white shadow-xl shadow-slate-100/50 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-red-600 transition-all placeholder:text-slate-900"
-            >
-              <option value="">Tous les modèles</option>
-              {modeles.map((modele) => (
-                <option key={modele} value={modele}>
-                  {modele}
-                </option>
-              ))}
-            </select>
+            {loadingModeles ? (
+              <div className="w-full p-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600"></div>
+                <span className="ml-3 text-sm text-slate-600 font-medium">Chargement des modèles...</span>
+              </div>
+            ) : modeles.length > 0 ? (
+              <select
+                id="modele"
+                value={filters.modele}
+                onChange={(e) => onFilterChange("modele", e.target.value)}
+                className="w-full p-4 bg-white shadow-xl shadow-slate-100/50 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-red-600 transition-all placeholder:text-slate-900"
+              >
+                <option value="">Tous les modèles</option>
+                {modeles.map((modele) => (
+                  <option key={modele} value={modele}>
+                    {modele}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="w-full p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl">
+                <p className="text-sm text-amber-800 font-medium">
+                  Aucun modèle trouvé pour cette marque
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

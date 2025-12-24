@@ -36,10 +36,10 @@ export default function BetaBadge() {
               <p className="text-xs text-slate-300 leading-relaxed">
                 Des bugs peuvent survenir. Un problème ? Contactez :{" "}
                 <a
-                  href="mailto:admin@redzone.be"
+                  href="mailto:dimitri.vanmieghem@gmail.com"
                   className="text-red-500 hover:text-red-400 font-bold underline"
                 >
-                  admin@redzone.be
+                  l&apos;administrateur
                 </a>
               </p>
             </div>

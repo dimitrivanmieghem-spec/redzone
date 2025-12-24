@@ -2,16 +2,21 @@
 
 import { ArrowLeft, Car, Bike, Check, AlertTriangle, ChevronRight, ChevronLeft, Upload, Music, Shield, Loader2, Building2, MapPin, Mail } from "lucide-react";
 import Link from "next/link";
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useRef, useEffect, useTransition, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBanSimulation } from "@/contexts/BanSimulationContext";
 import { useCookieConsent } from "@/contexts/CookieConsentContext";
 import { VehicleType } from "@/lib/supabase/modelSpecs";
 import { getBrands, getModels, getModelSpecs } from "@/lib/supabase/modelSpecs";
 import { checkVehicleModeration, getModerationMessage } from "@/lib/moderationUtils";
 import { uploadImages, uploadAudio } from "@/lib/supabase/uploads";
-import { createVehicule, verifyEmailCode, storeVerificationCode } from "@/lib/supabase/vehicules";
+import MediaManager from "@/components/MediaManager";
+import SearchableSelect from "@/components/SearchableSelect";
+import { verifyEmailCode, storeVerificationCode } from "@/lib/supabase/vehicules";
+import { createVehicule, saveVehicle } from "@/lib/supabase/server-actions/vehicules";
+import { getVehiculeById } from "@/lib/supabase/vehicules";
 import { logInfo, logError } from "@/lib/supabase/logs";
 import { EXTERIOR_COLORS, INTERIOR_COLORS, CARROSSERIE_TYPES, EXTERIOR_COLOR_HEX, INTERIOR_COLOR_HEX } from "@/lib/vehicleData";
 import { Turnstile } from "@marsidev/react-turnstile";
@@ -19,15 +24,37 @@ import { generateVerificationCode, sendVerificationEmail, getVerificationCodeExp
 
 type Step = 1 | 2 | 3 | 4;
 
-export default function SellPage() {
+function SellPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const { user } = useAuth();
+  const { isSimulatingBan } = useBanSimulation();
   const { hasResponded } = useCookieConsent();
+
+  // Détecter l'ID du véhicule dans l'URL (mode édition)
+  const vehiculeId = searchParams.get("id");
+  const isEditMode = !!vehiculeId;
+
+  // Combiner le ban réel et la simulation pour bloquer l'accès
+  const isEffectivelyBanned = user?.is_banned || (isSimulatingBan && user?.role === "admin");
+  const [isPending, startTransition] = useTransition();
+
+  // Bloquer l'accès si l'utilisateur est banni OU en mode simulation
+  useEffect(() => {
+    if (isEffectivelyBanned) {
+      const message = isSimulatingBan && user?.role === "admin"
+        ? "Mode test actif : Publication d'annonces désactivée (simulation)"
+        : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces.";
+      showToast(message, "error");
+      router.push("/dashboard");
+    }
+  }, [isEffectivelyBanned, isSimulatingBan, user?.role, router, showToast]);
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [isLoadingVehicle, setIsLoadingVehicle] = useState(false);
   
   // États pour la sécurité (CAPTCHA et vérification email)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -38,8 +65,6 @@ export default function SellPage() {
   // Refs pour les inputs file
   const photoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
-
-  // Plus besoin de calculer bottomOffset, les boutons sont toujours en bottom-0
 
   // Données du formulaire
   const [formData, setFormData] = useState({
@@ -89,6 +114,11 @@ export default function SellPage() {
     tvaNumber: "", // Numéro de TVA
     garageName: "", // Nom du garage
     garageAddress: "", // Adresse du garage
+    
+    // Champs pour calcul taxes belges (optionnels, pré-remplis si disponibles)
+    co2Wltp: "", // CO2 WLTP (pour Flandre) - Pré-rempli depuis la base si disponible
+    drivetrain: "", // RWD/FWD/AWD/4WD - Pré-rempli depuis la base si disponible
+    topSpeed: "", // Vitesse maximale en km/h - Pré-rempli depuis la base si disponible
   });
 
   // Auto-modération "Le Videur"
@@ -132,46 +162,195 @@ export default function SellPage() {
   const [modeles, setModeles] = useState<string[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [errorBrands, setErrorBrands] = useState<string | null>(null);
+  const [errorModels, setErrorModels] = useState<string | null>(null);
 
-  // Charger les marques quand le type change
+  // Charger les données du véhicule si on est en mode édition
+  useEffect(() => {
+    if (!isEditMode || !vehiculeId) return;
+
+    const loadVehicleData = async () => {
+      setIsLoadingVehicle(true);
+      try {
+        // Vérifier l'authentification avec getUser()
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !authUser) {
+          showToast("Vous devez être connecté pour modifier une annonce.", "error");
+          router.push("/login?redirect=/sell?id=" + vehiculeId);
+          return;
+        }
+
+        // Récupérer le véhicule
+        const vehicule = await getVehiculeById(vehiculeId);
+
+        if (!vehicule) {
+          showToast("Annonce introuvable.", "error");
+          router.push("/dashboard");
+          return;
+        }
+
+        // Vérifier que l'utilisateur est propriétaire ou admin
+        const isOwner = vehicule.owner_id === authUser.id;
+        const isAdmin = user?.role === "admin";
+
+        if (!isOwner && !isAdmin) {
+          showToast("Vous n'avez pas l'autorisation de modifier cette annonce.", "error");
+          router.push("/dashboard");
+          return;
+        }
+
+        // Pré-remplir le formulaire avec les données du véhicule (convertir colonnes anglaises vers françaises pour le formulaire)
+        setFormData({
+          type: vehicule.type || "",
+          marque: vehicule.brand || "",
+          modele: vehicule.is_manual_model ? "__AUTRE__" : (vehicule.model || ""),
+          modeleManuel: vehicule.is_manual_model ? vehicule.model : "",
+          carburant: vehicule.fuel_type || "",
+          prix: vehicule.price?.toString() || "",
+          annee: vehicule.year?.toString() || "",
+          km: vehicule.mileage?.toString() || "",
+          transmission: vehicule.transmission || "",
+          puissance: vehicule.power_hp?.toString() || "",
+          puissanceKw: "", // Calculer si nécessaire
+          cvFiscaux: vehicule.fiscal_horsepower?.toString() || "",
+          co2: vehicule.co2?.toString() || "",
+          cylindree: vehicule.displacement_cc?.toString() || "",
+          moteur: vehicule.engine_architecture || "",
+          architectureMoteur: vehicule.engine_architecture || "",
+          description: vehicule.description || "",
+          carrosserie: vehicule.body_type || "",
+          couleurExterieure: "", // Pas dans le type actuel
+          couleurInterieure: vehicule.interior_color || "",
+          nombrePlaces: vehicule.seats_count?.toString() || "",
+          photos: vehicule.images && Array.isArray(vehicule.images) ? vehicule.images : (vehicule.image ? [vehicule.image] : []),
+          photoFiles: [],
+          audioFile: null,
+          audioUrl: vehicule.audio_file || null,
+          carPassUrl: vehicule.car_pass_url || "",
+          history: vehicule.history && Array.isArray(vehicule.history) ? vehicule.history : [],
+          telephone: vehicule.phone || "",
+          contactEmail: vehicule.contact_email || user?.email || "",
+          contactMethods: vehicule.contact_methods && Array.isArray(vehicule.contact_methods) ? vehicule.contact_methods : [],
+          ville: vehicule.city || "",
+          codePostal: vehicule.postal_code || "",
+          tvaNumber: "",
+          garageName: "",
+          garageAddress: "",
+          // Champs optionnels (pré-remplis si disponibles)
+          co2Wltp: vehicule.co2_wltp?.toString() || "",
+          drivetrain: vehicule.drivetrain || "",
+          topSpeed: vehicule.top_speed?.toString() || "",
+        });
+
+        // Définir hasCo2Data si CO2 existe
+        if (vehicule.co2 !== null && vehicule.co2 !== undefined) {
+          setHasCo2Data(true);
+        }
+
+      } catch (error: any) {
+        console.error("❌ [Sell] Erreur chargement véhicule:", error);
+        showToast("Erreur lors du chargement de l'annonce. Veuillez réessayer.", "error");
+        router.push("/dashboard");
+      } finally {
+        setIsLoadingVehicle(false);
+      }
+    };
+
+    loadVehicleData();
+  }, [isEditMode, vehiculeId, user, router, showToast]);
+
+  // Charger les marques quand le type change (avec gestion d'erreur robuste)
   useEffect(() => {
     if (!formData.type) {
       setMarques([]);
+      setErrorBrands(null);
       return;
     }
     
-    setLoadingBrands(true);
-    getBrands(formData.type as VehicleType)
-      .then((brands) => {
-        setMarques(brands);
-        setLoadingBrands(false);
-      })
-      .catch((error) => {
-        console.error('Erreur chargement marques:', error);
-        setMarques([]);
-        setLoadingBrands(false);
-      });
-  }, [formData.type]);
+    // Vérifier que l'utilisateur n'est pas banni avant de charger
+    if (isEffectivelyBanned) {
+      setMarques([]);
+      setErrorBrands(
+        isSimulatingBan && user?.role === "admin"
+          ? "Mode test actif : Publication d'annonces désactivée (simulation)"
+          : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces."
+      );
+      return;
+    }
 
-  // Charger les modèles quand la marque change
+    // Charger les marques avec le client Browser (plus rapide, indépendant de la session serveur)
+    const loadBrands = async () => {
+      try {
+        // Vérifier l'authentification avec getUser() si l'utilisateur est connecté
+        if (user) {
+          const { createClient } = await import("@/lib/supabase/client");
+          const supabase = createClient();
+          const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+          
+          if (authError || !authUser) {
+            console.warn("⚠️ [Sell] Utilisateur non authentifié, chargement marques en mode invité");
+          }
+        }
+
+        setLoadingBrands(true);
+        setErrorBrands(null);
+        
+        // Utiliser getBrands qui utilise déjà le client browser
+        const brands = await getBrands(formData.type as VehicleType);
+        
+        if (brands.length === 0) {
+          setErrorBrands("Impossible de charger les marques. Réessayez.");
+          console.error("❌ [Sell] Aucune marque récupérée");
+        } else {
+          setMarques(brands);
+          setErrorBrands(null);
+        }
+      } catch (error: any) {
+        console.error('❌ [Sell] Erreur chargement marques:', error);
+        setErrorBrands("Impossible de charger les marques. Réessayez.");
+        setMarques([]);
+        showToast("Erreur lors du chargement des marques. Veuillez réessayer.", "error");
+      } finally {
+        setLoadingBrands(false);
+      }
+    };
+
+    loadBrands();
+  }, [formData.type, isEffectivelyBanned, user, showToast]);
+
+  // Charger les modèles quand la marque change (avec gestion d'erreur robuste)
   useEffect(() => {
     if (!formData.marque || !formData.type) {
       setModeles([]);
+      setErrorModels(null);
       return;
     }
     
     setLoadingModels(true);
+    setErrorModels(null);
+    
     getModels(formData.type as VehicleType, formData.marque)
       .then((models) => {
-        setModeles(models);
-        setLoadingModels(false);
+        if (models.length === 0) {
+          setErrorModels("Aucun modèle trouvé pour cette marque");
+        } else {
+          setModeles(models);
+          setErrorModels(null);
+        }
       })
       .catch((error) => {
-        console.error('Erreur chargement modèles:', error);
+        console.error('❌ [Sell] Erreur chargement modèles:', error);
+        setErrorModels("Impossible de charger les modèles. Réessayez.");
         setModeles([]);
+        showToast("Erreur lors du chargement des modèles.", "error");
+      })
+      .finally(() => {
         setLoadingModels(false);
       });
-  }, [formData.type, formData.marque]);
+  }, [formData.type, formData.marque, showToast]);
 
   // Vérifier si le modèle est "Autre / Modèle non listé"
   const isManualModel = formData.modele === "__AUTRE__";
@@ -209,37 +388,11 @@ export default function SellPage() {
 
   // Pré-remplissage automatique quand un modèle est sélectionné
   useEffect(() => {
-    // Debug: Log les valeurs pour diagnostic
-    console.log('🔍 useEffect specs - Conditions:', {
-      type: formData.type,
-      marque: formData.marque,
-      modele: formData.modele,
-      isManualModel,
-      shouldFetch: !!(formData.type && formData.marque && formData.modele && !isManualModel)
-    });
-
     if (formData.type && formData.marque && formData.modele && !isManualModel) {
-      console.log('📡 Appel getModelSpecs:', {
-        type: formData.type,
-        brand: formData.marque,
-        model: formData.modele
-      });
-
       getModelSpecs(formData.type as VehicleType, formData.marque, formData.modele)
         .then((specs) => {
-          console.log('✅ Réponse getModelSpecs:', specs);
           if (specs) {
             const extractedArch = extractArchitecture(specs.moteur || "");
-            console.log('📝 Pré-remplissage des champs avec:', {
-              ch: specs.ch,
-              kw: specs.kw,
-              cv_fiscaux: specs.cv_fiscaux,
-              co2: specs.co2,
-              cylindree: specs.cylindree,
-              moteur: specs.moteur,
-              transmission: specs.transmission,
-              architecture: extractedArch
-            });
             
             // Mettre à jour l'état hasCo2Data basé sur les specs
             const co2Exists = specs.co2 !== null && specs.co2 !== undefined;
@@ -257,25 +410,23 @@ export default function SellPage() {
               architectureMoteur: prev.architectureMoteur || extractedArch,
               transmission: prev.transmission || specs.transmission.toLowerCase(),
               carrosserie: prev.carrosserie || specs.default_carrosserie || "",
+              // Nouveaux champs pré-remplis si disponibles
+              co2Wltp: prev.co2Wltp || (specs.co2_wltp ? specs.co2_wltp.toString() : ""),
+              drivetrain: prev.drivetrain || specs.drivetrain || "",
+              topSpeed: prev.topSpeed || (specs.top_speed ? specs.top_speed.toString() : ""),
+              couleurExterieure: prev.couleurExterieure || specs.default_color || "",
+              nombrePlaces: prev.nombrePlaces || (specs.default_seats ? specs.default_seats.toString() : ""),
             }));
-            console.log('✅ Champs pré-remplis avec succès');
           } else {
-            console.warn('⚠️ getModelSpecs a retourné null - Aucune spec trouvée');
             // Si pas de specs, on cache le champ CO2
             setHasCo2Data(false);
           }
         })
         .catch((error) => {
-          console.error('❌ Erreur récupération specs:', error);
-          console.error('Détails erreur:', {
-            message: error.message,
-            code: error.code,
-            details: error
-          });
+          console.error('Erreur récupération specs:', error);
         });
     } else if (isManualModel) {
       // Si "Autre" est sélectionné, vider les champs techniques
-      console.log('🧹 Mode manuel activé - Vidage des champs techniques');
       // Cacher le champ CO2 en mode manuel
       setHasCo2Data(false);
       setFormData((prev) => ({
@@ -288,16 +439,24 @@ export default function SellPage() {
         moteur: "",
         architectureMoteur: "",
         transmission: "",
+        co2Wltp: "",
+        drivetrain: "",
+        topSpeed: "",
       }));
     }
   }, [formData.type, formData.marque, formData.modele, isManualModel]);
 
+  // Constantes pour validation carburant (thermique uniquement)
+  const VALID_CARBURANTS = ["essence", "e85", "lpg"] as const;
+  const FORBIDDEN_CARBURANTS = ["electrique", "electric", "électrique", "ELECTRIQUE", "hybride", "diesel"];
+
   // Validation des étapes
   const isStep1Valid = useMemo(() => {
-    // Validation stricte : Rejeter "electrique" même si injecté
-    const isValidCarburant = formData.carburant && 
-      formData.carburant !== "electrique" && 
-      ["essence", "e85", "lpg"].includes(formData.carburant);
+    // Validation stricte : Rejeter tout carburant non-thermique
+    const carburant = formData.carburant?.toLowerCase() || "";
+    const isValidCarburant = carburant && 
+      !FORBIDDEN_CARBURANTS.includes(carburant) &&
+      VALID_CARBURANTS.includes(carburant as typeof VALID_CARBURANTS[number]);
     
     return !!(
       formData.type &&
@@ -435,15 +594,25 @@ export default function SellPage() {
       return;
     }
 
-    // Vérification stricte : Rejeter "electrique" même si injecté
-    if (formData.carburant === "electrique" || !["essence", "e85", "lpg"].includes(formData.carburant)) {
-      showToast("⛔ RedZone est dédié aux sportives thermiques uniquement. Les véhicules électriques ne sont pas acceptés.", "error");
+    // Validation stricte : Rejeter tout carburant non-thermique
+    const carburant = formData.carburant?.toLowerCase() || "";
+    if (!carburant || FORBIDDEN_CARBURANTS.includes(carburant) || !VALID_CARBURANTS.includes(carburant as typeof VALID_CARBURANTS[number])) {
+      showToast("⛔ RedZone est dédié aux sportives thermiques uniquement. Les véhicules électriques, hybrides et diesel ne sont pas acceptés.", "error");
       return;
     }
 
     // Vérification stricte : Au moins une photo obligatoire
     if (formData.photos.length === 0) {
       showToast("Photo obligatoire ! Une annonce de sportive doit avoir au moins une photo pour être validée.", "error");
+      return;
+    }
+
+    // Vérifier le mode simulation banni
+    if (isEffectivelyBanned) {
+      const message = isSimulatingBan && user?.role === "admin"
+        ? "Mode test actif : Publication d'annonces désactivée (simulation)"
+        : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces.";
+      showToast(message, "error");
       return;
     }
 
@@ -456,89 +625,126 @@ export default function SellPage() {
         throw new Error("Email de contact requis");
       }
 
-      // Créer le véhicule dans Supabase (mode hybride : user ou invité)
-      const vehiculeId = await createVehicule({
+      // Préparer les données du véhicule (colonnes anglaises)
+      const vehiculeData = {
         type: formData.type as "car" | "moto",
-        marque: formData.marque,
-        modele: isManualModel ? formData.modeleManuel : formData.modele,
-        prix: parseFloat(formData.prix),
-        annee: parseInt(formData.annee),
-        km: parseInt(formData.km),
-        carburant: formData.carburant as "essence" | "e85" | "lpg",
+        brand: formData.marque,
+        model: isManualModel ? formData.modeleManuel : formData.modele,
+        price: parseFloat(formData.prix),
+        year: parseInt(formData.annee),
+        mileage: parseInt(formData.km),
+        fuel_type: formData.carburant as "essence" | "e85" | "lpg",
         transmission: formData.transmission as "manuelle" | "automatique" | "sequentielle",
-        carrosserie: formData.carrosserie || (formData.type === "car" ? "Coupé" : "Sportive"),
-        puissance: parseInt(formData.puissance),
-        etat: "Occasion",
-        norme_euro: "euro6d",
+        body_type: formData.carrosserie || (formData.type === "car" ? "Coupé" : "Sportive"),
+        power_hp: parseInt(formData.puissance),
+        condition: "Occasion" as "Neuf" | "Occasion",
+        euro_standard: "euro6d",
         car_pass: !!formData.carPassUrl, // true si URL fournie
         image: formData.photos[0] || "",
         images: formData.photos.length > 0 ? formData.photos : null,
         description: formData.description || null,
-        architecture_moteur: formData.moteur || formData.architectureMoteur || null,
+        engine_architecture: formData.moteur || formData.architectureMoteur || null,
         admission: null,
-        couleur_interieure: formData.couleurInterieure || null,
-        nombre_places: formData.nombrePlaces ? parseInt(formData.nombrePlaces) : null,
+        interior_color: formData.couleurInterieure || null,
+        seats_count: formData.nombrePlaces ? parseInt(formData.nombrePlaces) : null,
         zero_a_cent: null,
         co2: formData.co2 ? parseInt(formData.co2) : null,
         poids_kg: null,
-        cv_fiscaux: formData.cvFiscaux ? parseInt(formData.cvFiscaux) : null,
+        fiscal_horsepower: formData.cvFiscaux ? parseInt(formData.cvFiscaux) : null,
         car_pass_url: formData.carPassUrl || null,
         audio_file: formData.audioUrl || null,
         history: formData.history.length > 0 ? formData.history : null,
         is_manual_model: isManualModel, // Flag pour l'admin
-        telephone: formData.telephone || null,
+        phone: formData.telephone || null,
         contact_email: contactEmail,
         contact_methods: formData.contactMethods.length > 0 ? formData.contactMethods : null,
-        ville: formData.ville || null,
-        code_postal: formData.codePostal || null,
-      }, user?.id || null, user ? null : contactEmail); // userId si connecté, sinon guestEmail
+        city: formData.ville || null,
+        postal_code: formData.codePostal || null,
+        // Champs pour taxes (optionnels, pré-remplis si disponibles)
+        displacement_cc: formData.cylindree ? parseInt(formData.cylindree) : null,
+        co2_wltp: formData.co2Wltp ? parseInt(formData.co2Wltp) : null,
+        drivetrain: formData.drivetrain as "RWD" | "FWD" | "AWD" | "4WD" | null || null,
+        top_speed: formData.topSpeed ? parseInt(formData.topSpeed) : null,
+      };
+
+      // Sauvegarder le véhicule (CREATE ou UPDATE selon le mode)
+      const savedVehiculeId = await saveVehicle(
+        isEditMode ? vehiculeId : null, // ID si édition, null si création
+        vehiculeData,
+        user?.id || null,
+        user ? null : contactEmail // userId si connecté, sinon guestEmail
+      );
 
       // Log de succès (seulement si connecté)
       if (user) {
         await logInfo(
-          `Ad [${vehiculeId}] submitted successfully by User [${user.id}]`,
+          `Ad [${savedVehiculeId}] ${isEditMode ? "updated" : "submitted"} successfully by User [${user.id}]`,
           user.id,
           {
-            vehicule_id: vehiculeId,
+            vehicule_id: savedVehiculeId,
             marque: formData.marque,
             modele: isManualModel ? formData.modeleManuel : formData.modele,
             prix: parseFloat(formData.prix),
             is_manual_model: isManualModel,
+            is_edit: isEditMode,
           }
         );
         
-        // Utilisateur connecté : redirection directe
-        showToast("Annonce publiée ! En attente de validation par l'admin.", "success");
-        router.push("/sell/congrats");
+        // Utilisateur connecté : redirection selon le mode
+        if (isEditMode) {
+          showToast("Annonce modifiée avec succès !", "success");
+          
+          // Rafraîchir avant la redirection pour synchroniser
+          startTransition(() => {
+            router.refresh();
+          });
+          
+          router.push("/dashboard");
+        } else {
+          showToast("Annonce publiée ! En attente de validation par l'admin.", "success");
+          
+          // Rafraîchir avant la redirection pour synchroniser
+          startTransition(() => {
+            router.refresh();
+          });
+          
+          router.push("/sell/congrats");
+        }
       } else {
-        // Invité : générer et envoyer le code de vérification
-        const code = generateVerificationCode();
-        const expiresAt = getVerificationCodeExpiry();
-        
-        // Stocker le code hashé dans la base
-        await storeVerificationCode(vehiculeId, code, expiresAt);
-        
-        // Envoyer l'email (simulation pour l'instant)
-        await sendVerificationEmail(contactEmail, code, vehiculeId);
-        
-        // Log pour invité
-        await logInfo(
-          `Ad [${vehiculeId}] submitted by Guest [${contactEmail}], waiting email verification`,
-          undefined,
-          {
-            vehicule_id: vehiculeId,
-            marque: formData.marque,
-            modele: isManualModel ? formData.modeleManuel : formData.modele,
-            prix: parseFloat(formData.prix),
-            is_manual_model: isManualModel,
-            guest_email: contactEmail,
-          }
-        );
-        
-        // Passer à l'étape 4 : vérification email
-        setVehiculeIdForVerification(vehiculeId);
-        setCurrentStep(4);
-        showToast("Un email de vérification vous a été envoyé !", "success");
+        // Invité : générer et envoyer le code de vérification (uniquement en mode création)
+        if (!isEditMode) {
+          const code = generateVerificationCode();
+          const expiresAt = getVerificationCodeExpiry();
+          
+          // Stocker le code hashé dans la base
+          await storeVerificationCode(savedVehiculeId, code, expiresAt);
+          
+          // Envoyer l'email (simulation pour l'instant)
+          await sendVerificationEmail(contactEmail, code, savedVehiculeId);
+          
+          // Log pour invité
+          await logInfo(
+            `Ad [${savedVehiculeId}] submitted by Guest [${contactEmail}], waiting email verification`,
+            undefined,
+            {
+              vehicule_id: savedVehiculeId,
+              marque: formData.marque,
+              modele: isManualModel ? formData.modeleManuel : formData.modele,
+              prix: parseFloat(formData.prix),
+              is_manual_model: isManualModel,
+              guest_email: contactEmail,
+            }
+          );
+          
+          // Passer à l'étape 4 : vérification email
+          setVehiculeIdForVerification(savedVehiculeId);
+          setCurrentStep(4);
+          showToast("Un email de vérification vous a été envoyé !", "success");
+        } else {
+          // Mode édition pour invité (ne devrait pas arriver normalement)
+          showToast("Annonce modifiée avec succès !", "success");
+          router.push("/dashboard");
+        }
       }
     } catch (error: any) {
       console.error("Erreur publication:", error);
@@ -671,7 +877,8 @@ export default function SellPage() {
     }
   };
 
-  // Supprimer une photo
+  // Supprimer une photo (gérée par MediaManager maintenant)
+  // Cette fonction est conservée pour compatibilité mais n'est plus utilisée
   const removePhoto = (index: number) => {
     setFormData(prev => ({
       ...prev,
@@ -700,73 +907,103 @@ export default function SellPage() {
   };
 
   return (
-    <div className="min-h-0 sm:min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-0 sm:min-h-screen bg-neutral-950 pb-24 md:pb-0">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 shadow-md">
+      <div className="bg-neutral-900/50 border-b border-white/10 shadow-md">
         <div className="max-w-4xl mx-auto px-6 py-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-slate-700 hover:text-red-600 font-bold transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-neutral-300 hover:text-red-600 font-bold transition-colors mb-6"
           >
             <ArrowLeft size={20} />
             Retour
           </Link>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
-            🏁 Vendez votre sportive
+          <h1 className="text-4xl font-black text-white tracking-wide mb-2">
+            {isEditMode ? "Éditer la fiche technique" : "Confier un véhicule"}
           </h1>
-          <p className="text-slate-600">
-            Publication rapide • Visibilité maximale • Commission 0%
+          <p className="text-neutral-300 text-lg font-light tracking-wide">
+            {isEditMode 
+              ? "Mettez à jour les informations de votre véhicule" 
+              : "Ajoutez votre véhicule au Showroom RedZone • Visibilité premium • Commission 0%"}
           </p>
         </div>
       </div>
 
       {/* Barre de Progression */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
+      <div className="bg-neutral-900/50 border-b border-white/10 shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Étape 1 */}
-            <div className="flex items-center gap-3 flex-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep > 1) {
+                  setCurrentStep(1);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
+              disabled={currentStep === 1}
+              className={`flex items-center gap-3 flex-1 transition-opacity ${
+                currentStep > 1 ? "cursor-pointer hover:opacity-80" : "cursor-default"
+              }`}
+            >
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all ${
                   currentStep >= 1
                     ? "bg-red-600 text-white"
-                    : "bg-slate-200 text-slate-500"
+                    : "bg-neutral-200 text-neutral-500"
+                } ${
+                  currentStep > 1 ? "hover:scale-110" : ""
                 }`}
               >
                 {currentStep > 1 ? <Check size={20} /> : "1"}
               </div>
               <span
-                className={`font-bold text-sm ${
-                  currentStep >= 1 ? "text-slate-900" : "text-slate-400"
+                className={`font-bold text-sm tracking-wide ${
+                  currentStep >= 1 ? "text-white" : "text-neutral-400"
                 }`}
               >
-                L&apos;Essentiel
+                L&apos;Identité
               </span>
-            </div>
+            </button>
 
-            <div className={`h-1 flex-1 ${currentStep >= 2 ? "bg-red-600" : "bg-slate-200"}`} />
+            <div className={`h-1 flex-1 ${currentStep >= 2 ? "bg-red-600" : "bg-neutral-700"}`} />
 
             {/* Étape 2 */}
-            <div className="flex items-center gap-3 flex-1 justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep > 2) {
+                  setCurrentStep(2);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
+              disabled={currentStep === 2 || currentStep < 2}
+              className={`flex items-center gap-3 flex-1 justify-center transition-opacity ${
+                currentStep > 2 ? "cursor-pointer hover:opacity-80" : "cursor-default"
+              }`}
+            >
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all ${
                   currentStep >= 2
                     ? "bg-red-600 text-white"
-                    : "bg-slate-200 text-slate-500"
+                    : "bg-neutral-700 text-neutral-400"
+                } ${
+                  currentStep > 2 ? "hover:scale-110" : ""
                 }`}
               >
                 {currentStep > 2 ? <Check size={20} /> : "2"}
               </div>
               <span
-                className={`font-bold text-sm ${
-                  currentStep >= 2 ? "text-slate-900" : "text-slate-400"
+                className={`font-bold text-sm tracking-wide ${
+                  currentStep >= 2 ? "text-white" : "text-neutral-400"
                 }`}
               >
-                Les Chiffres
+                Caractéristiques & Configuration
               </span>
-            </div>
+            </button>
 
-            <div className={`h-1 flex-1 ${currentStep >= 3 ? "bg-red-600" : "bg-slate-200"}`} />
+            <div className={`h-1 flex-1 ${currentStep >= 3 ? "bg-red-600" : "bg-neutral-700"}`} />
 
             {/* Étape 3 */}
             <div className="flex items-center gap-3 flex-1 justify-end">
@@ -774,17 +1011,17 @@ export default function SellPage() {
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${
                   currentStep >= 3
                     ? "bg-red-600 text-white"
-                    : "bg-slate-200 text-slate-500"
+                    : "bg-neutral-700 text-neutral-400"
                 }`}
               >
                 3
               </div>
               <span
-                className={`font-bold text-sm ${
-                  currentStep >= 3 ? "text-slate-900" : "text-slate-400"
+                className={`font-bold text-sm tracking-wide ${
+                  currentStep >= 3 ? "text-white" : "text-neutral-400"
                 }`}
               >
-                Finitions
+                La Galerie
               </span>
             </div>
           </div>
@@ -793,15 +1030,16 @@ export default function SellPage() {
 
       {/* Contenu du Wizard */}
       <div className="max-w-4xl mx-auto px-6 py-6 sm:py-12">
-        <div className="bg-white rounded-3xl shadow-2xl shadow-slate-300/50 p-8 md:p-12">
-          {/* ÉTAPE 1 : L'Essentiel */}
+        <div className="bg-neutral-900/50 backdrop-blur-sm rounded-3xl shadow-2xl shadow-black/50 border border-white/10 p-8 md:p-12">
+          {/* ÉTAPE 1 : L'Identité */}
           {currentStep === 1 && (
             <div className="space-y-8">
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">
-                  Quel type de véhicule ?
+              {/* Section 1 : L'Identité (Card) */}
+              <div className="bg-neutral-800/50 rounded-2xl border border-white/10 p-6 md:p-8">
+                <h2 className="text-2xl font-black text-white mb-2 tracking-wide">
+                  L&apos;Identité
                 </h2>
-                <p className="text-slate-600 mb-6">Choisissez votre catégorie</p>
+                <p className="text-neutral-300 mb-6 font-light">Marque, modèle et essence</p>
 
                 <div className="grid grid-cols-2 gap-4">
                   <button
@@ -809,15 +1047,15 @@ export default function SellPage() {
                     onClick={() => handleTypeChange("car")}
                     className={`p-6 rounded-2xl border-4 transition-all hover:scale-105 ${
                       formData.type === "car"
-                        ? "border-red-600 bg-red-50 shadow-xl shadow-red-600/20"
-                        : "border-slate-200 hover:border-slate-300"
+                        ? "border-red-600 bg-red-900/20 shadow-xl shadow-red-600/20"
+                        : "border-neutral-700 hover:border-neutral-600 bg-neutral-800/50"
                     }`}
                   >
                     <Car
                       size={48}
-                      className={formData.type === "car" ? "text-red-600 mx-auto mb-3" : "text-slate-400 mx-auto mb-3"}
+                      className={formData.type === "car" ? "text-red-500 mx-auto mb-3" : "text-neutral-400 mx-auto mb-3"}
                     />
-                    <p className="font-black text-lg text-slate-900">Voiture</p>
+                    <p className="font-black text-lg text-white">Voiture</p>
                     {formData.type === "car" && (
                       <div className="mt-2">
                         <span className="inline-flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold">
@@ -833,15 +1071,15 @@ export default function SellPage() {
                     onClick={() => handleTypeChange("moto")}
                     className={`p-6 rounded-2xl border-4 transition-all hover:scale-105 ${
                       formData.type === "moto"
-                        ? "border-red-600 bg-red-50 shadow-xl shadow-red-600/20"
-                        : "border-slate-200 hover:border-slate-300"
+                        ? "border-red-600 bg-red-900/20 shadow-xl shadow-red-600/20"
+                        : "border-neutral-700 hover:border-neutral-600 bg-neutral-800/50"
                     }`}
                   >
                     <Bike
                       size={48}
-                      className={formData.type === "moto" ? "text-red-600 mx-auto mb-3" : "text-slate-400 mx-auto mb-3"}
+                      className={formData.type === "moto" ? "text-red-500 mx-auto mb-3" : "text-neutral-400 mx-auto mb-3"}
                     />
-                    <p className="font-black text-lg text-slate-900">Moto</p>
+                    <p className="font-black text-lg text-white">Moto</p>
                     {formData.type === "moto" && (
                       <div className="mt-2">
                         <span className="inline-flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold">
@@ -856,56 +1094,46 @@ export default function SellPage() {
 
               {formData.type && (
                 <>
-                  {/* Marque */}
+                  {/* Marque - SearchableSelect */}
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3">
-                      Marque *
-                    </label>
-                    <select
+                    <SearchableSelect
                       value={formData.marque}
-                      onChange={(e) => handleMarqueChange(e.target.value)}
-                      className="w-full p-4 bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
-                    >
-                      <option value="">Sélectionnez une marque</option>
-                      {marques.map((marque) => (
-                        <option key={marque} value={marque}>
-                          {marque}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => handleMarqueChange(value)}
+                      options={marques}
+                      placeholder="Rechercher une marque..."
+                      label="Marque"
+                      loading={loadingBrands}
+                      error={errorBrands}
+                      disabled={isEffectivelyBanned || !formData.type}
+                      required
+                    />
                   </div>
 
-                  {/* Modèle */}
+                  {/* Modèle - SearchableSelect */}
                   {formData.marque && (
                     <div>
-                      <label className="block text-sm font-bold text-slate-900 mb-3">
-                        Modèle *
-                      </label>
-                      <select
+                      <SearchableSelect
                         value={formData.modele}
-                        onChange={(e) => {
-                          const newModele = e.target.value;
-                          setFormData({ ...formData, modele: newModele });
+                        onChange={(value) => {
+                          setFormData({ ...formData, modele: value });
                         }}
-                        className="w-full p-4 bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
-                      >
-                        <option value="">Sélectionnez un modèle</option>
-                        {modeles.map((modele) => (
-                          <option key={modele} value={modele}>
-                            {modele}
-                          </option>
-                        ))}
-                        <option value="__AUTRE__">⚠️ Autre / Modèle non listé</option>
-                      </select>
+                        options={[...modeles, "__AUTRE__"]}
+                        placeholder="Rechercher un modèle..."
+                        label="Modèle"
+                        loading={loadingModels}
+                        error={errorModels}
+                        disabled={!formData.marque}
+                        required
+                      />
                       {isManualModel && (
                         <div className="mt-3 space-y-3">
-                          <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-xl">
-                            <p className="text-sm font-bold text-amber-900 mb-2">
+                          <div className="p-4 bg-amber-900/20 border-2 border-amber-600/40 rounded-xl">
+                            <p className="text-sm font-bold text-amber-300 mb-2">
                               ⚠️ Modèle non listé : Tous les champs techniques deviennent obligatoires.
                             </p>
                           </div>
                           <div>
-                            <label className="block text-sm font-bold text-slate-900 mb-2">
+                            <label className="block text-sm font-bold text-white mb-2">
                               Nom du modèle *
                             </label>
                             <input
@@ -915,7 +1143,7 @@ export default function SellPage() {
                                 setFormData({ ...formData, modeleManuel: e.target.value })
                               }
                               placeholder="Ex: 911 GT3 RS (992)"
-                              className="w-full p-4 bg-white border-2 border-amber-400 rounded-2xl focus:ring-4 focus:ring-amber-600/20 focus:border-amber-600 text-slate-900 font-medium"
+                              className="w-full p-4 bg-neutral-800 border-2 border-amber-400 rounded-2xl focus:ring-4 focus:ring-amber-600/20 focus:border-amber-600 text-white font-medium"
                               required
                             />
                           </div>
@@ -926,7 +1154,7 @@ export default function SellPage() {
 
                   {/* Carburant */}
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3">
+                    <label className="block text-sm font-bold text-white mb-3">
                       Carburant *
                     </label>
                     <div className="grid grid-cols-3 gap-4">
@@ -943,18 +1171,18 @@ export default function SellPage() {
                           }
                           className={`p-4 rounded-2xl border-4 transition-all hover:scale-105 ${
                             formData.carburant === carb.value
-                              ? "border-red-600 bg-red-50 shadow-lg"
-                              : "border-slate-200 hover:border-slate-300"
+                              ? "border-red-600 bg-red-900/20 shadow-lg"
+                              : "border-white/10 hover:border-white/20 bg-neutral-800/50"
                           }`}
                         >
                           <span className="text-3xl mb-2 block">{carb.emoji}</span>
-                          <p className="font-bold text-sm text-slate-900">
+                          <p className="font-bold text-sm text-white">
                             {carb.label}
                           </p>
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-red-600 mt-3 font-bold bg-red-50 p-3 rounded-xl border-2 border-red-200">
+                    <p className="text-xs text-red-400 mt-3 font-bold bg-red-900/20 p-3 rounded-xl border-2 border-red-600/40">
                       🏁 RedZone est dédié aux sportives thermiques uniquement. Pas de Diesel, Hybride ou Électrique.
                     </p>
                   </div>
@@ -990,20 +1218,30 @@ export default function SellPage() {
             </div>
           )}
 
-          {/* ÉTAPE 2 : Les Chiffres */}
+          {/* ÉTAPE 2 : Caractéristiques & Configuration */}
           {currentStep === 2 && (
             <div className="space-y-8">
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">
-                  Les caractéristiques
+              {/* Section 2 : Caractéristiques & Configuration (Card) */}
+              <div className="bg-slate-800/50 rounded-2xl border border-white/10 p-6 md:p-8">
+                <h2 className="text-2xl font-black text-white mb-2 tracking-wide">
+                  Caractéristiques & Configuration
                 </h2>
-                <p className="text-slate-600 mb-6">Soyez précis pour attirer les acheteurs</p>
-              </div>
+                <p className="text-slate-300 mb-6 font-light">Moteur, transmission et configuration esthétique</p>
 
-              <div className="grid grid-cols-2 gap-6">
+                {/* Sous-Section A : Mécanique & Performance */}
+                <div className="mb-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
+                    <h3 className="text-lg font-bold text-red-500/90 tracking-wide">
+                      Mécanique & Performance
+                    </h3>
+                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
+                  </div>
+
+                <div className="grid grid-cols-2 gap-6">
                 {/* Prix */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Prix (€) *
                   </label>
                   <input
@@ -1012,13 +1250,13 @@ export default function SellPage() {
                     value={formData.prix}
                     onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
                     placeholder="Ex: 145000"
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-bold text-xl"
+                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-bold text-xl placeholder:text-slate-500"
                   />
                 </div>
 
                 {/* Année */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Année *
                   </label>
                   <input
@@ -1029,13 +1267,13 @@ export default function SellPage() {
                     placeholder="Ex: 2021"
                     min="1950"
                     max={new Date().getFullYear() + 1}
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
                 </div>
 
                 {/* Kilométrage */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Kilométrage *
                   </label>
                   <input
@@ -1045,13 +1283,13 @@ export default function SellPage() {
                     onChange={(e) => setFormData({ ...formData, km: e.target.value })}
                     placeholder="Ex: 18000"
                     min="0"
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
                 </div>
 
                 {/* Puissance */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Puissance (ch) *
                   </label>
                   <input
@@ -1063,15 +1301,15 @@ export default function SellPage() {
                     }
                     placeholder="Ex: 450"
                     min="1"
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
                 </div>
 
                 {/* CV Fiscaux */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Puissance Fiscale (CV) *
-                    <span className="text-xs font-normal text-slate-600 ml-2">(Pour taxe annuelle)</span>
+                    <span className="text-xs font-normal text-slate-400 ml-2">(Pour taxe annuelle)</span>
                   </label>
                   <input
                     type="number"
@@ -1082,14 +1320,14 @@ export default function SellPage() {
                     }
                     placeholder="Ex: 17"
                     min="1"
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
                 </div>
 
                 {/* CO2 - Affiché uniquement si les specs contiennent des données CO2 */}
                 {hasCo2Data && (
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3">
+                    <label className="block text-sm font-bold text-white mb-3">
                       Émissions CO2 (g/km) *
                     </label>
                     <input
@@ -1101,14 +1339,14 @@ export default function SellPage() {
                       }
                       placeholder="Ex: 233"
                       min="0"
-                      className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                      className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                     />
                   </div>
                 )}
 
                 {/* Cylindrée */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Cylindrée (cc) {isManualModel ? "*" : ""}
                   </label>
                   <input
@@ -1121,13 +1359,13 @@ export default function SellPage() {
                     placeholder="Ex: 3996"
                     min="0"
                     required={isManualModel}
-                    className="w-full p-4 min-h-[48px] bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
                 </div>
 
                 {/* Architecture Moteur */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Architecture Moteur {isManualModel ? "*" : "(Optionnel)"}
                   </label>
                   <div className="flex flex-wrap gap-3">
@@ -1151,7 +1389,7 @@ export default function SellPage() {
                       className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
                         formData.architectureMoteur === arch.value
                           ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md"
+                          : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
                       }`}
                       >
                         <div className="text-center">
@@ -1175,18 +1413,18 @@ export default function SellPage() {
                 </div>
               </div>
 
-              {/* Note de pré-remplissage */}
-              {!isManualModel && formData.modele && formData.puissance && (
-                <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
-                  <p className="text-sm text-blue-900">
-                    <span className="font-bold">ℹ️ Données constructeur pré-remplies.</span> Vous pouvez les modifier si votre véhicule est différent (ex: Stage 1, préparation).
-                  </p>
-                </div>
-              )}
+                  {/* Note de pré-remplissage */}
+                  {!isManualModel && formData.modele && formData.puissance && (
+                    <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                      <p className="text-sm text-gray-700 font-light">
+                        <span className="font-bold">ℹ️ Données constructeur pré-remplies.</span> Vous pouvez les modifier si votre véhicule est différent (ex: Stage 1, préparation).
+                      </p>
+                    </div>
+                  )}
 
-              {/* Transmission */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
+                  {/* Transmission */}
+                  <div>
+                <label className="block text-sm font-bold text-white mb-3">
                   Transmission *
                 </label>
                 <div className="grid grid-cols-3 gap-4">
@@ -1203,20 +1441,97 @@ export default function SellPage() {
                       }
                       className={`p-4 rounded-2xl border-4 transition-all hover:scale-105 ${
                         formData.transmission === trans.value
-                          ? "border-red-600 bg-red-50 shadow-lg"
-                          : "border-slate-200 hover:border-slate-300"
+                          ? "border-red-600 bg-red-900/20 shadow-lg"
+                          : "border-white/10 hover:border-white/20 bg-slate-800/50"
                       }`}
                     >
                       <span className="text-2xl mb-2 block">{trans.emoji}</span>
-                      <p className="font-bold text-sm text-slate-900">{trans.label}</p>
+                      <p className="font-bold text-sm text-white">{trans.label}</p>
                     </button>
                   ))}
+                  </div>
                 </div>
-              </div>
+                </div>
 
-              {/* Type de Carrosserie */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
+                {/* Champs optionnels supplémentaires (affichés si pré-remplis depuis la base) */}
+                {(formData.co2Wltp || formData.topSpeed || formData.drivetrain) && (
+                  <div className="mt-6 grid grid-cols-2 gap-6">
+                    {/* CO2 WLTP */}
+                    <div>
+                      <label className="block text-sm font-bold text-white mb-3">
+                        CO2 WLTP (g/km) <span className="text-xs font-normal text-slate-400">(Pour Flandre)</span>
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={formData.co2Wltp}
+                        onChange={(e) => setFormData({ ...formData, co2Wltp: e.target.value })}
+                        placeholder="Ex: 245"
+                        min="0"
+                        className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
+                      />
+                    </div>
+
+                    {/* Vitesse max */}
+                    <div>
+                      <label className="block text-sm font-bold text-white mb-3">
+                        Vitesse max (km/h)
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={formData.topSpeed}
+                        onChange={(e) => setFormData({ ...formData, topSpeed: e.target.value })}
+                        placeholder="Ex: 320"
+                        min="0"
+                        className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
+                      />
+                    </div>
+
+                    {/* Transmission (RWD/FWD/AWD) */}
+                    <div>
+                      <label className="block text-sm font-bold text-white mb-3">
+                        Type de transmission
+                      </label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { value: "RWD", label: "RWD", subtitle: "Propulsion" },
+                          { value: "FWD", label: "FWD", subtitle: "Traction" },
+                          { value: "AWD", label: "AWD", subtitle: "4x4" },
+                          { value: "4WD", label: "4WD", subtitle: "4x4" },
+                        ].map((drivetrain) => (
+                          <button
+                            key={drivetrain.value}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, drivetrain: drivetrain.value })}
+                            className={`px-4 py-3 rounded-xl border-2 transition-all text-center ${
+                              formData.drivetrain === drivetrain.value
+                                ? "bg-red-600 border-red-600 text-white font-bold"
+                                : "bg-slate-800/50 border-white/10 text-white hover:border-white/20"
+                            }`}
+                          >
+                            <div className="font-bold text-sm">{drivetrain.label}</div>
+                            <div className="text-xs text-slate-400">{drivetrain.subtitle}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sous-Section B : Configuration Esthétique */}
+                <div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
+                    <h3 className="text-lg font-bold text-red-500/90 tracking-wide">
+                      Configuration Esthétique
+                    </h3>
+                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
+                  </div>
+
+                  {/* Type de Carrosserie */}
+                  <div>
+                <label className="block text-sm font-bold text-white mb-3">
                   Type de Carrosserie (Optionnel)
                 </label>
                 <div className="flex flex-wrap gap-3">
@@ -1230,7 +1545,7 @@ export default function SellPage() {
                       className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
                         formData.carrosserie === type
                           ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md"
+                          : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
                       }`}
                     >
                       {type}
@@ -1250,140 +1565,142 @@ export default function SellPage() {
                 </button>
               </div>
 
-              {/* Couleur Extérieure */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
-                  Couleur Extérieure (Optionnel)
-                </label>
-                <div className="flex flex-wrap gap-4">
-                  {EXTERIOR_COLORS.map((color) => {
-                    const isSelected = formData.couleurExterieure === color;
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, couleurExterieure: color })
-                        }
-                        className="group relative flex flex-col items-center gap-2"
-                        title={color}
-                      >
-                        <div
-                          className={`w-12 h-12 rounded-full border-4 transition-all duration-200 hover:scale-110 active:scale-95 ${
-                            isSelected
-                              ? "border-red-600 shadow-lg shadow-red-600/40 ring-4 ring-red-600/20"
-                              : "border-slate-300 hover:border-slate-400"
-                          }`}
-                          style={{
-                            backgroundColor: EXTERIOR_COLOR_HEX[color],
-                            boxShadow: isSelected ? `0 0 0 4px rgba(220, 38, 38, 0.2)` : undefined,
-                          }}
-                        />
-                        <span
-                          className={`text-xs font-medium transition-colors ${
-                            isSelected ? "text-red-600 font-bold" : "text-slate-600"
+                  {/* Couleur Extérieure */}
+                  <div>
+                    <label className="block text-sm font-bold text-white mb-3">
+                      Couleur Extérieure (Optionnel)
+                    </label>
+                    <div className="overflow-x-auto -mx-2 px-2 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                      <div className="flex gap-3 md:grid md:grid-cols-6 lg:grid-cols-8 md:gap-4 min-w-max md:min-w-0">
+                        {EXTERIOR_COLORS.map((color) => {
+                          const isSelected = formData.couleurExterieure === color;
+                          return (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() =>
+                                setFormData({ ...formData, couleurExterieure: color })
+                              }
+                              className="group relative flex flex-col items-center gap-2 flex-shrink-0"
+                              title={color}
+                            >
+                              <div
+                                className={`w-12 h-12 rounded-full border-4 transition-all duration-200 hover:scale-110 active:scale-95 ${
+                                  isSelected
+                                    ? "border-red-600 shadow-lg shadow-red-600/50 ring-4 ring-red-600/30 ring-offset-2 ring-offset-slate-800"
+                                    : "border-slate-300 hover:border-slate-400"
+                                }`}
+                                style={{
+                                  backgroundColor: EXTERIOR_COLOR_HEX[color],
+                                }}
+                              />
+                              <span
+                                className={`text-xs font-medium transition-colors text-center ${
+                                  isSelected ? "text-red-500 font-bold" : "text-slate-400"
+                                }`}
+                              >
+                                {color}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, couleurExterieure: "" })}
+                      className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
+                        formData.couleurExterieure
+                          ? "text-red-600 hover:text-red-700 font-medium"
+                          : "text-slate-400 cursor-not-allowed"
+                      }`}
+                    >
+                      {formData.couleurExterieure ? "✕ Réinitialiser" : ""}
+                    </button>
+                  </div>
+
+                  {/* Couleur Intérieure */}
+                  <div>
+                    <label className="block text-sm font-bold text-white mb-3">
+                      Couleur Intérieure (Optionnel)
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      {INTERIOR_COLORS.map((couleur) => (
+                        <button
+                          key={couleur}
+                          type="button"
+                          onClick={() =>
+                            setFormData({ ...formData, couleurInterieure: couleur })
+                          }
+                          className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                            formData.couleurInterieure === couleur
+                              ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30 ring-2 ring-red-600/50 ring-offset-2 ring-offset-slate-800"
+                              : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
                           }`}
                         >
-                          {color}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, couleurExterieure: "" })}
-                  className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                    formData.couleurExterieure
-                      ? "text-red-600 hover:text-red-700 font-medium"
-                      : "text-slate-400 cursor-not-allowed"
-                  }`}
-                >
-                  {formData.couleurExterieure ? "✕ Réinitialiser" : ""}
-                </button>
-              </div>
-
-              {/* Couleur Intérieure */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
-                  Couleur Intérieure (Optionnel)
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {INTERIOR_COLORS.map((couleur) => (
+                          {couleur}
+                        </button>
+                      ))}
+                    </div>
                     <button
-                      key={couleur}
                       type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, couleurInterieure: couleur })
-                      }
-                      className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                        formData.couleurInterieure === couleur
-                          ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md"
+                      onClick={() => setFormData({ ...formData, couleurInterieure: "" })}
+                      className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
+                        formData.couleurInterieure
+                          ? "text-red-600 hover:text-red-700 font-medium"
+                          : "text-slate-400 cursor-not-allowed"
                       }`}
                     >
-                      {couleur}
+                      {formData.couleurInterieure ? "✕ Réinitialiser" : ""}
                     </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, couleurInterieure: "" })}
-                  className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                    formData.couleurInterieure
-                      ? "text-red-600 hover:text-red-700 font-medium"
-                      : "text-slate-400 cursor-not-allowed"
-                  }`}
-                >
-                  {formData.couleurInterieure ? "✕ Réinitialiser" : ""}
-                </button>
-              </div>
+                  </div>
 
-              {/* Nombre de Places */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
-                  Nombre de Places (Optionnel)
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {[
-                    { value: "2", label: "2 places" },
-                    { value: "4", label: "4 places" },
-                    { value: "5", label: "5 places" },
-                    { value: "2+2", label: "2+2" },
-                  ].map((places) => (
+                  {/* Nombre de Places */}
+                  <div>
+                    <label className="block text-sm font-bold text-white mb-3">
+                      Nombre de Places (Optionnel)
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      {[
+                        { value: "2", label: "2 places" },
+                        { value: "4", label: "4 places" },
+                        { value: "5", label: "5 places" },
+                        { value: "2+2", label: "2+2" },
+                      ].map((places) => (
+                        <button
+                          key={places.value}
+                          type="button"
+                          onClick={() =>
+                            setFormData({ ...formData, nombrePlaces: places.value })
+                          }
+                          className={`px-6 py-3 rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                            formData.nombrePlaces === places.value
+                              ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
+                              : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
+                          }`}
+                        >
+                          {places.label}
+                        </button>
+                      ))}
+                    </div>
                     <button
-                      key={places.value}
                       type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, nombrePlaces: places.value })
-                      }
-                      className={`px-6 py-3 rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                        formData.nombrePlaces === places.value
-                          ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md"
+                      onClick={() => setFormData({ ...formData, nombrePlaces: "" })}
+                      className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
+                        formData.nombrePlaces
+                          ? "text-red-600 hover:text-red-700 font-medium"
+                          : "text-slate-400 cursor-not-allowed"
                       }`}
                     >
-                      {places.label}
+                      {formData.nombrePlaces ? "✕ Réinitialiser" : ""}
                     </button>
-                  ))}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, nombrePlaces: "" })}
-                  className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                    formData.nombrePlaces
-                      ? "text-red-600 hover:text-red-700 font-medium"
-                      : "text-slate-400 cursor-not-allowed"
-                  }`}
-                >
-                  {formData.nombrePlaces ? "✕ Réinitialiser" : ""}
-                </button>
-              </div>
 
-              {/* Description / Histoire */}
+              {/* L'Histoire du véhicule */}
               <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
-                  Description / Histoire du véhicule *
+                <label className="block text-sm font-bold text-white mb-3 tracking-wide">
+                  L&apos;Histoire du véhicule *
                 </label>
                 <textarea
                   value={formData.description}
@@ -1391,11 +1708,11 @@ export default function SellPage() {
                     setFormData({ ...formData, description: e.target.value })
                   }
                   rows={8}
-                  placeholder="Parlez-nous de l'entretien, des options, de votre passion pour ce véhicule... (Minimum 20 caractères)"
-                  className={`w-full p-4 bg-white border-2 rounded-2xl focus:ring-4 focus:ring-red-600/20 text-slate-900 font-medium resize-none ${
+                  placeholder="Racontez l'histoire de ce véhicule : entretien, options, modifications (Stage 1, préparation...), édition limitée, garantie, historique... (Minimum 20 caractères)"
+                  className={`w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 text-white font-light resize-none placeholder:text-slate-500 ${
                     descriptionCheck.hasError
                       ? "border-red-600 focus:border-red-600"
-                      : "border-slate-300 focus:border-red-600"
+                      : "focus:border-red-600"
                   }`}
                 />
 
@@ -1422,10 +1739,10 @@ export default function SellPage() {
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="text-red-600 flex-shrink-0" size={24} />
                       <div className="flex-1">
-                        <p className="text-red-800 font-bold mb-2">
+                        <p className="text-red-300 font-bold mb-2">
                           ⛔ Termes interdits détectés dans votre description
                         </p>
-                        <p className="text-red-700 text-sm mb-3">
+                        <p className="text-red-400 text-sm mb-3 font-light">
                           RedZone est réservé à la vente pure de sportives essence. Merci de retirer ces termes :
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -1443,67 +1760,69 @@ export default function SellPage() {
                   </div>
                 )}
               </div>
+              </div>
             </div>
           )}
 
-          {/* ÉTAPE 3 : Finitions */}
+          {/* ÉTAPE 3 : La Galerie */}
           {currentStep === 3 && (
             <div className="space-y-8">
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">
-                  La touche finale
+              {/* Section 3 : La Galerie (Card) */}
+              <div className="bg-slate-800/50 rounded-2xl border border-white/10 p-6 md:p-8">
+                <h2 className="text-2xl font-black text-white mb-2 tracking-wide">
+                  La Galerie
                 </h2>
-                <p className="text-slate-600 mb-6">
-                  Vérifiez et ajoutez des médias pour valoriser votre annonce
+                <p className="text-slate-300 mb-6 font-light">
+                  Photos, son et histoire du véhicule
                 </p>
-              </div>
 
-              {/* RÉCAPITULATIF DE L'ANNONCE */}
-              <div className="bg-gradient-to-br from-red-50 to-red-100/50 border-2 border-red-600 rounded-3xl p-8 shadow-2xl">
-                <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2">
-                  <Check className="text-red-600" size={28} />
-                  Récapitulatif de votre annonce
-                </h3>
+                {/* RÉCAPITULATIF DE L'ANNONCE */}
+                <div className="bg-gradient-to-br from-red-900/20 to-red-800/20 border-2 border-red-600 rounded-3xl p-8 shadow-2xl">
+                  <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
+                    <Check className="text-red-500" size={28} />
+                    Récapitulatif de votre annonce
+                  </h3>
 
-                <div className="bg-white rounded-2xl p-6 space-y-4">
-                  {/* Titre */}
-                  <div>
-                    <p className="text-xs font-bold text-slate-600 mb-1">TITRE</p>
-                    <p className="text-2xl font-black text-slate-900">
-                      {formData.marque} {formData.modele}
-                    </p>
-                  </div>
-
-                  {/* Prix */}
-                  <div>
-                    <p className="text-xs font-bold text-slate-600 mb-1">PRIX</p>
-                    <p className="text-3xl font-black text-red-600">
-                      {parseFloat(formData.prix).toLocaleString("fr-BE")} €
-                    </p>
-                  </div>
-
-                  {/* Détails */}
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-200">
+                  <div className="bg-slate-800/50 rounded-2xl p-6 space-y-4 border border-white/10">
+                    {/* Titre */}
                     <div>
-                      <p className="text-xs font-bold text-slate-600">ANNÉE</p>
-                      <p className="text-lg font-bold text-slate-900">{formData.annee}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-600">KM</p>
-                      <p className="text-lg font-bold text-slate-900">
-                        {parseInt(formData.km).toLocaleString("fr-BE")} km
+                      <p className="text-xs font-bold text-slate-400 mb-1">TITRE</p>
+                      <p className="text-2xl font-black text-white">
+                        {formData.marque} {formData.modele}
                       </p>
                     </div>
+
+                    {/* Prix */}
                     <div>
-                      <p className="text-xs font-bold text-slate-600">PUISSANCE</p>
-                      <p className="text-lg font-bold text-slate-900">{formData.puissance} ch</p>
+                      <p className="text-xs font-bold text-slate-400 mb-1">PRIX</p>
+                      <p className="text-3xl font-black text-red-500">
+                        {parseFloat(formData.prix).toLocaleString("fr-BE")} €
+                      </p>
+                    </div>
+
+                    {/* Détails */}
+                    <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10">
+                      <div>
+                        <p className="text-xs font-bold text-slate-400">ANNÉE</p>
+                        <p className="text-lg font-bold text-white">{formData.annee}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400">KM</p>
+                        <p className="text-lg font-bold text-white">
+                          {parseInt(formData.km).toLocaleString("fr-BE")} km
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400">PUISSANCE</p>
+                        <p className="text-lg font-bold text-white">{formData.puissance} ch</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <div className="pt-4 border-t border-slate-200">
-                    <p className="text-xs font-bold text-slate-600 mb-2">DESCRIPTION</p>
-                    <p className="text-sm text-slate-700 leading-relaxed line-clamp-4">
+                  {/* L'Histoire */}
+                  <div className="pt-4 border-t border-white/10">
+                    <p className="text-xs font-bold text-slate-400 mb-2 tracking-wide">L&apos;HISTOIRE</p>
+                    <p className="text-sm text-slate-300 leading-relaxed line-clamp-4 font-light">
                       {formData.description}
                     </p>
                   </div>
@@ -1512,14 +1831,14 @@ export default function SellPage() {
 
               {/* Localisation - Où voir le véhicule ? */}
               <div>
-                <label className="block text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                  <MapPin size={20} className="text-red-600" />
-                  Où voir le véhicule ? <span className="text-red-600">*</span>
+                <label className="block text-sm font-bold text-white mb-4 flex items-center gap-2">
+                  <MapPin size={20} className="text-red-500" />
+                  Où voir le véhicule ? <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Code Postal */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-2">
                       Code Postal <span className="text-red-600">*</span>
                     </label>
                     <input
@@ -1530,14 +1849,14 @@ export default function SellPage() {
                       required
                       maxLength={4}
                       pattern="[0-9]{4}"
-                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all"
+                      className="w-full px-4 py-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white placeholder:text-slate-500"
                     />
                     <p className="text-xs text-slate-500 mt-2">Format: 4 chiffres (ex: 5000)</p>
                   </div>
 
                   {/* Ville */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-2">
                       Ville <span className="text-red-600">*</span>
                     </label>
                     <input
@@ -1546,166 +1865,39 @@ export default function SellPage() {
                       onChange={(e) => setFormData((prev) => ({ ...prev, ville: e.target.value }))}
                       placeholder="Ex: Namur, Liège, Bruxelles"
                       required
-                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all"
+                      className="w-full px-4 py-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white placeholder:text-slate-500"
                     />
                   </div>
                 </div>
-                <p className="text-xs text-slate-600 mt-3 flex items-center gap-2">
+                <p className="text-xs text-slate-400 mt-3 flex items-center gap-2">
                   <MapPin size={14} className="text-slate-400" />
                   Cette information permettra aux acheteurs de localiser votre véhicule sur une carte.
                 </p>
               </div>
 
-              {/* Photos */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3">
-                  Photos du Véhicule <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="file"
-                  ref={photoInputRef}
-                  onChange={handlePhotoInputChange}
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                />
-                {formData.photos.length === 0 ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={isUploadingPhotos}
-                      className="w-full p-12 border-4 border-dashed border-red-400 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed bg-red-50/30"
-                    >
-                      {isUploadingPhotos ? (
-                        <>
-                          <Loader2 size={48} className="mx-auto mb-4 text-red-600 animate-spin" />
-                          <p className="text-lg font-bold text-slate-900">Upload en cours...</p>
-                        </>
-                      ) : (
-                        <>
-                          <Upload
-                            size={48}
-                            className="mx-auto mb-4 text-red-600 transition-colors"
-                          />
-                          <p className="text-lg font-bold text-red-700">
-                            Photo requise pour continuer
-                          </p>
-                          <p className="text-sm text-slate-600 mt-2">
-                            JPG, PNG (Max 5 MB par photo)
-                          </p>
-                        </>
-                      )}
-                    </button>
-                    <div className="mt-3 p-3 bg-red-50 border-2 border-red-200 rounded-xl">
-                      <p className="text-sm font-bold text-red-700 flex items-center gap-2">
-                        <AlertTriangle size={16} className="text-red-600" />
-                        Une annonce de sportive doit avoir au moins une photo pour être validée.
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="grid grid-cols-3 gap-4">
-                    {formData.photos.map((photo, i) => (
-                      <div key={i} className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group">
-                        <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removePhoto(i)}
-                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          ✕
-                        </button>
-                        <div className="absolute bottom-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          <Check size={14} className="inline mr-1" />
-                          OK
-                        </div>
-                      </div>
-                    ))}
-                    {formData.photos.length < 10 && (
-                      <button
-                        type="button"
-                        onClick={() => photoInputRef.current?.click()}
-                        disabled={isUploadingPhotos}
-                        className="aspect-square border-4 border-dashed border-slate-300 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all flex items-center justify-center disabled:opacity-50"
-                      >
-                        {isUploadingPhotos ? (
-                          <Loader2 size={24} className="text-red-600 animate-spin" />
-                        ) : (
-                          <Upload size={32} className="text-slate-400" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Son Moteur */}
-              <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <Music size={20} className="text-red-600" />
-                  Sonorité Moteur (Optionnel)
-                </label>
-                <input
-                  type="file"
-                  ref={audioInputRef}
-                  onChange={handleAudioInputChange}
-                  accept="audio/*"
-                  className="hidden"
-                />
-                {!formData.audioFile ? (
-                  <button
-                    type="button"
-                    onClick={() => audioInputRef.current?.click()}
-                    disabled={isUploadingAudio}
-                    className="w-full p-8 border-4 border-dashed border-slate-300 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUploadingAudio ? (
-                      <>
-                        <Loader2 size={40} className="mx-auto mb-3 text-red-600 animate-spin" />
-                        <p className="text-sm font-bold text-slate-900">Upload en cours...</p>
-                      </>
-                    ) : (
-                      <>
-                        <Music
-                          size={40}
-                          className="mx-auto mb-3 text-slate-400 group-hover:text-red-600 transition-colors"
-                        />
-                        <p className="text-sm font-bold text-slate-900">
-                          Uploadez un son de démarrage
-                        </p>
-                        <p className="text-xs text-slate-600 mt-1">MP3, WAV, M4A (Max 10 MB)</p>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div className="bg-green-50 border-2 border-green-600 rounded-2xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
-                      <Check size={24} className="text-green-600" />
-                      <div className="flex-1">
-                        <p className="font-bold text-green-900">Son uploadé</p>
-                        <p className="text-xs text-green-700">{formData.audioFile.name}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, audioFile: null, audioUrl: null }));
-                        if (audioInputRef.current) audioInputRef.current.value = "";
-                      }}
-                      className="text-red-600 hover:text-red-700 font-bold px-3"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* Module Média Pro (Photos & Audio) */}
+              <MediaManager
+                photos={formData.photos}
+                audioUrl={formData.audioUrl}
+                onPhotosChange={(newPhotos) => {
+                  setFormData(prev => ({ ...prev, photos: newPhotos }));
+                }}
+                onAudioChange={(newAudioUrl) => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    audioUrl: newAudioUrl,
+                    audioFile: newAudioUrl ? prev.audioFile : null
+                  }));
+                }}
+                userId={user?.id || null}
+                disabled={isEffectivelyBanned || isSubmitting}
+              />
 
               {/* Car-Pass URL */}
               <div data-field="carPassUrl">
-                <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <label className="block text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Shield size={20} className="text-green-600" />
-                  Lien Car-Pass (URL) <span className="text-xs font-normal text-slate-600">(Optionnel)</span>
+                  Lien Car-Pass (URL) <span className="text-xs font-normal text-slate-400">(Optionnel)</span>
                 </label>
                 <input
                   type="url"
@@ -1722,40 +1914,40 @@ export default function SellPage() {
                     }
                   }}
                   placeholder="https://www.car-pass.be/..."
-                  className={`w-full p-4 bg-white border-2 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium transition-all ${
+                  className={`w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium transition-all placeholder:text-slate-500 ${
                     fieldErrors.carPassUrl
-                      ? "border-red-600 bg-red-50"
-                      : "border-slate-300"
+                      ? "border-red-600 bg-red-900/20"
+                      : ""
                   }`}
                 />
                 {fieldErrors.carPassUrl ? (
-                  <div className="mt-2 p-3 bg-red-50 border-2 border-red-600 rounded-xl">
-                    <p className="text-sm font-bold text-red-700 flex items-center gap-2">
-                      <AlertTriangle size={16} className="text-red-600" />
+                  <div className="mt-2 p-3 bg-red-900/20 border-2 border-red-600/40 rounded-xl">
+                    <p className="text-sm font-bold text-red-300 flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-red-400" />
                       {fieldErrors.carPassUrl}
                     </p>
-                    <p className="text-xs text-red-600 mt-2 ml-6">
-                      Format attendu : <code className="bg-red-100 px-2 py-1 rounded">https://www.car-pass.be/...</code> ou <code className="bg-red-100 px-2 py-1 rounded">http://www.car-pass.be/...</code>
+                    <p className="text-xs text-red-400 mt-2 ml-6">
+                      Format attendu : <code className="bg-red-900/30 px-2 py-1 rounded text-red-200">https://www.car-pass.be/...</code> ou <code className="bg-red-900/30 px-2 py-1 rounded text-red-200">http://www.car-pass.be/...</code>
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-600 mt-2">
+                  <p className="text-xs text-slate-400 mt-2 font-light">
                     🔒 Plus sécurisé qu'un upload de fichier. Partagez le lien vers votre Car-Pass en ligne.
                   </p>
                 )}
               </div>
 
               {/* Vos Coordonnées */}
-              <div className="mt-8 pt-8 border-t-2 border-slate-200">
-                <h3 className="text-xl font-black text-slate-900 mb-6 tracking-tight">
+              <div className="mt-8 pt-8 border-t-2 border-white/10">
+                <h3 className="text-xl font-black text-white mb-6 tracking-wide">
                   Vos coordonnées
                 </h3>
 
                 {/* Email de contact */}
                 <div className="mb-6">
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Email de contact {!user && <span className="text-red-600">*</span>}
-                    {user && <span className="text-xs font-normal text-slate-600">(Optionnel - utilisera {user.email} par défaut)</span>}
+                    {user && <span className="text-xs font-normal text-slate-400">(Optionnel - utilisera {user.email} par défaut)</span>}
                   </label>
                   <input
                     type="email"
@@ -1765,9 +1957,9 @@ export default function SellPage() {
                     }
                     placeholder={user ? user.email : "votre@email.be"}
                     required={!user}
-                    className="w-full p-4 bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
-                  <p className="text-xs text-slate-600 mt-2">
+                  <p className="text-xs text-slate-400 mt-2">
                     {user 
                       ? "Cet email sera visible par les acheteurs intéressés. Si vide, votre email de compte sera utilisé."
                       : "⚠️ Email obligatoire pour les invités. Cet email sera visible par les acheteurs intéressés."
@@ -1777,8 +1969,8 @@ export default function SellPage() {
 
                 {/* Téléphone */}
                 <div className="mb-6">
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
-                    Téléphone {formData.contactMethods.includes('whatsapp') || formData.contactMethods.includes('tel') ? <span className="text-red-600">*</span> : <span className="text-xs font-normal text-slate-600">(Optionnel)</span>}
+                  <label className="block text-sm font-bold text-white mb-3">
+                    Téléphone {formData.contactMethods.includes('whatsapp') || formData.contactMethods.includes('tel') ? <span className="text-red-500">*</span> : <span className="text-xs font-normal text-slate-400">(Optionnel)</span>}
                   </label>
                   <input
                     type="tel"
@@ -1795,16 +1987,16 @@ export default function SellPage() {
                     }}
                     placeholder="+32 471 23 45 67"
                     required={formData.contactMethods.includes('whatsapp') || formData.contactMethods.includes('tel')}
-                    className="w-full p-4 bg-white border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900 font-medium"
+                    className="w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
                   />
-                  <p className="text-xs text-slate-600 mt-2">
+                  <p className="text-xs text-slate-400 mt-2">
                     Format belge : +32 XXX XX XX XX
                   </p>
                 </div>
 
                 {/* Préférences de contact */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-3">
+                  <label className="block text-sm font-bold text-white mb-3">
                     Préférences de contact *
                   </label>
                   <div className="space-y-3">
@@ -1828,8 +2020,8 @@ export default function SellPage() {
                         className="w-5 h-5 text-red-600 rounded border-2 border-slate-400 focus:ring-red-600"
                       />
                       <div className="flex-1">
-                        <span className="font-bold text-slate-900">Accepter les contacts par Email</span>
-                        <p className="text-xs text-slate-600">Les acheteurs pourront vous envoyer un email</p>
+                        <span className="font-bold text-white">Accepter les contacts par Email</span>
+                        <p className="text-xs text-slate-400">Les acheteurs pourront vous envoyer un email</p>
                       </div>
                     </label>
 
@@ -1853,12 +2045,12 @@ export default function SellPage() {
                         className="w-5 h-5 text-green-600 rounded border-2 border-slate-400 focus:ring-green-600"
                       />
                       <div className="flex-1">
-                        <span className="font-bold text-slate-900">Accepter les contacts par WhatsApp</span>
-                        <p className="text-xs text-slate-600">Nécessite un numéro de téléphone</p>
+                        <span className="font-bold text-white">Accepter les contacts par WhatsApp</span>
+                        <p className="text-xs text-slate-400">Nécessite un numéro de téléphone</p>
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-300 hover:border-blue-400 transition-all cursor-pointer">
+                    <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-300 hover:border-red-400 transition-all cursor-pointer">
                       <input
                         type="checkbox"
                         checked={formData.contactMethods.includes('tel')}
@@ -1875,11 +2067,11 @@ export default function SellPage() {
                             }));
                           }
                         }}
-                        className="w-5 h-5 text-blue-600 rounded border-2 border-slate-400 focus:ring-blue-600"
+                        className="w-5 h-5 text-red-600 rounded border-2 border-slate-400 focus:ring-red-600"
                       />
                       <div className="flex-1">
-                        <span className="font-bold text-slate-900">Accepter les appels téléphoniques</span>
-                        <p className="text-xs text-slate-600">Nécessite un numéro de téléphone</p>
+                        <span className="font-bold text-white">Accepter les appels téléphoniques</span>
+                        <p className="text-xs text-slate-400">Nécessite un numéro de téléphone</p>
                       </div>
                     </label>
                   </div>
@@ -1893,15 +2085,15 @@ export default function SellPage() {
 
               {/* Champs Professionnels (si role === 'pro') */}
               {user?.role === "pro" && (
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-300 rounded-3xl p-8 shadow-xl">
-                  <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                    <Building2 size={28} className="text-blue-600" />
+                <div className="bg-gradient-to-br from-red-950/30 to-red-900/20 border-2 border-red-600/30 rounded-3xl p-8 shadow-xl">
+                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-2">
+                    <Building2 size={28} className="text-red-600" />
                     Informations Professionnelles
                   </h3>
                   <div className="space-y-6">
                     {/* Nom du Garage */}
                     <div>
-                      <label className="block text-sm font-bold text-slate-900 mb-3">
+                      <label className="block text-sm font-bold text-white mb-3">
                         Nom du Garage *
                       </label>
                       <input
@@ -1910,13 +2102,13 @@ export default function SellPage() {
                         onChange={(e) => setFormData((prev) => ({ ...prev, garageName: e.target.value }))}
                         placeholder="Ex: Garage Auto Premium"
                         required={user.role === "pro"}
-                        className="w-full px-4 py-4 bg-white border-2 border-slate-300 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/20 transition-all"
+                        className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white"
                       />
                     </div>
 
                     {/* Numéro de TVA */}
                     <div>
-                      <label className="block text-sm font-bold text-slate-900 mb-3">
+                      <label className="block text-sm font-bold text-white mb-3">
                         Numéro de TVA (BE) *
                       </label>
                       <input
@@ -1926,16 +2118,16 @@ export default function SellPage() {
                         placeholder="Ex: BE0123456789"
                         required={user.role === "pro"}
                         pattern="BE[0-9]{10}"
-                        className="w-full px-4 py-4 bg-white border-2 border-slate-300 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/20 transition-all"
+                        className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white"
                       />
-                      <p className="text-xs text-slate-600 mt-2">
+                      <p className="text-xs text-slate-400 mt-2">
                         Format: BE suivi de 10 chiffres
                       </p>
                     </div>
 
                     {/* Adresse du Garage */}
                     <div>
-                      <label className="block text-sm font-bold text-slate-900 mb-3">
+                      <label className="block text-sm font-bold text-white mb-3">
                         Adresse du Garage
                       </label>
                       <textarea
@@ -1943,7 +2135,7 @@ export default function SellPage() {
                         onChange={(e) => setFormData((prev) => ({ ...prev, garageAddress: e.target.value }))}
                         placeholder="Rue, Numéro, Code postal, Ville"
                         rows={3}
-                        className="w-full px-4 py-4 bg-white border-2 border-slate-300 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/20 transition-all resize-y"
+                        className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all resize-y text-white"
                       />
                     </div>
                   </div>
@@ -1952,7 +2144,7 @@ export default function SellPage() {
 
               {/* Historique */}
               <div>
-                <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <label className="block text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Shield size={20} className="text-red-600" />
                   Transparence & Historique (Optionnel)
                 </label>
@@ -1963,38 +2155,47 @@ export default function SellPage() {
                     "Véhicule non accidenté",
                     "Origine Belgique",
                     "2 clés disponibles",
-                  ].map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => toggleHistory(item)}
-                      className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-3 ${
-                        formData.history.includes(item)
-                          ? "border-green-600 bg-green-50"
-                          : "border-slate-300 hover:border-slate-400"
-                      }`}
-                    >
-                      <div
-                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${
-                          formData.history.includes(item)
-                            ? "bg-green-600 border-green-600"
-                            : "border-slate-400"
+                  ].map((item) => {
+                    const isSelected = formData.history.includes(item);
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => toggleHistory(item)}
+                        className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-3 ${
+                          isSelected
+                            ? "border-green-600 bg-green-50"
+                            : "border-slate-300 hover:border-slate-400 bg-slate-800/50"
                         }`}
                       >
-                        {formData.history.includes(item) && (
-                          <Check size={16} className="text-white" />
-                        )}
-                      </div>
-                      <span className="font-medium text-slate-900">{item}</span>
-                    </button>
-                  ))}
+                        <div
+                          className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${
+                            isSelected
+                              ? "bg-green-600 border-green-600"
+                              : "border-slate-400"
+                          }`}
+                        >
+                          {isSelected && (
+                            <Check size={16} className="text-white" />
+                          )}
+                        </div>
+                        <span className={`font-medium ${
+                          isSelected 
+                            ? "text-green-900" 
+                            : "text-white"
+                        }`}>
+                          {item}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* CAPTCHA Turnstile - Uniquement pour les invités */}
               {!user && (
                 <div className="mt-8 pt-8 border-t-2 border-slate-200">
-                  <label className="block text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <label className="block text-sm font-bold text-white mb-4 flex items-center gap-2">
                     <Shield size={20} className="text-red-600" />
                     Vérification anti-robot <span className="text-red-600">*</span>
                   </label>
@@ -2037,32 +2238,32 @@ export default function SellPage() {
           {currentStep === 4 && vehiculeIdForVerification && (
             <div className="space-y-8">
               <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight flex items-center gap-2">
+                <h2 className="text-2xl font-black text-white mb-2 tracking-tight flex items-center gap-2">
                   <Mail size={28} className="text-red-600" />
                   Vérification de votre email
                 </h2>
-                <p className="text-slate-600 mb-6">
+                <p className="text-slate-400 mb-6">
                   Un code de vérification à 6 chiffres vous a été envoyé à <strong>{formData.contactEmail}</strong>
                 </p>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-300 rounded-3xl p-8 shadow-xl">
+              <div className="bg-gradient-to-br from-red-950/30 to-red-900/20 border-2 border-red-600/30 rounded-3xl p-8 shadow-xl">
                 <div className="space-y-6">
                   <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-full mb-4">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-red-600 rounded-full mb-4">
                       <Mail size={40} className="text-white" />
                     </div>
-                    <h3 className="text-xl font-black text-slate-900 mb-2">
+                    <h3 className="text-xl font-black text-white mb-2">
                       Vérifiez votre boîte email
                     </h3>
-                    <p className="text-slate-700">
+                    <p className="text-slate-300">
                       Entrez le code à 6 chiffres reçu par email pour confirmer votre annonce.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3">
-                      Code de vérification <span className="text-red-600">*</span>
+                    <label className="block text-sm font-bold text-white mb-3">
+                      Code de vérification <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -2075,16 +2276,16 @@ export default function SellPage() {
                       }}
                       placeholder="123456"
                       maxLength={6}
-                      className="w-full p-6 text-center text-3xl font-black tracking-widest bg-white border-4 border-slate-300 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-slate-900"
+                      className="w-full p-6 text-center text-3xl font-black tracking-widest bg-slate-800 border-4 border-slate-600 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white"
                       autoFocus
                     />
-                    <p className="text-xs text-slate-600 mt-3 text-center">
+                    <p className="text-xs text-slate-400 mt-3 text-center font-light">
                       {verificationCode.length}/6 chiffres
                     </p>
                   </div>
 
-                  <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4">
-                    <p className="text-sm text-amber-900 font-medium">
+                  <div className="bg-amber-900/20 border-2 border-amber-600/40 rounded-xl p-4">
+                    <p className="text-sm text-amber-300 font-light">
                       ⚠️ <strong>Code expiré ?</strong> Le code est valide pendant 15 minutes. Si vous ne l'avez pas reçu, vérifiez vos spams ou contactez le support.
                     </p>
                   </div>
@@ -2117,20 +2318,20 @@ export default function SellPage() {
         </div>
 
         {/* Navigation Buttons (Fixed Bottom) - TOUJOURS VISIBLE */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-200 shadow-2xl z-[90] pointer-events-auto">
+        <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-white/10 shadow-2xl z-[90] pointer-events-auto">
           <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-            {/* Bouton Précédent - Visible uniquement si étape > 1 */}
-            {currentStep > 1 ? (
+            {/* Bouton Précédent - Visible uniquement si étape > 1 et <= 3 */}
+            {currentStep > 1 && currentStep <= 3 ? (
               <button
                 type="button"
                 onClick={handlePrevious}
-                className="flex items-center gap-2 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded-full transition-all hover:scale-105"
+                className="flex items-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white font-medium rounded-full transition-all duration-200"
               >
-                <ChevronLeft size={20} />
-                Précédent
+                <ChevronLeft size={18} />
+                Retour
               </button>
             ) : (
-              <div className="w-0" /> // Placeholder pour garder l'espace
+              <div className="w-0" />
             )}
 
             <div className="flex-1" />
@@ -2158,14 +2359,24 @@ export default function SellPage() {
               <>
                 {/* Note BETA - Publication gratuite */}
                 <div className="w-full mb-4">
-                  <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                    <p className="text-sm text-blue-900 font-medium text-center">
+                  <div className="bg-red-900/20 border-2 border-red-600/40 rounded-xl p-4">
+                    <p className="text-sm text-red-300 font-light text-center tracking-wide">
                       ℹ️ Durant la phase Bêta, la publication d&apos;annonces est entièrement gratuite et illimitée.
                     </p>
                   </div>
                 </div>
 
-                {/* Bouton Publier - Visible uniquement étape 3 */}
+                {/* Bouton Publier/Enregistrer - Visible uniquement étape 3 */}
+                {isEffectivelyBanned && (
+                  <div className="mb-4 p-4 bg-red-900/20 border-2 border-red-600/40 rounded-xl">
+                    <p className="text-sm font-bold text-red-300 flex items-center gap-2">
+                      <AlertTriangle size={16} />
+                      {isSimulatingBan && user?.role === "admin"
+                        ? "Mode test actif : Publication d'annonces désactivée (simulation)"
+                        : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces."}
+                    </p>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={handleSubmit}
@@ -2173,18 +2384,24 @@ export default function SellPage() {
                     isSubmitting || 
                     !moderationCheck.isAllowed || 
                     !isStep3Valid || 
-                    (!user && !turnstileToken) // CAPTCHA requis pour les invités
+                    (!user && !turnstileToken) || // CAPTCHA requis pour les invités
+                    isEffectivelyBanned // Bloqué si banni ou en simulation
                   }
                   className={`flex items-center gap-2 px-8 py-4 rounded-full font-black text-lg transition-all shadow-2xl ${
                     isSubmitting || 
                     !moderationCheck.isAllowed || 
                     !isStep3Valid || 
-                    (!user && !turnstileToken)
+                    (!user && !turnstileToken) ||
+                    isEffectivelyBanned
                       ? "bg-slate-400 cursor-not-allowed text-white opacity-60"
                       : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105 shadow-red-600/50 active:scale-95"
                   }`}
                   title={
-                    !isStep3Valid 
+                    isEffectivelyBanned
+                      ? (isSimulatingBan && user?.role === "admin"
+                          ? "Mode test actif : Publication d'annonces désactivée (simulation)"
+                          : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces.")
+                      : !isStep3Valid 
                       ? "Une annonce de sportive doit avoir au moins une photo pour être validée." 
                       : (!user && !turnstileToken)
                       ? "Veuillez compléter la vérification anti-robot"
@@ -2194,11 +2411,15 @@ export default function SellPage() {
                 {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
-                    Publication...
+                    <span className="tracking-wide">
+                      {isEditMode ? "Enregistrement en cours..." : "Envoi du dossier en cours..."}
+                    </span>
                   </>
                 ) : (
                   <>
-                    🏁 Publier l&apos;annonce
+                    <span className="tracking-wide">
+                      {isEditMode ? "Enregistrer les modifications" : "Ajouter au Showroom"}
+                    </span>
                   </>
                 )}
               </button>
@@ -2211,5 +2432,20 @@ export default function SellPage() {
       {/* Padding Bottom pour éviter que le contenu soit caché par les boutons fixes et le CookieBanner */}
       <div className="h-32" />
     </div>
+  );
+}
+
+export default function SellPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-slate-300">Chargement...</p>
+        </div>
+      </div>
+    }>
+      <SellPageContent />
+    </Suspense>
   );
 }

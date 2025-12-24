@@ -1,29 +1,29 @@
 // RedZone - Types Supabase
 
-export type Vehicule = Database['public']['Tables']['vehicules']['Row'];
-export type VehiculeInsert = Database['public']['Tables']['vehicules']['Insert'];
-export type VehiculeUpdate = Database['public']['Tables']['vehicules']['Update'];
+export type Vehicule = Database['public']['Tables']['vehicles']['Row'];
+export type VehiculeInsert = Database['public']['Tables']['vehicles']['Insert'];
+export type VehiculeUpdate = Database['public']['Tables']['vehicles']['Update'];
 
 export interface Database {
   public: {
     Tables: {
-      vehicules: {
+      vehicles: {
         Row: {
           id: string;
           created_at: string;
-          user_id: string;
+          owner_id: string | null; // ID du propriétaire (utilisateur connecté ou null pour invité)
           type: "car" | "moto";
-          marque: string;
-          modele: string;
-          prix: number;
-          annee: number;
-          km: number;
-          carburant: "essence" | "e85" | "lpg";
+          brand: string; // Marque (anglais)
+          model: string; // Modèle (anglais)
+          price: number; // Prix (anglais)
+          year: number; // Année (anglais)
+          mileage: number; // Kilométrage (anglais)
+          fuel_type: "essence" | "e85" | "lpg"; // Type de carburant (anglais)
           transmission: "manuelle" | "automatique" | "sequentielle";
-          carrosserie: string;
-          puissance: number;
-          etat: "Neuf" | "Occasion";
-          norme_euro: string;
+          body_type: string | null; // Type de carrosserie (anglais)
+          power_hp: number; // Puissance en chevaux (anglais)
+          condition: "Neuf" | "Occasion"; // État (anglais)
+          euro_standard: string; // Norme Euro (anglais)
           car_pass: boolean;
           image: string;
           images: string[] | null;
@@ -31,18 +31,18 @@ export interface Database {
           status: "pending" | "active" | "rejected" | "waiting_email_verification" | "pending_validation";
           
           // Vérification email (pour invités)
-          email_contact: string | null; // Email de contact pour les invités
+          guest_email: string | null; // Email de contact pour les invités
           is_email_verified: boolean | null; // True si l'email a été vérifié
           verification_code: string | null; // Code de vérification hashé
           verification_code_expires_at: string | null; // Date d'expiration du code
           
           // Champs techniques
-          architecture_moteur: string | null;
+          engine_architecture: string | null; // Architecture moteur (anglais)
           admission: string | null;
           zero_a_cent: number | null;
           co2: number | null;
           poids_kg: number | null;
-          cv_fiscaux: number | null; // Chevaux fiscaux (pour taxe annuelle)
+          fiscal_horsepower: number | null; // Chevaux fiscaux (anglais)
           
           // Passion & Transparence
           audio_file: string | null;
@@ -51,103 +51,172 @@ export interface Database {
           is_manual_model: boolean | null; // Modèle non listé (saisie manuelle)
           
           // Contact
-          telephone: string | null; // Numéro de téléphone du vendeur
+          phone: string | null; // Numéro de téléphone du vendeur (anglais)
           contact_email: string | null; // Email de contact (par défaut email du vendeur)
           contact_methods: string[] | null; // Méthodes de contact acceptées: 'whatsapp', 'email', 'tel'
           
           // Filtres avancés
-          couleur_interieure: string | null; // Couleur intérieure (Noir, Rouge, Cuir Beige, Alcantara)
-          nombre_places: number | null; // Nombre de places (2, 4, 5)
+          interior_color: string | null; // Couleur intérieure (anglais)
+          seats_count: number | null; // Nombre de places (anglais)
           
           // Localisation
-          ville: string | null; // Ville où se trouve le véhicule (ex: Namur, Liège, Bruxelles)
-          code_postal: string | null; // Code postal belge (ex: 5000, 7181)
+          city: string | null; // Ville où se trouve le véhicule (anglais)
+          postal_code: string | null; // Code postal belge (anglais)
+          
+          // Champs pour calcul taxes belges (CRITIQUES)
+          displacement_cc: number | null; // Cylindrée en cm³ - OBLIGATOIRE pour calcul CV fiscaux
+          co2_wltp: number | null; // Émissions CO2 WLTP - RECOMMANDÉ pour Flandre
+          first_registration_date: string | null; // Date de première immatriculation
+          is_hybrid: boolean | null; // Véhicule hybride - Réduction taxes Flandre (50%)
+          is_electric: boolean | null; // Véhicule électrique - Exemption taxes Flandre
+          region_of_registration: "wallonie" | "flandre" | "bruxelles" | null; // Région d'immatriculation
+          
+          // Champs pour véhicules sportifs
+          drivetrain: "RWD" | "FWD" | "AWD" | "4WD" | null; // Type de transmission
+          top_speed: number | null; // Vitesse maximale en km/h
+          torque_nm: number | null; // Couple moteur en Newton-mètres (Nm)
+          engine_configuration: string | null; // Configuration moteur (V6, V8, V12, I4, I6, Boxer, etc.)
+          number_of_cylinders: number | null; // Nombre de cylindres
+          redline_rpm: number | null; // Régime de rupture en tr/min
+          limited_edition: boolean | null; // Édition limitée
+          number_produced: number | null; // Nombre d'exemplaires produits
+          racing_heritage: string | null; // Héritage sportif (ex: "Le Mans Winner", "F1 Technology")
+          modifications: string[] | null; // Liste des modifications
+          track_ready: boolean | null; // Prêt pour circuit
+          warranty_remaining: number | null; // Garantie restante en mois
+          service_history_count: number | null; // Nombre d'entretiens documentés
         };
         Insert: {
           id?: string;
           created_at?: string;
-          user_id: string;
+          owner_id?: string | null; // ID du propriétaire (utilisateur connecté ou null pour invité)
           type: "car" | "moto";
-          marque: string;
-          modele: string;
-          prix: number;
-          annee: number;
-          km: number;
-          carburant: "essence" | "e85" | "lpg";
+          brand: string; // Marque (anglais)
+          model: string; // Modèle (anglais)
+          price: number; // Prix (anglais)
+          year: number; // Année (anglais)
+          mileage: number; // Kilométrage (anglais)
+          fuel_type: "essence" | "e85" | "lpg"; // Type de carburant (anglais)
           transmission: "manuelle" | "automatique" | "sequentielle";
-          carrosserie: string;
-          puissance: number;
-          etat: "Neuf" | "Occasion";
-          norme_euro: string;
-          car_pass: boolean;
+          body_type?: string | null; // Type de carrosserie (anglais)
+          power_hp: number; // Puissance en chevaux (anglais)
+          condition: "Neuf" | "Occasion"; // État (anglais)
+          euro_standard: string; // Norme Euro (anglais)
+          car_pass?: boolean;
           image: string;
           images?: string[] | null;
           description?: string | null;
           status?: "pending" | "active" | "rejected" | "waiting_email_verification" | "pending_validation";
-          email_contact?: string | null;
+          guest_email?: string | null;
           is_email_verified?: boolean | null;
           verification_code?: string | null;
           verification_code_expires_at?: string | null;
-          architecture_moteur?: string | null;
+          engine_architecture?: string | null;
           admission?: string | null;
           zero_a_cent?: number | null;
           co2?: number | null;
           poids_kg?: number | null;
-          cv_fiscaux?: number | null;
+          fiscal_horsepower?: number | null;
           audio_file?: string | null;
           history?: string[] | null;
           car_pass_url?: string | null;
           is_manual_model?: boolean | null;
-          telephone?: string | null;
+          phone?: string | null;
           contact_email?: string | null;
           contact_methods?: string[] | null;
-          couleur_interieure?: string | null;
-          nombre_places?: number | null;
-          ville?: string | null;
-          code_postal?: string | null;
+          interior_color?: string | null;
+          seats_count?: number | null;
+          city?: string | null;
+          postal_code?: string | null;
+          
+          // Champs pour calcul taxes belges
+          displacement_cc?: number | null;
+          co2_wltp?: number | null;
+          first_registration_date?: string | null;
+          is_hybrid?: boolean | null;
+          is_electric?: boolean | null;
+          region_of_registration?: "wallonie" | "flandre" | "bruxelles" | null;
+          
+          // Champs pour véhicules sportifs
+          drivetrain?: "RWD" | "FWD" | "AWD" | "4WD" | null;
+          top_speed?: number | null;
+          torque_nm?: number | null;
+          engine_configuration?: string | null;
+          number_of_cylinders?: number | null;
+          redline_rpm?: number | null;
+          limited_edition?: boolean | null;
+          number_produced?: number | null;
+          racing_heritage?: string | null;
+          modifications?: string[] | null;
+          track_ready?: boolean | null;
+          warranty_remaining?: number | null;
+          service_history_count?: number | null;
         };
         Update: {
           id?: string;
           created_at?: string;
-          user_id?: string;
+          owner_id?: string | null;
           type?: "car" | "moto";
-          marque?: string;
-          modele?: string;
-          prix?: number;
-          annee?: number;
-          km?: number;
-          carburant?: "essence" | "e85" | "lpg";
+          brand?: string;
+          model?: string;
+          price?: number;
+          year?: number;
+          mileage?: number;
+          fuel_type?: "essence" | "e85" | "lpg";
           transmission?: "manuelle" | "automatique" | "sequentielle";
-          carrosserie?: string;
-          puissance?: number;
-          etat?: "Neuf" | "Occasion";
-          norme_euro?: string;
+          body_type?: string | null;
+          power_hp?: number;
+          condition?: "Neuf" | "Occasion";
+          euro_standard?: string;
           car_pass?: boolean;
           image?: string;
           images?: string[] | null;
           description?: string | null;
           status?: "pending" | "active" | "rejected" | "waiting_email_verification" | "pending_validation";
-          email_contact?: string | null;
+          guest_email?: string | null;
           is_email_verified?: boolean | null;
           verification_code?: string | null;
           verification_code_expires_at?: string | null;
-          architecture_moteur?: string | null;
+          engine_architecture?: string | null;
           admission?: string | null;
           zero_a_cent?: number | null;
           co2?: number | null;
           poids_kg?: number | null;
-          cv_fiscaux?: number | null;
+          fiscal_horsepower?: number | null;
           audio_file?: string | null;
           history?: string[] | null;
           car_pass_url?: string | null;
           is_manual_model?: boolean | null;
-          telephone?: string | null;
+          phone?: string | null;
           contact_email?: string | null;
           contact_methods?: string[] | null;
-          couleur_interieure?: string | null;
-          nombre_places?: number | null;
-          ville?: string | null;
-          code_postal?: string | null;
+          interior_color?: string | null;
+          seats_count?: number | null;
+          city?: string | null;
+          postal_code?: string | null;
+          
+          // Champs pour calcul taxes belges
+          displacement_cc?: number | null;
+          co2_wltp?: number | null;
+          first_registration_date?: string | null;
+          is_hybrid?: boolean | null;
+          is_electric?: boolean | null;
+          region_of_registration?: "wallonie" | "flandre" | "bruxelles" | null;
+          
+          // Champs pour véhicules sportifs
+          drivetrain?: "RWD" | "FWD" | "AWD" | "4WD" | null;
+          top_speed?: number | null;
+          torque_nm?: number | null;
+          engine_configuration?: string | null;
+          number_of_cylinders?: number | null;
+          redline_rpm?: number | null;
+          limited_edition?: boolean | null;
+          number_produced?: number | null;
+          racing_heritage?: string | null;
+          modifications?: string[] | null;
+          track_ready?: boolean | null;
+          warranty_remaining?: number | null;
+          service_history_count?: number | null;
         };
       };
       articles: {
@@ -220,8 +289,23 @@ export interface Database {
           created_at: string;
           email: string;
           full_name: string | null;
-          role: "particulier" | "pro" | "admin";
+          role: "particulier" | "pro" | "admin" | "moderator";
           avatar_url: string | null;
+          is_banned: boolean | null;
+          ban_reason: string | null;
+          ban_until: string | null;
+          garage_name: string | null;
+          garage_description: string | null;
+          website: string | null;
+          address: string | null;
+          city: string | null;
+          postal_code: string | null;
+          phone: string | null;
+          bio: string | null;
+          speciality: string | null;
+          founded_year: number | null;
+          cover_image_url: string | null;
+          is_verified: boolean | null;
         };
         Insert: {
           id: string;
@@ -230,6 +314,21 @@ export interface Database {
           full_name?: string | null;
           role?: "particulier" | "pro" | "admin";
           avatar_url?: string | null;
+          is_banned?: boolean | null;
+          ban_reason?: string | null;
+          ban_until?: string | null;
+          garage_name?: string | null;
+          garage_description?: string | null;
+          website?: string | null;
+          address?: string | null;
+          city?: string | null;
+          postal_code?: string | null;
+          phone?: string | null;
+          bio?: string | null;
+          speciality?: string | null;
+          founded_year?: number | null;
+          cover_image_url?: string | null;
+          is_verified?: boolean | null;
         };
         Update: {
           id?: string;
@@ -238,6 +337,21 @@ export interface Database {
           full_name?: string | null;
           role?: "particulier" | "pro" | "admin";
           avatar_url?: string | null;
+          is_banned?: boolean | null;
+          ban_reason?: string | null;
+          ban_until?: string | null;
+          garage_name?: string | null;
+          garage_description?: string | null;
+          website?: string | null;
+          address?: string | null;
+          city?: string | null;
+          postal_code?: string | null;
+          phone?: string | null;
+          bio?: string | null;
+          speciality?: string | null;
+          founded_year?: number | null;
+          cover_image_url?: string | null;
+          is_verified?: boolean | null;
         };
       };
       site_settings: {
@@ -296,6 +410,170 @@ export interface Database {
           user_id?: string | null;
           message?: string;
           metadata?: Record<string, any>;
+        };
+      };
+      favorites: {
+        Row: {
+          id: string;
+          user_id: string;
+          vehicle_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          vehicle_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          vehicle_id?: string;
+          created_at?: string;
+        };
+      };
+      conversations: {
+        Row: {
+          id: string;
+          vehicle_id: string;
+          buyer_id: string;
+          seller_id: string;
+          created_at: string;
+          updated_at: string;
+          buyer_last_read_at: string | null;
+          seller_last_read_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          vehicle_id: string;
+          buyer_id: string;
+          seller_id: string;
+          created_at?: string;
+          updated_at?: string;
+          buyer_last_read_at?: string | null;
+          seller_last_read_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          vehicle_id?: string;
+          buyer_id?: string;
+          seller_id?: string;
+          created_at?: string;
+          updated_at?: string;
+          buyer_last_read_at?: string | null;
+          seller_last_read_at?: string | null;
+        };
+      };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          created_at: string;
+          is_read: boolean;
+          read_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          created_at?: string;
+          is_read?: boolean;
+          read_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          sender_id?: string;
+          content?: string;
+          created_at?: string;
+          is_read?: boolean;
+          read_at?: string | null;
+        };
+      };
+      saved_searches: {
+        Row: {
+          id: string;
+          user_id: string;
+          created_at: string;
+          updated_at: string;
+          marque: string | null;
+          modele: string | null;
+          prix_min: number | null;
+          prix_max: number | null;
+          annee_min: number | null;
+          annee_max: number | null;
+          km_max: number | null;
+          type: string[] | null;
+          carburants: string[] | null;
+          transmissions: string[] | null;
+          carrosseries: string[] | null;
+          norme_euro: string | null;
+          car_pass_only: boolean | null;
+          architectures: string[] | null;
+          admissions: string[] | null;
+          couleur_exterieure: string[] | null;
+          couleur_interieure: string[] | null;
+          nombre_places: string[] | null;
+          name: string | null;
+          is_active: boolean | null;
+          last_notified_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          created_at?: string;
+          updated_at?: string;
+          marque?: string | null;
+          modele?: string | null;
+          prix_min?: number | null;
+          prix_max?: number | null;
+          annee_min?: number | null;
+          annee_max?: number | null;
+          km_max?: number | null;
+          type?: string[] | null;
+          carburants?: string[] | null;
+          transmissions?: string[] | null;
+          carrosseries?: string[] | null;
+          norme_euro?: string | null;
+          car_pass_only?: boolean | null;
+          architectures?: string[] | null;
+          admissions?: string[] | null;
+          couleur_exterieure?: string[] | null;
+          couleur_interieure?: string[] | null;
+          nombre_places?: string[] | null;
+          name?: string | null;
+          is_active?: boolean | null;
+          last_notified_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+          updated_at?: string;
+          marque?: string | null;
+          modele?: string | null;
+          prix_min?: number | null;
+          prix_max?: number | null;
+          annee_min?: number | null;
+          annee_max?: number | null;
+          km_max?: number | null;
+          type?: string[] | null;
+          carburants?: string[] | null;
+          transmissions?: string[] | null;
+          carrosseries?: string[] | null;
+          norme_euro?: string | null;
+          car_pass_only?: boolean | null;
+          architectures?: string[] | null;
+          admissions?: string[] | null;
+          couleur_exterieure?: string[] | null;
+          couleur_interieure?: string[] | null;
+          nombre_places?: string[] | null;
+          name?: string | null;
+          is_active?: boolean | null;
+          last_notified_at?: string | null;
         };
       };
     };

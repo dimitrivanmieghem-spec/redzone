@@ -9,7 +9,7 @@ interface AuthLayoutProps {
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <main className="min-h-screen bg-slate-950 flex">
+    <main className="min-h-screen bg-neutral-950 flex">
       {/* Colonne de gauche - Marketing (Desktop) */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         {/* Image de fond avec overlay sombre */}
@@ -20,7 +20,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               "url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?q=80&w=1920&auto=format&fit=crop')",
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-slate-900/90 to-slate-800/95" />
+          <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/95 via-neutral-900/90 to-neutral-800/95" />
         </div>
 
         {/* Contenu marketing */}
@@ -52,10 +52,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   Membre Fondateur
                 </span>
               </h1>
-              <p className="text-xl text-slate-300 leading-relaxed">
+              <p className="text-xl text-neutral-300 leading-relaxed">
                 Réservé aux <span className="font-bold text-yellow-400">500 premiers inscrits</span>.
               </p>
-              <p className="text-lg text-slate-400">
+              <p className="text-lg text-neutral-400">
                 Obtenez le badge exclusif à vie et un accès prioritaire aux futures fonctionnalités Pro.
               </p>
             </div>
@@ -78,7 +78,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     </div>
                     <div>
                       <p className="text-white font-medium">La Sentinelle</p>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-neutral-400 text-sm">
                         Soyez alerté avant tout le monde des nouvelles annonces.
                       </p>
                     </div>
@@ -89,7 +89,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     </div>
                     <div>
                       <p className="text-white font-medium">Garage de Rêve</p>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-neutral-400 text-sm">
                         Suivez l&apos;évolution des prix de vos favoris.
                       </p>
                     </div>
@@ -110,7 +110,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     </div>
                     <div>
                       <p className="text-white font-medium">Showroom Digital</p>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-neutral-400 text-sm">
                         Votre page vitrine dédiée{" "}
                         <span className="text-yellow-400">(Bientôt disponible)</span>.
                       </p>
@@ -122,7 +122,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     </div>
                     <div>
                       <p className="text-white font-medium">Badge Vérifié</p>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-neutral-400 text-sm">
                         Rassurez vos acheteurs avec le statut Pro.
                       </p>
                     </div>
@@ -133,20 +133,20 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           </div>
 
           {/* Footer marketing */}
-          <div className="text-sm text-slate-400">
+          <div className="text-sm text-neutral-400">
             <p>🔒 Vos données sont protégées conformément au RGPD</p>
           </div>
         </div>
       </div>
 
       {/* Colonne de droite - Contenu (Desktop) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-slate-950">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-neutral-950">
         <div className="w-full max-w-md">
           {/* Logo et retour (Mobile) */}
           <div className="lg:hidden mb-8">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors font-medium"
+              className="inline-flex items-center gap-2 text-neutral-400 hover:text-white mb-6 transition-colors font-medium"
             >
               <ArrowLeft size={20} />
               <span>Retour à l&apos;accueil</span>
@@ -169,7 +169,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   Membre Fondateur
                 </span>
               </h1>
-              <p className="text-slate-400">
+              <p className="text-neutral-400">
                 Réservé aux <span className="font-bold text-yellow-400">500 premiers inscrits</span>.
                 Obtenez le badge exclusif à vie.
               </p>
@@ -181,28 +181,28 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 <Bell className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
                   <p className="text-white font-medium text-xs">La Sentinelle</p>
-                  <p className="text-slate-500 text-xs">Alertes exclusives</p>
+                  <p className="text-neutral-500 text-xs">Alertes exclusives</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <TrendingUp className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
                   <p className="text-white font-medium text-xs">Garage de Rêve</p>
-                  <p className="text-slate-500 text-xs">Suivi des prix</p>
+                  <p className="text-neutral-500 text-xs">Suivi des prix</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Building2 className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
                   <p className="text-white font-medium text-xs">Showroom Pro</p>
-                  <p className="text-slate-500 text-xs">Bientôt disponible</p>
+                  <p className="text-neutral-500 text-xs">Bientôt disponible</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Shield className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
                   <p className="text-white font-medium text-xs">Badge Vérifié</p>
-                  <p className="text-slate-500 text-xs">Statut Pro</p>
+                  <p className="text-neutral-500 text-xs">Statut Pro</p>
                 </div>
               </div>
             </div>

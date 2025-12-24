@@ -3,7 +3,7 @@ import { Car, Home } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
+    <main className="min-h-screen bg-gradient-to-br from-neutral-950 via-red-950/20 to-neutral-950 flex items-center justify-center px-4">
       <div className="max-w-2xl w-full text-center">
         {/* Icône animée */}
         <div className="mb-8 flex justify-center">
@@ -19,16 +19,16 @@ export default function NotFound() {
 
         {/* Titre */}
         <h1 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tight">
-          Sortie de route !
+          Sortie de route ! 
         </h1>
 
         {/* Sous-titre */}
-        <p className="text-xl md:text-2xl text-slate-300 mb-8 font-medium">
+        <p className="text-xl md:text-2xl text-neutral-300 mb-8 font-medium">
           Cette page n&apos;existe pas ou le véhicule a été vendu.
         </p>
 
         {/* Message additionnel */}
-        <p className="text-slate-400 mb-12 max-w-md mx-auto">
+        <p className="text-neutral-400 mb-12 max-w-md mx-auto">
           Le véhicule que vous recherchez n&apos;est plus disponible ou la page
           demandée n&apos;existe pas. Retournez au garage pour découvrir d&apos;autres
           sportives.
@@ -46,7 +46,7 @@ export default function NotFound() {
 
           <Link
             href="/search"
-            className="group bg-slate-800 hover:bg-slate-700 text-white font-bold px-8 py-4 rounded-full transition-all hover:scale-105 shadow-xl border-2 border-slate-700 flex items-center gap-3"
+            className="group bg-neutral-800 hover:bg-neutral-700 text-white font-bold px-8 py-4 rounded-full transition-all hover:scale-105 shadow-xl border-2 border-neutral-700 flex items-center gap-3"
           >
             <Car size={20} className="group-hover:scale-110 transition-transform" />
             Rechercher
@@ -54,7 +54,7 @@ export default function NotFound() {
         </div>
 
         {/* Code d'erreur discret */}
-        <p className="mt-16 text-xs text-slate-600 font-mono">
+        <p className="mt-16 text-xs text-neutral-600 font-mono">
           Erreur 404
         </p>
       </div>

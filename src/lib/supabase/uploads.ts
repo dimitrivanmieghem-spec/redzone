@@ -2,6 +2,94 @@
 
 import { createClient } from "./client";
 
+// Types MIME autorisés
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+const ALLOWED_AUDIO_TYPES = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/webm"];
+
+// Limites de taille (en bytes)
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_AUDIO_SIZE = 5 * 1024 * 1024; // 5MB
+
+/**
+ * Valider un fichier image
+ */
+function validateImageFile(file: File): { valid: boolean; error?: string } {
+  // Vérifier le type MIME
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return {
+      valid: false,
+      error: `Type de fichier non autorisé. Types acceptés: ${ALLOWED_IMAGE_TYPES.join(", ")}`,
+    };
+  }
+
+  // Vérifier l'extension
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  const allowedExts = ["jpg", "jpeg", "png", "webp", "gif"];
+  if (!ext || !allowedExts.includes(ext)) {
+    return {
+      valid: false,
+      error: `Extension non autorisée. Extensions acceptées: ${allowedExts.join(", ")}`,
+    };
+  }
+
+  // Vérifier la taille
+  if (file.size > MAX_IMAGE_SIZE) {
+    return {
+      valid: false,
+      error: `Fichier trop volumineux. Taille maximale: ${MAX_IMAGE_SIZE / 1024 / 1024}MB`,
+    };
+  }
+
+  if (file.size === 0) {
+    return {
+      valid: false,
+      error: "Le fichier est vide",
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Valider un fichier audio
+ */
+function validateAudioFile(file: File): { valid: boolean; error?: string } {
+  // Vérifier le type MIME
+  if (!ALLOWED_AUDIO_TYPES.includes(file.type)) {
+    return {
+      valid: false,
+      error: `Type de fichier non autorisé. Types acceptés: ${ALLOWED_AUDIO_TYPES.join(", ")}`,
+    };
+  }
+
+  // Vérifier l'extension
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  const allowedExts = ["mp3", "wav", "ogg", "webm"];
+  if (!ext || !allowedExts.includes(ext)) {
+    return {
+      valid: false,
+      error: `Extension non autorisée. Extensions acceptées: ${allowedExts.join(", ")}`,
+    };
+  }
+
+  // Vérifier la taille
+  if (file.size > MAX_AUDIO_SIZE) {
+    return {
+      valid: false,
+      error: `Fichier trop volumineux. Taille maximale: ${MAX_AUDIO_SIZE / 1024 / 1024}MB`,
+    };
+  }
+
+  if (file.size === 0) {
+    return {
+      valid: false,
+      error: "Le fichier est vide",
+    };
+  }
+
+  return { valid: true };
+}
+
 /**
  * Upload une image vers Supabase Storage
  * @param file - Fichier image
@@ -9,6 +97,12 @@ import { createClient } from "./client";
  * @returns URL publique de l'image
  */
 export async function uploadImage(file: File, userId?: string | null): Promise<string> {
+  // Valider le fichier AVANT l'upload
+  const validation = validateImageFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || "Fichier invalide");
+  }
+
   const supabase = createClient();
 
   // Générer un nom unique
@@ -27,19 +121,9 @@ export async function uploadImage(file: File, userId?: string | null): Promise<s
     });
 
   if (error) {
-    // Log détaillé pour diagnostic
-    console.error('❌ [uploadImage] Erreur upload:', {
-      error: error.message,
-      name: error.name || 'N/A',
-      path: filePath,
-      userId: userId || 'guest',
-      bucket: 'files',
-      details: JSON.stringify(error, Object.getOwnPropertyNames(error))
-    });
-    
     // Détection spécifique des erreurs RLS
     if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-      console.error('🔒 [uploadImage] BLOQUAGE RLS DÉTECTÉ');
+      console.error('[uploadImage] BLOQUAGE RLS DÉTECTÉ');
       console.error('   → Vérifiez que la politique "guest_upload_files" existe sur storage.objects');
       console.error('   → Le path doit commencer par "images/guest_" ou "audio/guest_"');
     }
@@ -76,6 +160,12 @@ export async function uploadImages(
  * @returns URL publique de l'audio
  */
 export async function uploadAudio(file: File, userId?: string | null): Promise<string> {
+  // Valider le fichier AVANT l'upload
+  const validation = validateAudioFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || "Fichier invalide");
+  }
+
   const supabase = createClient();
 
   // Pour les invités, utiliser un UUID temporaire basé sur timestamp
@@ -92,19 +182,9 @@ export async function uploadAudio(file: File, userId?: string | null): Promise<s
     });
 
   if (error) {
-    // Log détaillé pour diagnostic
-    console.error('❌ [uploadAudio] Erreur upload:', {
-      error: error.message,
-      name: error.name || 'N/A',
-      path: filePath,
-      userId: userId || 'guest',
-      bucket: 'files',
-      details: JSON.stringify(error, Object.getOwnPropertyNames(error))
-    });
-    
     // Détection spécifique des erreurs RLS
     if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-      console.error('🔒 [uploadAudio] BLOQUAGE RLS DÉTECTÉ');
+      console.error('[uploadAudio] BLOQUAGE RLS DÉTECTÉ');
       console.error('   → Vérifiez que la politique "guest_upload_files" existe sur storage.objects');
       console.error('   → Le path doit commencer par "images/guest_" ou "audio/guest_"');
     }
@@ -127,16 +207,39 @@ export async function deleteFile(url: string): Promise<void> {
   const supabase = createClient();
 
   // Extraire le path du fichier depuis l'URL
-  const path = url.split("/files/")[1];
+  // Format attendu : https://xxx.supabase.co/storage/v1/object/public/files/images/...
+  let path: string | null = null;
+
+  // Essayer plusieurs formats d'URL
+  if (url.includes("/files/")) {
+    path = url.split("/files/")[1];
+  } else if (url.includes("/storage/v1/object/public/files/")) {
+    path = url.split("/storage/v1/object/public/files/")[1];
+  } else if (url.startsWith("images/") || url.startsWith("audio/")) {
+    // Si c'est déjà un path relatif
+    path = url;
+  }
 
   if (!path) {
-    throw new Error("URL invalide");
+    // Impossible d'extraire le path de l'URL
+    // Ne pas throw d'erreur, juste logger un avertissement
+    // Car certaines URLs peuvent être des URLs externes (non Supabase)
+    return;
   }
 
   const { error } = await supabase.storage.from("files").remove([path]);
 
   if (error) {
-    throw new Error(`Erreur suppression fichier: ${error.message}`);
+    // Logger l'erreur mais ne pas bloquer l'application
+    console.error("[deleteFile] Erreur suppression fichier:", {
+      error: error.message,
+      path,
+      url
+    });
+    // Ne pas throw pour éviter de bloquer l'UI si le fichier n'existe plus
+    // throw new Error(`Erreur suppression fichier: ${error.message}`);
+  } else {
+    // Fichier supprimé avec succès
   }
 }
 

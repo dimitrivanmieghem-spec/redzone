@@ -1,7 +1,8 @@
 // RedZone - Fonctions Admin pour CRUD model_specs_db
 
 import { createClient } from "./client";
-import { requireAdmin } from "./auth-utils";
+// ⚠️ Ce fichier ne doit JAMAIS importer auth-utils-server ou server.ts
+// Les fonctions admin doivent être déplacées dans server-actions/modelSpecsAdmin.ts
 
 export interface ModelSpec {
   id: string;
@@ -53,9 +54,10 @@ export interface ModelSpecUpdate {
 
 /**
  * Récupérer tous les modèles (admin uniquement)
+ * ⚠️ NOTE: Vérification admin supprimée (doit être fait dans server-actions)
+ * Protection RLS active en base de données
  */
 export async function getAllModelSpecs(): Promise<ModelSpec[]> {
-  await requireAdmin();
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -73,9 +75,10 @@ export async function getAllModelSpecs(): Promise<ModelSpec[]> {
 
 /**
  * Récupérer un modèle par ID (admin uniquement)
+ * ⚠️ NOTE: Vérification admin supprimée (doit être fait dans server-actions)
+ * Protection RLS active en base de données
  */
 export async function getModelSpecById(id: string): Promise<ModelSpec | null> {
-  await requireAdmin();
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -93,9 +96,10 @@ export async function getModelSpecById(id: string): Promise<ModelSpec | null> {
 
 /**
  * Créer un nouveau modèle (admin uniquement)
+ * ⚠️ NOTE: Vérification admin supprimée (doit être fait dans server-actions)
+ * Protection RLS active en base de données
  */
 export async function createModelSpec(spec: ModelSpecInsert): Promise<ModelSpec> {
-  await requireAdmin();
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -117,12 +121,13 @@ export async function createModelSpec(spec: ModelSpecInsert): Promise<ModelSpec>
 
 /**
  * Mettre à jour un modèle (admin uniquement)
+ * ⚠️ NOTE: Vérification admin supprimée (doit être fait dans server-actions)
+ * Protection RLS active en base de données
  */
 export async function updateModelSpec(
   id: string,
   updates: ModelSpecUpdate
 ): Promise<ModelSpec> {
-  await requireAdmin();
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -141,9 +146,10 @@ export async function updateModelSpec(
 
 /**
  * Supprimer un modèle (admin uniquement)
+ * ⚠️ NOTE: Vérification admin supprimée (doit être fait dans server-actions)
+ * Protection RLS active en base de données
  */
 export async function deleteModelSpec(id: string): Promise<void> {
-  await requireAdmin();
   const supabase = createClient();
 
   const { error } = await supabase

@@ -84,7 +84,7 @@ export default function PrivacyPage() {
                 Adresse : [ADRESSE COMPLÈTE À REMPLIR]<br />
                 Numéro BCE : [NUMÉRO BCE À REMPLIR]<br />
                 Numéro TVA : BE [NUMÉRO TVA À REMPLIR]<br />
-                Email de contact : privacy@RedZone.be (À CONFIGURER)<br />
+                Email de contact : <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a><br />
                 Délégué à la Protection des Données (DPO) : [NOM DPO À REMPLIR]
               </p>
             </div>
@@ -295,7 +295,7 @@ export default function PrivacyPage() {
             <div className="bg-red-100 p-6 rounded-2xl mt-6">
               <h4 className="font-bold text-slate-900 mb-2">📧 Comment exercer vos droits ?</h4>
               <p className="text-slate-900 mb-3">
-                Envoyez un email à : <strong>privacy@RedZone.be</strong> (À CONFIGURER)
+                Envoyez un email à : <strong><a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 underline">dimitri.vanmieghem@gmail.com</a></strong>
               </p>
               <p className="text-slate-700 text-sm mb-2">
                 Joignez une copie de votre carte d&apos;identité (pour vérification) et précisez votre demande.
@@ -335,7 +335,7 @@ export default function PrivacyPage() {
             <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">8. Cookies et technologies similaires</h2>
             <p className="text-slate-700 mb-4">
               Pour plus d&apos;informations sur notre utilisation des cookies, consultez notre bandeau cookies 
-              et notre <Link href="#" className="text-red-600 hover:text-red-700 font-bold underline">politique de gestion des cookies</Link>.
+              et notre politique de gestion des cookies (accessible via le bandeau cookies en bas de page).
             </p>
             <p className="text-slate-700 mb-4">
               Vous pouvez à tout moment modifier vos préférences via le lien <strong>&quot;Gestion des cookies&quot;</strong> en bas de page.
@@ -384,7 +384,7 @@ export default function PrivacyPage() {
             </p>
             <div className="bg-red-50 p-6 rounded-2xl">
               <p className="text-slate-900 mb-2">
-                <strong>Email :</strong> privacy@RedZone.be (À CONFIGURER)
+                <strong>Email :</strong> <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a>
               </p>
               <p className="text-slate-900 mb-2">
                 <strong>Courrier :</strong> RedZone SPRL - Service Protection des Données<br />

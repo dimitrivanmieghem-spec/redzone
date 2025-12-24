@@ -12,6 +12,12 @@ export interface VehicleSpecs {
   moteur: string;
   transmission: 'Manuelle' | 'Automatique' | 'Séquentielle';
   default_carrosserie?: string | null;
+  // Nouveaux champs pour pré-remplissage amélioré
+  top_speed?: number | null; // Vitesse maximale en km/h
+  drivetrain?: 'RWD' | 'FWD' | 'AWD' | '4WD' | null; // Type de transmission
+  co2_wltp?: number | null; // CO2 WLTP pour taxes Flandre
+  default_color?: string | null; // Couleur extérieure standard
+  default_seats?: number | null; // Nombre de places standard
 }
 
 export type VehicleType = 'car' | 'moto';
@@ -75,7 +81,6 @@ export async function getBrands(type: VehicleType = 'car', retries = 2): Promise
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      console.log(`🔍 [${context}] Tentative ${attempt + 1}/${retries + 1} - Récupération marques (${type})`);
       
       const { data, error } = await supabase
         .from(table)
@@ -97,7 +102,6 @@ export async function getBrands(type: VehicleType = 'car', retries = 2): Promise
       const uniqueBrands = Array.from(new Set(data.map(item => item.marque).filter(Boolean)));
       const sortedBrands = uniqueBrands.sort();
       
-      console.log(`✅ [${context}] ${sortedBrands.length} marques récupérées pour ${type}`);
       return sortedBrands;
     } catch (err) {
       logError(context, table, operation, err, { type, attempt: attempt + 1 });
@@ -109,7 +113,6 @@ export async function getBrands(type: VehicleType = 'car', retries = 2): Promise
       
       // Attendre avant de réessayer (backoff exponentiel)
       const delay = 1000 * Math.pow(2, attempt);
-      console.log(`⏳ [${context}] Nouvelle tentative dans ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -137,7 +140,6 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      console.log(`🔍 [${context}] Tentative ${attempt + 1}/${retries + 1} - Récupération modèles (${type}, ${brand})`);
       
       const { data, error } = await supabase
         .from(table)
@@ -158,7 +160,6 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
       }
 
       const models = data.map(item => item.modele).filter(Boolean);
-      console.log(`✅ [${context}] ${models.length} modèles récupérés pour ${brand} (${type})`);
       return models;
     } catch (err) {
       logError(context, table, operation, err, { type, brand, attempt: attempt + 1 });
@@ -169,7 +170,6 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
       }
       
       const delay = 1000 * Math.pow(2, attempt);
-      console.log(`⏳ [${context}] Nouvelle tentative dans ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -195,7 +195,6 @@ export async function searchBrands(type: VehicleType, searchTerm: string): Promi
   const supabase = createClient();
   
   try {
-    console.log(`🔍 [${context}] Recherche marques: "${searchTerm}" (${type})`);
     
     const { data, error } = await supabase
       .from(table)
@@ -216,7 +215,6 @@ export async function searchBrands(type: VehicleType, searchTerm: string): Promi
 
     const uniqueBrands = Array.from(new Set(data.map(item => item.marque).filter(Boolean)));
     const sortedBrands = uniqueBrands.sort();
-    console.log(`✅ [${context}] ${sortedBrands.length} marques trouvées`);
     return sortedBrands;
   } catch (err) {
     logError(context, table, operation, err, { type, searchTerm });
@@ -251,7 +249,6 @@ export async function searchModels(
   const supabase = createClient();
   
   try {
-    console.log(`🔍 [${context}] Recherche modèles: "${searchTerm}" (${type}, ${brand})`);
     
     const { data, error } = await supabase
       .from(table)
@@ -273,7 +270,6 @@ export async function searchModels(
     }
 
     const models = data.map(item => item.modele).filter(Boolean);
-    console.log(`✅ [${context}] ${models.length} modèles trouvés`);
     return models;
   } catch (err) {
     logError(context, table, operation, err, { type, brand, searchTerm });
@@ -304,14 +300,13 @@ export async function getModelSpecs(
 
   const supabase = createClient();
   
-  console.log(`🔍 [${context}] Recherche specs: ${brand} ${model} (${type})`);
   
   // Tentative 1 : Recherche avec ILIKE (plus tolérant pour les espaces et caractères spéciaux)
   // On évite .eq() qui peut causer des erreurs 400 avec les espaces dans les valeurs
-  // Note: default_carrosserie n'existe pas dans la table, on ne le sélectionne pas
+  // Inclure les nouveaux champs pour pré-remplissage amélioré
   let { data, error } = await supabase
     .from(table)
-    .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission')
+    .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
     .eq('type', type)
     .ilike('marque', brand.trim())
     .ilike('modele', model.trim())
@@ -330,7 +325,6 @@ export async function getModelSpecs(
       error.code === '22P02'; // Invalid text representation (PostgreSQL)
     
     if (isBadRequest) {
-      console.log(`⚠️ [${context}] Erreur 400 détectée (problème d'encodage), passage à la recherche partielle`);
       error = null; // Réinitialiser l'erreur pour continuer
     } else {
       // Pour les autres erreurs, on log et on continue quand même
@@ -340,7 +334,6 @@ export async function getModelSpecs(
   }
 
   if (!error && !data) {
-    console.log(`⚠️ [${context}] Recherche ILIKE: aucun résultat, tentative avec recherche exacte`);
     
     // Essayer avec .eq() mais seulement si les valeurs ne contiennent pas d'espaces problématiques
     const hasSpaces = model.includes(' ') || brand.includes(' ');
@@ -348,7 +341,7 @@ export async function getModelSpecs(
     if (!hasSpaces) {
       const { data: dataExact, error: errorExact } = await supabase
         .from(table)
-        .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission')
+        .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
         .eq('type', type)
         .eq('marque', brand.trim())
         .eq('modele', model.trim())
@@ -356,7 +349,6 @@ export async function getModelSpecs(
         .maybeSingle();
       
       if (!errorExact && dataExact) {
-        console.log(`✅ [${context}] Trouvé avec recherche exacte`);
         data = dataExact;
         error = null;
       }
@@ -364,7 +356,6 @@ export async function getModelSpecs(
     
     // Si toujours pas trouvé, essayer recherche partielle
     if (!data) {
-      console.log(`⚠️ [${context}] Tentative recherche partielle`);
       const modelNormalized = model.replace(/\s+/g, '').toLowerCase();
       const brandNormalized = brand.replace(/\s+/g, '').toLowerCase();
       
@@ -373,7 +364,7 @@ export async function getModelSpecs(
       // Si la marque contient des espaces, on essaie quand même .eq() qui devrait fonctionner
       let queryPartial = supabase
         .from(table)
-        .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, marque, modele')
+        .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, marque, modele')
         .eq('type', type)
         .eq('is_active', true);
       
@@ -396,10 +387,6 @@ export async function getModelSpecs(
         });
         
         if (bestMatch) {
-          console.log(`✅ [${context}] Trouvé avec recherche partielle:`, { 
-            recherché: `${brand} ${model}`, 
-            trouvé: `${bestMatch.marque} ${bestMatch.modele}`
-          });
           data = bestMatch;
           error = null;
         }
@@ -423,13 +410,6 @@ export async function getModelSpecs(
     return null;
   }
 
-  console.log(`✅ [${context}] Specs trouvées:`, {
-    ch: data.ch,
-    kw: data.kw,
-    cv_fiscaux: data.cv_fiscaux,
-    co2: data.co2,
-    cylindree: data.cylindree
-  });
 
   return {
     kw: data.kw,
@@ -439,6 +419,11 @@ export async function getModelSpecs(
     cylindree: data.cylindree,
     moteur: data.moteur,
     transmission: data.transmission as 'Manuelle' | 'Automatique' | 'Séquentielle',
-    default_carrosserie: null, // Cette colonne n'existe pas dans model_specs_db
+    default_carrosserie: data.default_carrosserie || null,
+    top_speed: data.top_speed ? parseInt(String(data.top_speed)) : null,
+    drivetrain: (data.drivetrain as 'RWD' | 'FWD' | 'AWD' | '4WD') || null,
+    co2_wltp: data.co2_wltp ? parseFloat(String(data.co2_wltp)) : null,
+    default_color: data.default_color || null,
+    default_seats: data.default_seats ? parseInt(String(data.default_seats)) : null,
   };
 }

@@ -62,7 +62,6 @@ export function useModelData(options: UseModelDataOptions = {}): UseModelDataRet
     setErrorBrands(null);
     
     try {
-      console.log(`[useModelData] Chargement marques pour type: ${type}`);
       const fetchedBrands = await getBrands(type);
       
       // Vérifier si la requête a été annulée
@@ -78,7 +77,6 @@ export function useModelData(options: UseModelDataOptions = {}): UseModelDataRet
         previousBrandsRef.current = fetchedBrands;
       }
       
-      console.log(`[useModelData] ${fetchedBrands.length} marques chargées`);
     } catch (err) {
       if (abortController.signal.aborted || !isMountedRef.current) {
         return;
@@ -122,7 +120,6 @@ export function useModelData(options: UseModelDataOptions = {}): UseModelDataRet
     setErrorModels(null);
     
     try {
-      console.log(`[useModelData] Chargement modèles pour: ${brand} (${type})`);
       const fetchedModels = await getModels(type, brand);
       
       // Vérifier si la requête a été annulée
@@ -131,7 +128,6 @@ export function useModelData(options: UseModelDataOptions = {}): UseModelDataRet
       }
       
       setModels(fetchedModels);
-      console.log(`[useModelData] ${fetchedModels.length} modèles chargés pour ${brand}`);
     } catch (err) {
       if (abortController.signal.aborted || !isMountedRef.current) {
         return;

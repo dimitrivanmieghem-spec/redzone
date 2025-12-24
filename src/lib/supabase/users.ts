@@ -1,14 +1,17 @@
-// RedZone - Actions Supabase pour la Gestion des Utilisateurs (Admin)
+// RedZone - Actions Supabase pour la Gestion des Utilisateurs (CLIENT SIDE)
+// ⚠️ Ce fichier ne doit JAMAIS importer auth-utils-server ou server.ts
+// Les fonctions admin sont dans server-actions/users.ts
 
 import { createClient } from "./client";
-import { requireAdmin } from "./auth-utils";
 
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "particulier" | "pro" | "admin";
+  role: "particulier" | "pro" | "admin" | "moderator";
   is_banned: boolean;
+  ban_reason: string | null;
+  ban_until: string | null;
   created_at: string;
   avatar_url: string | null;
 }
@@ -57,11 +60,11 @@ export async function getUserWithVehicles(
     return null;
   }
 
-  // Compter les véhicules
+  // Compter les véhicules (la table vehicles utilise owner_id au lieu de user_id)
   const { count, error: countError } = await supabase
-    .from("vehicules")
+    .from("vehicles")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .eq("owner_id", userId);
 
   return {
     ...(profile as UserProfile),
@@ -71,26 +74,14 @@ export async function getUserWithVehicles(
 
 /**
  * Bannir/Débannir un utilisateur (admin uniquement)
- * @param userId - ID de l'utilisateur
- * @param isBanned - True pour bannir, false pour débannir
+ * ⚠️ DEPRECATED - Utilisez banUser/unbanUser depuis server-actions/users.ts
+ * Cette fonction est conservée pour compatibilité mais ne doit plus être utilisée
  */
 export async function toggleUserBan(
   userId: string,
   isBanned: boolean
 ): Promise<void> {
-  // Vérification admin côté code (défense en profondeur)
-  await requireAdmin();
-  
-  const supabase = createClient();
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ is_banned: isBanned })
-    .eq("id", userId);
-
-  if (error) {
-    throw new Error(`Erreur modification statut: ${error.message}`);
-  }
+  throw new Error("Cette fonction est dépréciée. Utilisez banUser/unbanUser depuis server-actions/users.ts");
 }
 
 /**
@@ -102,57 +93,29 @@ export async function getUserVehicles(userId: string) {
   const supabase = createClient();
 
   const { data, error } = await supabase
-    .from("vehicules")
+    .from("vehicles")
     .select("*")
-    .eq("user_id", userId)
+    .eq("owner_id", userId) // La table vehicles utilise owner_id
     .order("created_at", { ascending: false });
 
   if (error) {
     throw new Error(`Erreur récupération véhicules: ${error.message}`);
   }
 
+  // Les données doivent être mappées depuis l'anglais vers le français
+  // Mais comme cette fonction retourne `any`, on laisse le mapping au niveau supérieur
   return data || [];
 }
 
 /**
  * Mettre à jour le rôle d'un utilisateur (admin uniquement)
- * @param userId - ID de l'utilisateur
- * @param newRole - Nouveau rôle ('particulier' | 'pro' | 'admin')
+ * ⚠️ DEPRECATED - Cette fonction doit être déplacée dans server-actions/users.ts
+ * Cette fonction est conservée pour compatibilité mais ne doit plus être utilisée
  */
 export async function updateUserRole(
   userId: string,
   newRole: "particulier" | "pro" | "admin"
 ): Promise<void> {
-  // Vérification admin côté code (défense en profondeur)
-  await requireAdmin();
-  
-  const supabase = createClient();
-  
-  // Vérifier que l'utilisateur n'essaie pas de modifier son propre rôle
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user && user.id === userId) {
-    throw new Error("Vous ne pouvez pas modifier votre propre rôle");
-  }
-
-  // Vérifier qu'on ne modifie pas un autre admin (protection)
-  const { data: targetUser } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
-
-  if (targetUser?.role === "admin" && newRole !== "admin") {
-    // Protection : ne pas permettre de dégrader un autre admin
-    throw new Error("Vous ne pouvez pas modifier le rôle d'un autre administrateur");
-  }
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role: newRole })
-    .eq("id", userId);
-
-  if (error) {
-    throw new Error(`Erreur modification rôle: ${error.message}`);
-  }
+  throw new Error("Cette fonction est dépréciée. Elle doit être déplacée dans server-actions/users.ts");
 }
 

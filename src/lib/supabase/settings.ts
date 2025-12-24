@@ -2,7 +2,7 @@
 // REFACTORING: Gestion d'erreur exhaustive avec logging détaillé
 
 import { createClient } from "./client";
-import { requireAdmin } from "./auth-utils";
+// ⚠️ Les fonctions admin sont dans server-actions/settings.ts (à créer si nécessaire)
 
 export interface SiteSettings {
   id: string;
@@ -83,8 +83,6 @@ export async function getSiteSettings(): Promise<SiteSettings | null> {
   const supabase = createClient();
 
   try {
-    console.log(`🔍 [${context}] Récupération des réglages (id: ${settingsId})`);
-    
     const { data, error } = await supabase
       .from(table)
       .select("*")
@@ -97,7 +95,6 @@ export async function getSiteSettings(): Promise<SiteSettings | null> {
     }
 
     if (!data) {
-      console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null)`);
       return null;
     }
 
@@ -107,15 +104,9 @@ export async function getSiteSettings(): Promise<SiteSettings | null> {
       typeof data.maintenance_mode !== 'boolean' ||
       typeof data.tva_rate !== 'number'
     ) {
-      console.error(`❌ [${context}] Données invalides retournées:`, data);
+      console.error(`[${context}] Données invalides retournées:`, data);
       return null;
     }
-
-    console.log(`✅ [${context}] Réglages récupérés:`, {
-      maintenance_mode: data.maintenance_mode,
-      tva_rate: data.tva_rate,
-      site_name: data.site_name
-    });
 
     return data as SiteSettings;
   } catch (err) {
@@ -137,19 +128,12 @@ export async function updateSiteSettings(
   const operation = 'UPDATE';
   const settingsId = '00000000-0000-0000-0000-000000000000';
   
-  // Vérification admin côté code (défense en profondeur)
-  try {
-    await requireAdmin();
-  } catch (err) {
-    console.error(`❌ [${context}] Accès refusé: utilisateur non admin`);
-    throw new Error('Accès refusé: droits administrateur requis');
-  }
+  // ⚠️ Vérification admin déplacée dans server-actions/settings.ts
+  // Cette fonction ne doit plus être utilisée directement depuis des Client Components
   
   const supabase = createClient();
 
   try {
-    console.log(`🔍 [${context}] Mise à jour des réglages:`, updates);
-    
     const { error } = await supabase
       .from(table)
       .update(updates)
@@ -159,8 +143,6 @@ export async function updateSiteSettings(
       logError(context, table, operation, error, { settingsId, updates });
       throw new Error(`Erreur mise à jour réglages: ${error.message}`);
     }
-
-    console.log(`✅ [${context}] Réglages mis à jour avec succès`);
   } catch (err) {
     if (err instanceof Error && err.message.includes('Accès refusé')) {
       throw err;
@@ -187,8 +169,6 @@ export async function getAdminStats(): Promise<{
   const supabase = createClient();
 
   try {
-    console.log(`🔍 [${context}] Récupération des stats admin`);
-    
     const { data, error } = await supabase.rpc("get_admin_stats");
 
     if (error) {
@@ -226,11 +206,6 @@ export async function getAdminStats(): Promise<{
       return null;
     }
 
-    console.log(`✅ [${context}] Stats récupérées:`, {
-      total_vehicles: stats.total_vehicles,
-      active_vehicles: stats.active_vehicles,
-      pending_vehicles: stats.pending_vehicles
-    });
 
     return stats as {
       total_vehicles: number;

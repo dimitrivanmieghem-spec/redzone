@@ -1,304 +1,254 @@
 "use client";
 
-import { Search, Car, HelpCircle } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import CarCard from "@/components/CarCard";
+import { Car, Shield, Users, Zap, ArrowRight, Plus } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import CarCard from "@/components/features/vehicles/car-card";
 import { useVehicules } from "@/hooks/useVehicules";
-import { useModelData } from "@/hooks/useModelData";
-import { VehicleType } from "@/lib/supabase/modelSpecs";
-import { getSiteSettings } from "@/lib/supabase/settings";
-import { getActiveFAQ } from "@/lib/supabase/faq";
-import type { FAQItem } from "@/lib/supabase/faq";
 
 export default function Home() {
   const router = useRouter();
-  const typeVehicule: VehicleType = "car"; // Pour l'instant, uniquement voitures
-  const [selectedMarque, setSelectedMarque] = useState<string>("");
-  const [selectedModele, setSelectedModele] = useState<string>("");
-  const [selectedBudget, setSelectedBudget] = useState<string>("");
-  const [selectedCarburant, setSelectedCarburant] = useState<string>("");
-  const [homeTitle, setHomeTitle] = useState<string>("Le sanctuaire du moteur thermique");
-  const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
-
-  // Utiliser le hook robuste pour charger les marques et modèles
-  const { brands: marques, loadingBrands: loadingMarques, refetchModels, models: modeles, loadingModels: loadingModeles } = useModelData({ type: typeVehicule });
-
-  // Charger les modèles quand la marque change
-  useEffect(() => {
-    if (selectedMarque) {
-      refetchModels(selectedMarque);
-    }
-  }, [selectedMarque, refetchModels]);
-
-  // Options de budget prédéfinies
-  const budgetOptions = [
-    { value: "", label: "Budget Max" },
-    { value: "10000", label: "Jusqu'à 10.000 €" },
-    { value: "15000", label: "Jusqu'à 15.000 €" },
-    { value: "20000", label: "Jusqu'à 20.000 €" },
-    { value: "25000", label: "Jusqu'à 25.000 €" },
-    { value: "30000", label: "Jusqu'à 30.000 €" },
-    { value: "40000", label: "Jusqu'à 40.000 €" },
-    { value: "50000", label: "Jusqu'à 50.000 €" },
-  ];
-
-  // Options de carburant (Thermiques uniquement - RedZone)
-  const carburantOptions = [
-    { value: "", label: "Tous les carburants" },
-    { value: "essence", label: "Essence" },
-    { value: "e85", label: "E85 (Éthanol)" },
-    { value: "lpg", label: "LPG (GPL)" },
-  ];
 
   // Récupérer les annonces actives depuis Supabase
-  // Note: useVehicules filtre déjà par défaut sur status: "active"
-  const { vehicules, isLoading, error } = useVehicules({ 
-    status: "active", 
-    type: "car" 
+  const { vehicules, isLoading } = useVehicules({
+    status: "active",
+    type: "car",
   });
 
-  // Charger le titre dynamique et la FAQ
-  useEffect(() => {
-    const loadContent = async () => {
-      try {
-        const settings = await getSiteSettings();
-        if (settings?.home_title) {
-          setHomeTitle(settings.home_title);
-        }
-        const faq = await getActiveFAQ();
-        setFaqItems(faq);
-      } catch (error) {
-        console.error("Erreur chargement contenu:", error);
-      }
-    };
-    loadContent();
-  }, []);
-
-  // 6 dernières annonces (les plus récentes) pour la vitrine
+  // 9 dernières annonces (les plus récentes) pour la vitrine
   const dernieresAnnonces = useMemo(() => {
     if (!vehicules || !Array.isArray(vehicules)) return [];
     return [...vehicules]
-      .filter(v => v && v.id && v.created_at) // Filtrer les véhicules invalides
+      .filter((v) => v && v.id && v.created_at)
       .sort((a, b) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
         return dateB - dateA;
       })
-      .slice(0, 6);
+      .slice(0, 9);
   }, [vehicules]);
 
-  // Réinitialiser le modèle quand la marque change
-  const handleMarqueChange = (marque: string) => {
-    setSelectedMarque(marque);
-    setSelectedModele("");
-  };
-
-  // Rediriger vers la page de recherche avec les paramètres
-  const handleSearch = () => {
-    const params = new URLSearchParams();
-
-    // Toujours ajouter le type (car par défaut)
-    params.set("type", typeVehicule);
-
-    // Ajouter les filtres sélectionnés
-    if (selectedMarque) params.set("marque", selectedMarque);
-    if (selectedModele) params.set("modele", selectedModele);
-    if (selectedBudget) params.set("prixMax", selectedBudget);
-    if (selectedCarburant) params.set("carburants", selectedCarburant);
-
-    const queryString = params.toString();
-    const searchUrl = `/search?${queryString}`;
-
-    router.push(searchUrl);
-  };
-
   return (
-    <main className="min-h-0 sm:min-h-screen bg-white text-slate-900 font-sans">
-      {/* HERO SECTION - PASSION THERMIQUE */}
-      <section className="py-6 sm:py-20 px-4 bg-gradient-to-b from-slate-900 via-slate-800 to-white text-center">
-        <h1 className="text-5xl md:text-7xl font-black mb-6 text-white tracking-tight">
-          La mécanique des <span className="text-red-600">puristes</span>.
-        </h1>
-        <p className="text-slate-300 mb-8 text-xl max-w-3xl mx-auto font-medium">
-          Du Youngtimer au Supercar. Ici, seule la passion compte.
-        </p>
-        <p className="text-slate-400 text-sm max-w-2xl mx-auto mb-6 sm:mb-12 flex items-center justify-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1">
-            <Car size={16} className="text-red-500" />
-            Supercars
-          </span>
-          <span>•</span>
-          <span className="inline-flex items-center gap-1">
-            <Car size={16} className="text-red-500" />
-            Youngtimers
-          </span>
-          <span>•</span>
-          <span className="inline-flex items-center gap-1">
-            <Car size={16} className="text-red-500" />
-            GTI
-          </span>
-          <span>•</span>
-          <span className="inline-flex items-center gap-1">
-            <Car size={16} className="text-red-500" />
-            Roadsters
-          </span>
-          <span>•</span>
-          <span>Le graal des puristes</span>
-        </p>
-
-        {/* MOTEUR DE RECHERCHE */}
-        <div className="max-w-5xl mx-auto bg-white p-4 rounded-2xl shadow-xl shadow-xl shadow-slate-100/50 border-0 grid grid-cols-1 md:grid-cols-5 gap-4 sm:gap-4">
-          <select
-            value={selectedMarque}
-            onChange={(e) => handleMarqueChange(e.target.value)}
-            className="p-4 border rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all"
-          >
-            <option value="">Toutes les marques</option>
-            {marques.map((marque) => (
-              <option key={marque} value={marque}>
-                {marque}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedModele}
-            onChange={(e) => setSelectedModele(e.target.value)}
-            disabled={!selectedMarque}
-            className="p-4 border rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <option value="">Tous les modèles</option>
-            {modeles.map((modele) => (
-              <option key={modele} value={modele}>
-                {modele}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedCarburant}
-            onChange={(e) => setSelectedCarburant(e.target.value)}
-            className="p-4 border rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all"
-          >
-            {carburantOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedBudget}
-            onChange={(e) => setSelectedBudget(e.target.value)}
-            className="p-4 border rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all"
-          >
-            {budgetOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleSearch}
-            className="bg-black text-white font-bold rounded-2xl p-4 hover:bg-slate-800 flex items-center justify-center gap-2 transition-all"
-          >
-            <Search size={20} /> Rechercher
-          </button>
+    <main className="min-h-screen bg-neutral-950 text-white">
+      {/* HERO SECTION */}
+      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+        {/* Fond avec dégradé noir/rouge profond */}
+        <div className="absolute inset-0 bg-gradient-to-br from-neutral-950 via-red-950/20 to-neutral-950">
+          {/* Pattern subtil */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(220,38,38,0.1),transparent_70%)]" />
         </div>
+
+        {/* Overlay pour améliorer la lisibilité du texte */}
+        <div className="absolute inset-0 bg-black/40" />
+
+        {/* Contenu central */}
+        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 tracking-wide leading-tight">
+            L&apos;Exclusivité{" "}
+            <span className="bg-gradient-to-r from-red-600 via-red-500 to-red-600 bg-clip-text text-transparent">
+              n&apos;a pas de batterie
+            </span>
+            .
+          </h1>
+          <p className="text-xl md:text-2xl lg:text-3xl text-neutral-300 mb-16 max-w-4xl mx-auto font-light leading-relaxed tracking-wide">
+            Le sanctuaire digital dédié aux puristes de la mécanique thermique. De la GTI à la Supercar, entrez dans le cercle RedZone.
+          </p>
+
+          {/* Boutons CTA */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+            <Link
+              href="/search"
+              className="group relative px-10 py-5 bg-red-600 hover:bg-red-700 text-white font-bold text-lg rounded-full transition-all duration-300 shadow-2xl shadow-red-600/50 hover:shadow-red-600/70 hover:scale-105 flex items-center gap-3 overflow-hidden"
+            >
+              <span className="relative z-10 tracking-wide">Explorer le Showroom</span>
+              <ArrowRight
+                size={20}
+                className="relative z-10 group-hover:translate-x-1 transition-transform"
+              />
+              {/* Effet de brillance au survol */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+            </Link>
+
+            <Link
+              href="/sell"
+              className="group px-10 py-5 bg-transparent border-2 border-white/20 hover:border-white text-white font-semibold text-lg rounded-full transition-all duration-300 hover:bg-white/5 hover:scale-105 flex items-center gap-3 backdrop-blur-sm tracking-wide"
+            >
+              <span>Confier mon véhicule</span>
+              <Car
+                size={20}
+                className="group-hover:rotate-12 transition-transform duration-300"
+              />
+            </Link>
+          </div>
+        </div>
+
+        {/* Lignes décoratives en bas */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-600/50 to-transparent" />
       </section>
 
-      {/* DERNIÈRES ANNONCES */}
-      <section className="max-w-6xl mx-auto py-6 sm:py-16 px-4">
-        <div className="flex items-center justify-between mb-8">
-          <h3 className="text-2xl font-bold flex items-center gap-2 tracking-tight">
-            <Car className="text-red-600" /> Dernières Annonces
-          </h3>
-          <button
-            onClick={() => router.push("/search")}
-            className="text-sm text-slate-900 hover:text-slate-900 font-medium underline transition-colors"
-          >
-            Voir toutes les annonces →
-          </button>
+      {/* SECTION "DERNIÈRES ENTREES AU GARAGE" */}
+      <section className="py-24 px-4 max-w-7xl mx-auto">
+        <div className="text-center mb-20">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-wide">
+            Dernières Entrées au{" "}
+            <span className="bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
+              Garage
+            </span>
+          </h2>
+          <div className="w-32 h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent mx-auto" />
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-slate-100 rounded-3xl overflow-hidden animate-pulse">
-                <div className="h-64 bg-slate-200" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {[...Array(9)].map((_, i) => (
+              <div
+                key={i}
+                className="bg-neutral-900 rounded-3xl overflow-hidden animate-pulse"
+              >
+                <div className="h-64 bg-neutral-800" />
                 <div className="p-6 space-y-4">
-                  <div className="h-6 bg-slate-200 rounded w-3/4" />
-                  <div className="h-4 bg-slate-200 rounded w-1/2" />
-                  <div className="h-4 bg-slate-200 rounded w-full" />
+                  <div className="h-6 bg-neutral-800 rounded w-3/4" />
+                  <div className="h-4 bg-neutral-800 rounded w-1/2" />
+                  <div className="h-4 bg-neutral-800 rounded w-full" />
                 </div>
               </div>
             ))}
           </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <p className="text-red-600 font-medium mb-4">Erreur de chargement des annonces</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-2xl transition-all"
-            >
-              Réessayer
-            </button>
-          </div>
         ) : dernieresAnnonces.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-slate-600 font-medium">Aucune annonce disponible pour le moment</p>
+          <div className="text-center py-20">
+            <div className="max-w-md mx-auto">
+              <Car size={80} className="mx-auto mb-6 text-neutral-700 opacity-50" />
+              <h2 className="text-3xl font-black mb-4 text-neutral-300">
+                Soyez le premier à publier !
+              </h2>
+              <p className="text-neutral-400 text-lg mb-8">
+                Aucune annonce disponible pour le moment. Partagez votre passion automobile et soyez le premier à publier une annonce sur RedZone.
+              </p>
+              <Link
+                href="/sell"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full transition-all tracking-wide shadow-xl hover:shadow-md hover:scale-105"
+              >
+                <Plus size={20} />
+                Publier ma première annonce
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {dernieresAnnonces.map((vehicule) => (
-              <CarCard key={vehicule.id} car={vehicule} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-10">
+              {dernieresAnnonces.map((vehicule, index) => (
+                <div
+                  key={vehicule.id}
+                  className="group transform transition-all duration-300 hover:scale-[1.02]"
+                >
+                  <CarCard car={vehicule} priority={index < 3} />
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
-        {/* Call to Action */}
-        <div className="mt-12 text-center">
-          <p className="text-slate-900 mb-4">
-            Vous cherchez quelque chose de spécifique ?
-          </p>
-          <button
-            onClick={() => router.push("/search")}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-3 rounded-2xl transition-all shadow-xl hover:shadow-md inline-flex items-center gap-2 hover:scale-105 transition-transform"
-          >
-            <Search size={20} />
-            Recherche avancée
-          </button>
-        </div>
+        {/* Lien vers toutes les annonces */}
+        {dernieresAnnonces.length > 0 && (
+          <div className="text-center mt-16">
+            <Link
+              href="/search"
+              className="group inline-flex items-center gap-2 text-neutral-400 hover:text-red-500 font-medium transition-colors duration-300 tracking-wide"
+            >
+              Accéder au Showroom complet
+              <ArrowRight
+                size={18}
+                className="group-hover:translate-x-1 transition-transform"
+              />
+            </Link>
+          </div>
+        )}
       </section>
 
-      {/* SECTION FAQ */}
-      {faqItems.length > 0 && (
-        <section className="max-w-6xl mx-auto py-6 sm:py-16 px-4 bg-gradient-to-b from-white to-slate-50">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 flex items-center justify-center gap-3">
-              <HelpCircle className="text-red-600" size={36} />
-              Questions Fréquentes
+      {/* SECTION "LA CONFIANCE" */}
+      <section className="py-28 px-4 bg-gradient-to-b from-neutral-950 via-neutral-900 to-neutral-950">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-wide">
+              La{" "}
+              <span className="bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
+                Confiance
+              </span>
             </h2>
-            <p className="text-slate-600 text-lg">
-              Tout ce que vous devez savoir sur RedZone
-            </p>
+            <div className="w-32 h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent mx-auto" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {faqItems.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl p-6 shadow-lg shadow-slate-200/50 border-2 border-slate-100 hover:border-red-200 transition-all hover:shadow-xl"
-              >
-                <h3 className="text-xl font-black text-slate-900 mb-3">
-                  {item.question}
-                </h3>
-                <p className="text-slate-700 leading-relaxed">
-                  {item.answer}
-                </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {/* Bloc 1: 100% Mécanique Noble */}
+            <div className="group relative bg-gradient-to-br from-neutral-900 to-neutral-800 p-10 rounded-3xl border border-neutral-800 hover:border-red-600/50 transition-all duration-500 hover:shadow-2xl hover:shadow-red-600/20 hover:-translate-y-2">
+              {/* Icône avec effet de brillance */}
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-red-600/20 rounded-full blur-2xl group-hover:bg-red-600/40 transition-all duration-500" />
+                <div className="relative bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-2xl w-16 h-16 flex items-center justify-center">
+                  <Zap
+                    size={32}
+                    className="text-white group-hover:rotate-12 transition-transform duration-300"
+                  />
+                </div>
               </div>
-            ))}
+              <h3 className="text-2xl font-black mb-5 text-white tracking-wide">
+                100% Mécanique Noble
+              </h3>
+              <p className="text-neutral-300 leading-relaxed text-lg font-light">
+                Aucun compromis. Ici, on parle cylindres, échappement et émotion. Zéro électrique.
+              </p>
+              {/* Ligne décorative au survol */}
+              <div className="absolute bottom-0 left-10 right-10 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </div>
+
+            {/* Bloc 2: Transparence Totale */}
+            <div className="group relative bg-gradient-to-br from-neutral-900 to-neutral-800 p-10 rounded-3xl border border-neutral-800 hover:border-red-600/50 transition-all duration-500 hover:shadow-2xl hover:shadow-red-600/20 hover:-translate-y-2">
+              {/* Icône avec effet de brillance */}
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-red-600/20 rounded-full blur-2xl group-hover:bg-red-600/40 transition-all duration-500" />
+                <div className="relative bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-2xl w-16 h-16 flex items-center justify-center">
+                  <Shield
+                    size={32}
+                    className="text-white group-hover:scale-110 transition-transform duration-300"
+                  />
+                </div>
+              </div>
+              <h3 className="text-2xl font-black mb-5 text-white tracking-wide">
+                Transparence Totale
+              </h3>
+              <p className="text-neutral-300 leading-relaxed text-lg font-light">
+                Chaque annonce est vérifiée. Vendeurs qualifiés, historiques limpides. Achetez en confiance.
+              </p>
+              {/* Ligne décorative au survol */}
+              <div className="absolute bottom-0 left-10 right-10 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </div>
+
+            {/* Bloc 3: Entre Gentlemen Drivers */}
+            <div className="group relative bg-gradient-to-br from-neutral-900 to-neutral-800 p-10 rounded-3xl border border-neutral-800 hover:border-red-600/50 transition-all duration-500 hover:shadow-2xl hover:shadow-red-600/20 hover:-translate-y-2">
+              {/* Icône avec effet de brillance */}
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-red-600/20 rounded-full blur-2xl group-hover:bg-red-600/40 transition-all duration-500" />
+                <div className="relative bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-2xl w-16 h-16 flex items-center justify-center">
+                  <Users
+                    size={32}
+                    className="text-white group-hover:scale-110 transition-transform duration-300"
+                  />
+                </div>
+              </div>
+              <h3 className="text-2xl font-black mb-5 text-white tracking-wide">
+                Entre Gentlemen Drivers
+              </h3>
+              <p className="text-neutral-300 leading-relaxed text-lg font-light">
+                Une plateforme conçue par des passionnés, pour des passionnés qui parlent le même langage.
+              </p>
+              {/* Ligne décorative au survol */}
+              <div className="absolute bottom-0 left-10 right-10 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
     </main>
   );
 }

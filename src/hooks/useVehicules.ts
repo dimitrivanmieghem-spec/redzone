@@ -4,6 +4,17 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Vehicule } from "@/lib/supabase/types";
 
+// Helper function pour convertir les valeurs numériques
+function parseNumber(value: any): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
 export function useVehicules(filters?: {
   status?: "pending" | "active" | "rejected";
   type?: "car" | "moto";
@@ -35,7 +46,7 @@ export function useVehicules(filters?: {
       try {
         const supabase = createClient();
         let query = supabase
-          .from("vehicules")
+          .from("vehicles")
           .select("*")
           .order("created_at", { ascending: false });
 
@@ -47,21 +58,21 @@ export function useVehicules(filters?: {
           query = query.eq("status", "active");
         }
 
-        // Appliquer les autres filtres
+        // Appliquer les autres filtres (utiliser les noms de colonnes anglais pour Supabase)
         if (filters?.type) {
           query = query.eq("type", filters.type);
         }
         if (filters?.marque) {
-          query = query.eq("marque", filters.marque);
+          query = query.eq("brand", filters.marque);
         }
         if (filters?.modele) {
-          query = query.eq("modele", filters.modele);
+          query = query.eq("model", filters.modele);
         }
         if (filters?.prixMin) {
-          query = query.gte("prix", filters.prixMin);
+          query = query.gte("price", filters.prixMin);
         }
         if (filters?.prixMax) {
-          query = query.lte("prix", filters.prixMax);
+          query = query.lte("price", filters.prixMax);
         }
 
         const { data, error: fetchError } = await query;
@@ -75,7 +86,17 @@ export function useVehicules(filters?: {
           throw fetchError;
         }
 
-        const newVehicules = (data as Vehicule[]) || [];
+        // Utiliser directement les données avec colonnes anglaises (pas de mapping)
+        // S'assurer que les valeurs numériques sont bien des nombres
+        const newVehicules = ((data || []).map(v => ({
+          ...v,
+          price: parseNumber(v.price),
+          year: parseNumber(v.year),
+          mileage: parseNumber(v.mileage),
+          power_hp: parseNumber(v.power_hp),
+          fiscal_horsepower: parseNumber(v.fiscal_horsepower),
+          seats_count: parseNumber(v.seats_count),
+        })) as Vehicule[]) || [];
         setVehicules(newVehicules);
         previousDataRef.current = newVehicules; // Sauvegarder les données réussies
       } catch (err) {
@@ -137,7 +158,7 @@ export function useVehicule(id: string) {
       try {
         const supabase = createClient();
         const { data, error: fetchError } = await supabase
-          .from("vehicules")
+          .from("vehicles")
           .select("*")
           .eq("id", id)
           .single();
@@ -146,7 +167,18 @@ export function useVehicule(id: string) {
           throw fetchError;
         }
 
-        setVehicule(data as Vehicule);
+        // Utiliser directement les données avec colonnes anglaises (pas de mapping)
+        // S'assurer que les valeurs numériques sont bien des nombres
+        const mappedVehicule = {
+          ...data,
+          price: parseNumber(data.price),
+          year: parseNumber(data.year),
+          mileage: parseNumber(data.mileage),
+          power_hp: parseNumber(data.power_hp),
+          fiscal_horsepower: parseNumber(data.fiscal_horsepower),
+          seats_count: parseNumber(data.seats_count),
+        } as Vehicule;
+        setVehicule(mappedVehicule);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Véhicule introuvable");
         console.error("Erreur useVehicule:", err);

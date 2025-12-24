@@ -5,11 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBanSimulation } from "@/contexts/BanSimulationContext";
 
 export default function MobileNav() {
   const pathname = usePathname();
   const { favorites } = useFavorites();
   const { user } = useAuth();
+  const { isSimulatingBan } = useBanSimulation();
+
+  // Combiner le ban réel et la simulation pour bloquer l'accès
+  const isEffectivelyBanned = user?.is_banned || (isSimulatingBan && user?.role === "admin");
 
   const navItems = [
     { href: "/", label: "Accueil", icon: Home },
@@ -27,7 +32,7 @@ export default function MobileNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 block md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 block md:hidden safe-area-inset-bottom shadow-2xl">
       {/* Fond glassmorphism avec bordure haute */}
       <div className="bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-2xl shadow-black/10 safe-area-inset-bottom">
         <div className="flex items-center justify-around px-2 py-2">
@@ -37,7 +42,23 @@ export default function MobileNav() {
             const isPrimary = item.isPrimary;
 
             if (isPrimary) {
-              // Bouton central en relief (Rouge RedZone)
+              // Bouton central en relief (Rouge RedZone) - Bloqué si banni ou simulation
+              if (isEffectivelyBanned) {
+                return (
+                  <div
+                    key={item.href}
+                    className="flex flex-col items-center justify-center gap-1 -mt-6 relative z-10 opacity-50 cursor-not-allowed"
+                    title={isSimulatingBan ? "Mode test actif : Publication désactivée" : "Votre compte est suspendu"}
+                  >
+                    <div className="w-16 h-16 rounded-full bg-slate-400 shadow-lg flex items-center justify-center border-4 border-white">
+                      <Plus size={28} className="text-white" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 mt-1">
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              }
               return (
                 <Link
                   key={item.href}

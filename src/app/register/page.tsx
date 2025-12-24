@@ -1,12 +1,14 @@
 "use client";
 
-import { Loader2, Lock, Mail, User, UserPlus, CheckCircle, ArrowLeft } from "lucide-react";
+import { Loader2, Lock, Mail, User, UserPlus, CheckCircle, ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
 import AuthLayout from "@/components/AuthLayout";
+import { registerSchema, type RegisterFormData } from "@/lib/validation/registerSchema";
+import { ZodError } from "zod";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,46 +18,63 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [userEmail, setUserEmail] = useState<string>("");
-  const [formData, setFormData] = useState({
-    prenom: "",
-    nom: "",
+  const [formData, setFormData] = useState<RegisterFormData>({
+    firstName: "",
+    lastName: "",
     email: "",
+    confirmEmail: "",
     password: "",
     confirmPassword: "",
-    role: "particulier" as "particulier" | "pro",
+    accountType: "particulier",
+    vatNumber: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+    // Effacer l'erreur du champ modifié
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleAccountTypeChange = (type: "particulier" | "pro") => {
+    setFormData((prev) => ({
+      ...prev,
+      accountType: type,
+      // Réinitialiser le numéro de TVA si on passe à particulier
+      ...(type === "particulier" && { vatNumber: "" }),
+    }));
+    // Effacer l'erreur du champ vatNumber si elle existe
+    if (fieldErrors.vatNumber) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.vatNumber;
+        return newErrors;
+      });
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setFieldErrors({});
 
     try {
-      // Validation des champs
-      if (!formData.prenom || !formData.nom || !formData.email || !formData.password || !formData.confirmPassword) {
-        throw new Error("Veuillez remplir tous les champs");
-      }
-
-      // Vérification que les mots de passe correspondent
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error("Les mots de passe ne correspondent pas");
-      }
-
-      // Validation du mot de passe (minimum 6 caractères)
-      if (formData.password.length < 6) {
-        throw new Error("Le mot de passe doit contenir au moins 6 caractères");
-      }
+      // Validation avec Zod
+      const validatedData = registerSchema.parse(formData);
 
       // 1. Appel Supabase avec emailRedirectTo
-      const fullName = `${formData.prenom} ${formData.nom}`.trim();
+      const fullName = `${validatedData.firstName} ${validatedData.lastName}`.trim();
       
       // Déterminer l'URL de redirection : priorité à NEXT_PUBLIC_SITE_URL (production)
       // Ne jamais utiliser localhost pour les emails de confirmation
@@ -72,15 +91,16 @@ export default function RegisterPage() {
       }
       
       const { data, error: supabaseError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+        email: validatedData.email,
+        password: validatedData.password,
         options: {
           emailRedirectTo: `${siteUrl}/auth/callback`,
           data: {
-            first_name: formData.prenom,
-            last_name: formData.nom,
+            first_name: validatedData.firstName,
+            last_name: validatedData.lastName,
             full_name: fullName,
-            role: formData.role,
+            role: validatedData.accountType,
+            vat_number: validatedData.vatNumber || null,
           },
         },
       });
@@ -94,20 +114,37 @@ export default function RegisterPage() {
       if (data.user) {
         const { error: profileError } = await supabase.from("profiles").insert({
           id: data.user.id,
-          email: formData.email,
+          email: validatedData.email,
           full_name: fullName,
-          role: formData.role,
+          role: validatedData.accountType,
         });
 
         if (profileError) {
           console.warn("Erreur création profil (peut déjà exister):", profileError);
+        } else {
+          // Logger la création de compte
+          try {
+            const { logAuditEvent } = await import("@/lib/supabase/audit-logs-client");
+            await logAuditEvent({
+              action_type: "data_modification",
+              user_id: data.user.id,
+              user_email: validatedData.email,
+              resource_type: "profile",
+              resource_id: data.user.id,
+              description: "Création de compte utilisateur",
+              status: "success",
+              metadata: { accountType: validatedData.accountType },
+            });
+          } catch (logError) {
+            console.error("Erreur lors du logging d'audit:", logError);
+          }
         }
       }
 
       // 4. Gestion du succès : Si pas de session, c'est que l'email doit être confirmé
       if (!data.session) {
         // Email de confirmation envoyé
-        setUserEmail(formData.email);
+        setUserEmail(validatedData.email);
         setPendingVerification(true);
         showToast("Email de confirmation envoyé ! Vérifiez votre boîte mail.", "success");
       } else {
@@ -121,13 +158,27 @@ export default function RegisterPage() {
     } catch (err: any) {
       console.error("Erreur Inscription:", err);
       
+      // Gestion des erreurs Zod
+      if (err instanceof ZodError) {
+        const errors: Record<string, string> = {};
+        err.issues.forEach((error) => {
+          if (error.path.length > 0) {
+            errors[error.path[0] as string] = error.message;
+          }
+        });
+        setFieldErrors(errors);
+        const firstError = err.issues[0];
+        showToast(firstError?.message || "Veuillez corriger les erreurs du formulaire", "error");
+        return;
+      }
+      
       let errorMessage = "Une erreur est survenue lors de la création du compte";
       
       if (err?.message) {
         if (err.message.includes("already registered") || err.message.includes("already exists") || err.message.includes("User already registered")) {
           errorMessage = "Cet email est déjà utilisé";
         } else if (err.message.includes("password") || err.message.includes("Password")) {
-          errorMessage = "Le mot de passe est trop faible (minimum 6 caractères)";
+          errorMessage = "Le mot de passe ne respecte pas les critères de sécurité";
         } else if (err.message.includes("email") || err.message.includes("Email")) {
           errorMessage = "Format d'email invalide";
         } else {
@@ -237,7 +288,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label
-                htmlFor="prenom"
+                htmlFor="firstName"
                 className="block text-sm font-bold text-slate-300 mb-3"
               >
                 Prénom *
@@ -248,36 +299,46 @@ export default function RegisterPage() {
                 </div>
                 <input
                   type="text"
-                  id="prenom"
-                  name="prenom"
-                  value={formData.prenom}
+                  id="firstName"
+                  name="firstName"
+                  value={formData.firstName}
                   onChange={handleInputChange}
                   placeholder="Jean"
                   required
                   disabled={isLoading}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    fieldErrors.firstName ? "border-red-500" : "border-white/10"
+                  }`}
                 />
               </div>
+              {fieldErrors.firstName && (
+                <p className="text-xs text-red-400 mt-1">{fieldErrors.firstName}</p>
+              )}
             </div>
 
             <div>
               <label
-                htmlFor="nom"
+                htmlFor="lastName"
                 className="block text-sm font-bold text-slate-300 mb-3"
               >
                 Nom *
               </label>
               <input
                 type="text"
-                id="nom"
-                name="nom"
-                value={formData.nom}
+                id="lastName"
+                name="lastName"
+                value={formData.lastName}
                 onChange={handleInputChange}
                 placeholder="Dupont"
                 required
                 disabled={isLoading}
-                className="w-full px-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full px-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  fieldErrors.lastName ? "border-red-500" : "border-white/10"
+                }`}
               />
+              {fieldErrors.lastName && (
+                <p className="text-xs text-red-400 mt-1">{fieldErrors.lastName}</p>
+              )}
             </div>
           </div>
 
@@ -302,9 +363,45 @@ export default function RegisterPage() {
                 placeholder="votre@email.be"
                 required
                 disabled={isLoading}
-                className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  fieldErrors.email ? "border-red-500" : "border-white/10"
+                }`}
               />
             </div>
+            {fieldErrors.email && (
+              <p className="text-xs text-red-400 mt-1">{fieldErrors.email}</p>
+            )}
+          </div>
+
+          {/* Confirmer Email */}
+          <div>
+            <label
+              htmlFor="confirmEmail"
+              className="block text-sm font-bold text-slate-300 mb-3"
+            >
+              Confirmer l&apos;email *
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Mail size={20} className="text-slate-500" />
+              </div>
+              <input
+                type="email"
+                id="confirmEmail"
+                name="confirmEmail"
+                value={formData.confirmEmail}
+                onChange={handleInputChange}
+                placeholder="votre@email.be"
+                required
+                disabled={isLoading}
+                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  fieldErrors.confirmEmail ? "border-red-500" : "border-white/10"
+                }`}
+              />
+            </div>
+            {fieldErrors.confirmEmail && (
+              <p className="text-xs text-red-400 mt-1">{fieldErrors.confirmEmail}</p>
+            )}
           </div>
 
           {/* Type de compte */}
@@ -315,9 +412,9 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, role: "particulier" }))}
+                onClick={() => handleAccountTypeChange("particulier")}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  formData.role === "particulier"
+                  formData.accountType === "particulier"
                     ? "border-red-600 bg-red-600/20"
                     : "border-white/10 bg-slate-800/50 hover:border-white/20"
                 }`}
@@ -328,19 +425,74 @@ export default function RegisterPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, role: "pro" }))}
+                onClick={() => handleAccountTypeChange("pro")}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  formData.role === "pro"
+                  formData.accountType === "pro"
                     ? "border-red-600 bg-red-600/20"
                     : "border-white/10 bg-slate-800/50 hover:border-white/20"
                 }`}
                 disabled={isLoading}
               >
-                <div className="font-bold text-white mb-1">Professionnel</div>
+                <div className="font-bold text-white mb-1 flex items-center gap-2">
+                  <Building2 size={16} />
+                  Professionnel
+                </div>
                 <div className="text-xs text-slate-400">Garage / Concessionnaire</div>
               </button>
             </div>
           </div>
+
+          {/* Numéro de TVA (conditionnel) */}
+          {formData.accountType === "pro" && (
+            <div>
+              <label
+                htmlFor="vatNumber"
+                className="block text-sm font-bold text-slate-300 mb-3"
+              >
+                Numéro de TVA * <span className="text-slate-500 font-normal">(Format: BE0123456789)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Building2 size={20} className="text-slate-500" />
+                </div>
+                <input
+                  type="text"
+                  id="vatNumber"
+                  name="vatNumber"
+                  value={formData.vatNumber || ""}
+                  onChange={(e) => {
+                    // Convertir en majuscules et supprimer les espaces
+                    const cleaned = e.target.value.replace(/\s/g, "").toUpperCase();
+                    setFormData((prev) => ({
+                      ...prev,
+                      vatNumber: cleaned,
+                    }));
+                    // Effacer l'erreur du champ modifié
+                    if (fieldErrors.vatNumber) {
+                      setFieldErrors((prev) => {
+                        const newErrors = { ...prev };
+                        delete newErrors.vatNumber;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  placeholder="BE0123456789"
+                  required={formData.accountType === "pro"}
+                  disabled={isLoading}
+                  className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase ${
+                    fieldErrors.vatNumber ? "border-red-500" : "border-white/10"
+                  }`}
+                  maxLength={12}
+                />
+              </div>
+              {fieldErrors.vatNumber && (
+                <p className="text-xs text-red-400 mt-1">{fieldErrors.vatNumber}</p>
+              )}
+              <p className="text-xs text-slate-400 mt-2">
+                Format belge requis : BE suivi de 10 chiffres
+              </p>
+            </div>
+          )}
 
           {/* Mot de passe */}
           <div>
@@ -348,7 +500,7 @@ export default function RegisterPage() {
               htmlFor="password"
               className="block text-sm font-bold text-slate-300 mb-3"
             >
-              Mot de passe * <span className="text-slate-500 font-normal">(min. 6 caractères)</span>
+              Mot de passe * <span className="text-slate-500 font-normal">(min. 8 caractères, 1 chiffre, 1 majuscule, 1 caractère spécial)</span>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -362,10 +514,29 @@ export default function RegisterPage() {
                 onChange={handleInputChange}
                 placeholder="••••••••"
                 required
-                minLength={6}
+                minLength={8}
                 disabled={isLoading}
-                className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  fieldErrors.password ? "border-red-500" : "border-white/10"
+                }`}
               />
+            </div>
+            {fieldErrors.password && (
+              <p className="text-xs text-red-400 mt-1">{fieldErrors.password}</p>
+            )}
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-slate-400">
+                ✓ Minimum 8 caractères
+              </p>
+              <p className="text-xs text-slate-400">
+                ✓ Au moins 1 chiffre (0-9)
+              </p>
+              <p className="text-xs text-slate-400">
+                ✓ Au moins 1 majuscule (A-Z)
+              </p>
+              <p className="text-xs text-slate-400">
+                ✓ Au moins 1 caractère spécial (!@#$%^&*...)
+              </p>
             </div>
           </div>
 
@@ -390,9 +561,14 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 required
                 disabled={isLoading}
-                className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  fieldErrors.confirmPassword ? "border-red-500" : "border-white/10"
+                }`}
               />
             </div>
+            {fieldErrors.confirmPassword && (
+              <p className="text-xs text-red-400 mt-1">{fieldErrors.confirmPassword}</p>
+            )}
           </div>
 
           {/* Affichage erreur */}
@@ -442,10 +618,23 @@ export default function RegisterPage() {
           </Link>
         </form>
 
-        {/* Message RGPD */}
+        {/* Message RGPD avec liens légaux */}
         <div className="mt-6 text-center">
-          <p className="text-xs text-slate-500">
-            🔒 En créant un compte, vous acceptez nos conditions d&apos;utilisation et notre politique de confidentialité
+          <p className="text-xs text-slate-400">
+            🔒 En créant un compte, vous acceptez nos{" "}
+            <Link
+              href="/legal/terms"
+              className="text-red-500 hover:text-red-400 underline font-medium transition-colors"
+            >
+              conditions d&apos;utilisation
+            </Link>
+            {" "}et notre{" "}
+            <Link
+              href="/legal/privacy"
+              className="text-red-500 hover:text-red-400 underline font-medium transition-colors"
+            >
+              politique de confidentialité
+            </Link>
           </p>
         </div>
       </div>

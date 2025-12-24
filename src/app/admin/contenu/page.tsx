@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Save, Image as ImageIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
-import { getSiteSettings, updateSiteSettings, SiteSettings } from "@/lib/supabase/settings";
+import { getSiteSettings, SiteSettings } from "@/lib/supabase/settings";
+import { updateSiteSettings } from "@/lib/supabase/server-actions/settings";
 
 export default function AdminContenuPage() {
   const { user } = useAuth();

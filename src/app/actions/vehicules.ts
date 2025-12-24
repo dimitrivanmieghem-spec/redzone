@@ -24,7 +24,11 @@ export async function deleteVehiculeByToken(token: string): Promise<{ success: b
       return { success: false, error: 'Token invalide ou véhicule introuvable' };
     }
     
+    // Invalider TOUT le cache
+    revalidatePath('/', 'layout');
     revalidatePath('/search');
+    revalidatePath('/dashboard');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Erreur suppression véhicule:', error);
@@ -50,9 +54,10 @@ export async function deleteVehiculeForUser(vehiculeId: string): Promise<{ succe
     }
     
     // Récupérer le véhicule pour vérifier la propriété et les images
+    // La table vehicles utilise owner_id au lieu de user_id
     const { data: vehicule, error: fetchError } = await supabase
-      .from('vehicules')
-      .select('id, user_id, image, images')
+      .from('vehicles')
+      .select('id, owner_id, image, images')
       .eq('id', vehiculeId)
       .single();
     
@@ -60,8 +65,8 @@ export async function deleteVehiculeForUser(vehiculeId: string): Promise<{ succe
       return { success: false, error: 'Véhicule introuvable' };
     }
     
-    // Vérifier que l'utilisateur est propriétaire
-    if (vehicule.user_id !== user.id) {
+    // Vérifier que l'utilisateur est propriétaire (la table utilise owner_id)
+    if (vehicule.owner_id !== user.id) {
       return { success: false, error: 'Non autorisé' };
     }
     
@@ -88,7 +93,7 @@ export async function deleteVehiculeForUser(vehiculeId: string): Promise<{ succe
     
     // Supprimer le véhicule
     const { error: deleteError } = await supabase
-      .from('vehicules')
+      .from('vehicles')
       .delete()
       .eq('id', vehiculeId);
     
@@ -96,8 +101,11 @@ export async function deleteVehiculeForUser(vehiculeId: string): Promise<{ succe
       return { success: false, error: deleteError.message };
     }
     
+    // Invalider TOUT le cache
+    revalidatePath('/', 'layout');
     revalidatePath('/dashboard');
     revalidatePath('/search');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Erreur suppression véhicule:', error);

@@ -50,7 +50,7 @@ export default function MentionsPage() {
                 <strong>Numéro de TVA :</strong> BE [NUMÉRO TVA À REMPLIR]
               </p>
               <p className="text-slate-700 text-sm mb-2">
-                <strong>Email :</strong> contact@RedZone.be (À CONFIGURER)
+                <strong>Email :</strong> <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a>
               </p>
               <p className="text-slate-700 text-sm">
                 <strong>Téléphone :</strong> [NUMÉRO DE TÉLÉPHONE À REMPLIR]
@@ -94,7 +94,7 @@ export default function MentionsPage() {
               <strong>Délégué à la Protection des Données (DPO) :</strong> [NOM DPO À REMPLIR]
             </p>
             <p className="text-slate-700 mb-4">
-              <strong>Contact DPO :</strong> privacy@RedZone.be (À CONFIGURER)
+              <strong>Contact DPO :</strong> <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a>
             </p>
             <p className="text-slate-700 mb-4">
               Pour plus d&apos;informations sur le traitement de vos données, consultez notre{" "}
@@ -202,15 +202,15 @@ export default function MentionsPage() {
               Pour toute question ou réclamation concernant le site :
             </p>
             <div className="bg-red-50 p-6 rounded-2xl">
-              <p className="text-slate-900 mb-2">
-                <strong>Email général :</strong> contact@RedZone.be (À CONFIGURER)
+              <p className="text-slate-900 mb-4">
+                <strong>Pour toute question, contactez l&apos;administrateur :</strong>
               </p>
-              <p className="text-slate-900 mb-2">
-                <strong>Support client :</strong> support@RedZone.be (À CONFIGURER)
-              </p>
-              <p className="text-slate-900 mb-2">
-                <strong>Protection des données :</strong> privacy@RedZone.be (À CONFIGURER)
-              </p>
+              <a
+                href="mailto:dimitri.vanmieghem@gmail.com"
+                className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-6 py-2.5 rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-red-900/20 hover:scale-105"
+              >
+                Contacter l&apos;administrateur
+              </a>
               <p className="text-slate-900">
                 <strong>Courrier postal :</strong><br />
                 RedZone SPRL<br />

@@ -30,8 +30,8 @@ export function analyzePrice(
     (v) =>
       v.id !== vehicule.id && // Exclure le véhicule actuel
       v.status === "active" && // Uniquement les actifs
-      v.modele === vehicule.modele && // Même modèle
-      v.marque === vehicule.marque // Même marque
+      v.model === vehicule.model && // Même modèle (anglais)
+      v.brand === vehicule.brand // Même marque (anglais)
   );
 
   // Besoin d'au moins 2 véhicules similaires pour faire une analyse
@@ -40,19 +40,19 @@ export function analyzePrice(
   }
 
   // Calculer les statistiques
-  const prices = similarVehicules.map((v) => v.prix);
+  const prices = similarVehicules.map((v) => v.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const averagePrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
 
   // Calculer la différence
-  const difference = vehicule.prix - averagePrice;
+  const difference = vehicule.price - averagePrice;
   const percentageDiff = (difference / averagePrice) * 100;
 
   // Calculer la position pour la jauge (0-100)
   const position =
     maxPrice > minPrice
-      ? ((vehicule.prix - minPrice) / (maxPrice - minPrice)) * 100
+      ? ((vehicule.price - minPrice) / (maxPrice - minPrice)) * 100
       : 50;
 
   // Déterminer le label et la couleur
@@ -140,11 +140,11 @@ export function getPriceAnalysisText(
   const diffText = formatPriceDifference(analysis.difference);
   
   if (analysis.label === "Super Affaire") {
-    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% moins cher que la moyenne des ${vehicule.modele} actuellement en vente sur RedZone (${diffText} sous la cote).`;
+    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% moins cher que la moyenne des ${vehicule.model} actuellement en vente sur RedZone (${diffText} sous la cote).`;
   } else if (analysis.label === "Prix Élevé") {
-    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% plus cher que la moyenne des ${vehicule.modele} actuellement en vente sur RedZone (${diffText} au-dessus de la cote).`;
+    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% plus cher que la moyenne des ${vehicule.model} actuellement en vente sur RedZone (${diffText} au-dessus de la cote).`;
   } else {
-    return `Ce véhicule est au prix du marché (${percentText} par rapport à la moyenne des ${vehicule.modele} en vente sur RedZone).`;
+    return `Ce véhicule est au prix du marché (${percentText} par rapport à la moyenne des ${vehicule.model} en vente sur RedZone).`;
   }
 }
 

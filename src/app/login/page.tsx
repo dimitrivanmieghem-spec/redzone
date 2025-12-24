@@ -54,30 +54,76 @@ function LoginContent() {
 
     try {
       const supabase = createClient();
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
       if (error) {
+        // Logger la tentative de connexion échouée
+        try {
+          const { logFailedLogin } = await import("@/lib/supabase/audit-logs-client");
+          await logFailedLogin(formData.email, error.message);
+        } catch (logError) {
+          // Ne pas bloquer l'erreur de connexion en cas d'erreur de logging
+          console.error("Erreur lors du logging d'audit:", logError);
+        }
         throw error;
       }
 
+      if (!data?.user || !data?.session) {
+        throw new Error("Erreur de connexion : session non créée");
+      }
+
+      // Logger la connexion réussie
+      try {
+        const { logAuditEvent } = await import("@/lib/supabase/audit-logs-client");
+        await logAuditEvent({
+          action_type: "login_attempt",
+          user_id: data.user.id,
+          user_email: data.user.email || undefined,
+          description: "Connexion réussie",
+          status: "success",
+        });
+      } catch (logError) {
+        // Ne pas bloquer la connexion en cas d'erreur de logging
+        console.error("Erreur lors du logging d'audit:", logError);
+      }
+
       showToast("Connexion réussie !", "success");
-      router.refresh();
-      router.push("/dashboard");
+
+      // Attendre un peu pour que les cookies soient bien mis à jour et que les contextes soient initialisés
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Utiliser router.push au lieu de window.location.assign pour éviter les problèmes avec les extensions
+      // et permettre une navigation plus fluide avec Next.js
+      const redirectUrl = searchParams.get("redirect") || "/dashboard";
+      
+      // Valider que l'URL de redirection est sécurisée (commence par /)
+      if (redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")) {
+        // Utiliser router.push pour une navigation Next.js native
+        router.push(redirectUrl);
+        // Forcer un refresh pour s'assurer que la session est bien chargée
+        router.refresh();
+      } else {
+        // En cas d'URL invalide, rediriger vers le dashboard par défaut
+        router.push("/dashboard");
+        router.refresh();
+      }
     } catch (error: any) {
-      console.error("Erreur Login:", error);
-      showToast(error.message || "Erreur de connexion", "error");
-    } finally {
-      setIsLoading(false);
+      console.error("Erreur de connexion:", error);
+      const errorMessage = error?.message || "Erreur de connexion";
+      showToast(errorMessage, "error");
+      setIsLoading(false); // Réactiver le bouton en cas d'erreur
     }
+    // Note: setIsLoading(false) n'est pas dans finally car on redirige en cas de succès
   };
 
   return (
     <AuthLayout>
       {/* Formulaire */}
-      <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+      <div className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
         {/* Titre */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-black text-white mb-2 tracking-tight">
@@ -102,13 +148,13 @@ function LoginContent() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-bold text-slate-300 mb-3"
+              className="block text-sm font-bold text-neutral-300 mb-3"
             >
               Email
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail size={20} className="text-slate-500" />
+                <Mail size={20} className="text-neutral-500" />
               </div>
               <input
                 type="email"
@@ -118,7 +164,7 @@ function LoginContent() {
                 onChange={handleInputChange}
                 placeholder="votre@email.be"
                 required
-                className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all"
+                className="w-full pl-12 pr-4 py-4 bg-neutral-800/50 border border-white/10 rounded-xl text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all"
               />
             </div>
           </div>
@@ -128,7 +174,7 @@ function LoginContent() {
             <div className="flex items-center justify-between mb-3">
               <label
                 htmlFor="password"
-                className="block text-sm font-bold text-slate-300"
+                className="block text-sm font-bold text-neutral-300"
               >
                 Mot de passe
               </label>
@@ -141,7 +187,7 @@ function LoginContent() {
             </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock size={20} className="text-slate-500" />
+                <Lock size={20} className="text-neutral-500" />
               </div>
               <input
                 type="password"
@@ -151,7 +197,7 @@ function LoginContent() {
                 onChange={handleInputChange}
                 placeholder="••••••••"
                 required
-                className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all"
+                className="w-full pl-12 pr-4 py-4 bg-neutral-800/50 border border-white/10 rounded-xl text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all"
               />
             </div>
           </div>
@@ -178,7 +224,7 @@ function LoginContent() {
               <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/50 text-slate-400 font-medium">
+              <span className="px-4 bg-neutral-900/50 text-neutral-400 font-medium">
                 Pas encore de compte ?
               </span>
             </div>
@@ -195,7 +241,7 @@ function LoginContent() {
 
         {/* Message sécurité */}
         <div className="mt-6 text-center">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-neutral-500">
             🔒 Vos données sont protégées conformément au RGPD
           </p>
         </div>
@@ -208,7 +254,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <AuthLayout>
-        <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+        <div className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
           <div className="flex justify-center items-center min-h-[400px]">
             <Loader2 className="animate-spin text-red-600" size={32} />
           </div>

@@ -28,8 +28,13 @@ export async function GET(request: Request) {
       }
 
       if (data?.user) {
-        // Succès : l'utilisateur est maintenant confirmé et connecté
-        // Rediriger vers le dashboard
+        // Si type recovery, rediriger vers reset-password avec le token
+        if (type === "recovery") {
+          return NextResponse.redirect(
+            new URL(`/reset-password?token_hash=${token_hash}&type=recovery`, requestUrl.origin)
+          );
+        }
+        // Sinon, rediriger vers la page demandée (ou dashboard par défaut)
         return NextResponse.redirect(new URL(next, requestUrl.origin));
       }
     } catch (err) {
@@ -44,11 +49,13 @@ export async function GET(request: Request) {
   }
 
   // Si pas de token_hash, vérifier si l'utilisateur est déjà connecté (cas où Supabase a déjà géré la session)
+  // Utiliser getUser() au lieu de getSession() pour éviter les boucles de session
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-  if (session) {
+  if (user && !userError) {
     // L'utilisateur est connecté, rediriger vers le dashboard
     return NextResponse.redirect(new URL(next, requestUrl.origin));
   }

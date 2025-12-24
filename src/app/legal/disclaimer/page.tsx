@@ -305,7 +305,7 @@ export default function DisclaimerPage() {
             </h2>
             <p className="text-slate-900 leading-relaxed mb-4">
               Si vous suspectez une annonce frauduleuse ou trompeuse, nous vous encourageons
-              à nous la signaler immédiatement à l&apos;adresse : <strong>report@redzone.be</strong>
+              à nous la signaler immédiatement en <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">contactant l&apos;administrateur</a>
             </p>
             <p className="text-slate-900 leading-relaxed mb-4">
               Nous ferons de notre mieux pour traiter les signalements rapidement, mais nous
@@ -342,11 +342,16 @@ export default function DisclaimerPage() {
               Pour toute question relative à cet avertissement, contactez-nous :
             </p>
             <div className="bg-white p-4 rounded-2xl shadow-xl shadow-slate-100/50 border-0">
-              <p className="text-slate-900 leading-relaxed">
-                <strong>Email :</strong> contact@redzone.be
-                <br />
-                <strong>Signalement de fraude :</strong> report@redzone.be
-                <br />
+              <p className="text-slate-900 leading-relaxed mb-4">
+                <strong>Pour toute question ou signalement, contactez l&apos;administrateur :</strong>
+              </p>
+              <a
+                href="mailto:dimitri.vanmieghem@gmail.com"
+                className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-6 py-2.5 rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-red-900/20 hover:scale-105 mb-2"
+              >
+                Contacter l&apos;administrateur
+              </a>
+              <p className="text-slate-900 leading-relaxed mt-2">
                 <strong>Courrier :</strong> RedZone, [Adresse à compléter]
               </p>
             </div>

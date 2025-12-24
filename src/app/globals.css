@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* RedZone Brand Colors */
+  --redzone-bg: #0a0a0b;
+  --redzone-action: #ff0000;
+  --redzone-action-hover: #cc0000;
 }
 
 @theme inline {
@@ -14,13 +18,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #0a0a0b;
     --foreground: #ededed;
   }
 }
 
 body {
-  background: var(--background);
+  background: #0a0a0b;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -48,6 +52,18 @@ body {
   animation: slide-up 0.3s ease-out;
 }
 
+/* Animation slide-in-right pour la bannière de simulation */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* ===== MODERNISATION ULTRA-CLEAN 2025 ===== */
 
 /* Améliorer la lisibilité des inputs et selects */
@@ -61,9 +77,10 @@ input::placeholder, select::placeholder, textarea::placeholder {
   opacity: 1;
 }
 
-/* Pour les options des select */
+/* Pour les options des select - Mode sombre */
 option {
-  color: #0f172a !important; /* text-slate-900 - Noir */
+  background-color: #1e293b !important; /* bg-slate-800 */
+  color: #f1f5f9 !important; /* text-slate-100 - Blanc cassé */
 }
 
 /* Titres modernes : lettres serrées (tracking-tight) */

@@ -33,6 +33,62 @@ export function sanitizeString(input: string, maxLength: number = 10000): string
 }
 
 /**
+ * Sanitize HTML pour dangerouslySetInnerHTML (permet certaines balises HTML sûres)
+ * Utilise une approche plus permissive mais sécurisée pour le contenu riche
+ */
+export function sanitizeHTML(html: string, maxLength: number = 50000): string {
+  if (!html || typeof html !== "string") {
+    return "";
+  }
+
+  // Limiter la longueur
+  let sanitized = html.slice(0, maxLength);
+
+  // Liste des balises HTML autorisées (sécurisées)
+  const allowedTags = [
+    "p", "br", "strong", "em", "u", "b", "i", "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li", "blockquote", "a", "img", "div", "span", "hr"
+  ];
+
+  // Supprimer toutes les balises non autorisées
+  sanitized = sanitized.replace(/<(\/?)([^>]+)>/g, (match, closing, tagName) => {
+    const tag = tagName.split(/\s/)[0].toLowerCase();
+    if (allowedTags.includes(tag)) {
+      // Pour les liens, vérifier que l'URL est sûre
+      if (tag === "a") {
+        const hrefMatch = tagName.match(/href=["']([^"']+)["']/i);
+        if (hrefMatch) {
+          const href = hrefMatch[1];
+          if (!href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("/") && !href.startsWith("#")) {
+            return ""; // Supprimer le lien si l'URL n'est pas sûre
+          }
+        }
+      }
+      // Pour les images, vérifier que src est sûr
+      if (tag === "img") {
+        const srcMatch = tagName.match(/src=["']([^"']+)["']/i);
+        if (srcMatch) {
+          const src = srcMatch[1];
+          if (!src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("/") && !src.startsWith("data:image/")) {
+            return ""; // Supprimer l'image si src n'est pas sûr
+          }
+        }
+      }
+      return match; // Garder la balise autorisée
+    }
+    return ""; // Supprimer la balise non autorisée
+  });
+
+  // Supprimer les attributs dangereux (onclick, onerror, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, "");
+
+  // Supprimer javascript: dans les href
+  sanitized = sanitized.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, "");
+
+  return sanitized.trim();
+}
+
+/**
  * Valider une URL
  */
 export function validateUrl(url: string): boolean {

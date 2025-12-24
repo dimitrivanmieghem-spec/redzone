@@ -296,7 +296,7 @@ export default function TermsPage() {
             
             <h3 className="text-xl font-bold text-slate-900 mb-3">9.1. Résiliation par l&apos;Utilisateur</h3>
             <p className="text-slate-700 mb-4">
-              L&apos;Utilisateur peut supprimer son compte à tout moment via les paramètres ou en contactant support@RedZone.be.
+              L&apos;Utilisateur peut supprimer son compte à tout moment via les paramètres ou en <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">contactant l&apos;administrateur</a>.
             </p>
 
             <h3 className="text-xl font-bold text-slate-900 mb-3">9.2. Suspension ou résiliation par RedZone</h3>
@@ -384,7 +384,7 @@ export default function TermsPage() {
                 Adresse : [ADRESSE COMPLÈTE À REMPLIR]<br />
                 Numéro BCE : [NUMÉRO BCE À REMPLIR]<br />
                 Numéro TVA : BE [NUMÉRO TVA À REMPLIR]<br />
-                Email : support@RedZone.be <span className="text-red-600 font-semibold">(Non actif en phase bêta - À CONFIGURER)</span><br />
+                Email : <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a><br />
                 Téléphone : [NUMÉRO À REMPLIR]
               </p>
               <p className="text-slate-600 text-xs mt-3 italic">

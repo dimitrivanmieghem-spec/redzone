@@ -146,7 +146,7 @@ export default function CookieBanner() {
 
       {/* Modale de personnalisation */}
       {showCustomize && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-slate-200 p-6 rounded-t-3xl flex items-center justify-between">

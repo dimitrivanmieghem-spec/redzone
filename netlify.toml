@@ -9,7 +9,7 @@
 # Netlify détecte automatiquement Next.js, mais on peut spécifier le plugin pour plus de contrôle
 # Le plugin @netlify/plugin-nextjs sera installé automatiquement si nécessaire
 
-# Headers de sécurité
+# Headers de sécurité (appliqués à toutes les routes)
 [[headers]]
   for = "/*"
   [headers.values]
@@ -17,8 +17,18 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.supabase.in https://challenges.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
 
-# Cache pour les assets statiques
+# Headers pour les routes API (pas de cache)
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+
+# Cache pour les assets statiques Next.js
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
@@ -29,4 +39,21 @@
   for = "/images/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Redirections pour les routes admin (compatibilité)
+[[redirects]]
+  from = "/admin/dashboard"
+  to = "/admin?tab=dashboard"
+  status = 301
+
+[[redirects]]
+  from = "/admin/moderation"
+  to = "/admin?tab=moderation"
+  status = 301
+
+# Redirection pour les routes obsolètes (si nécessaire)
+# [[redirects]]
+#   from = "/old-route"
+#   to = "/new-route"
+#   status = 301
 
