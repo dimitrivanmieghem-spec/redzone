@@ -10,6 +10,7 @@ import { useBanSimulation } from "@/contexts/BanSimulationContext";
 import Image from "next/image";
 import { getUnreadNotificationsCount, getAllNotifications, markNotificationAsRead } from "@/lib/supabase/notifications";
 import type { Notification } from "@/lib/supabase/notifications";
+import { createClient } from "@/lib/supabase/client";
 
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,9 +56,34 @@ function Navbar() {
 
     loadUnreadCount();
 
-    // Recharger toutes les 30 secondes
-    const interval = setInterval(loadUnreadCount, 30000);
-    return () => clearInterval(interval);
+    // Abonnement en temps réel aux notifications
+    if (user) {
+      const supabase = createClient();
+      const channel = supabase
+        .channel("notifications-realtime")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            // Recharger le compteur quand une nouvelle notification arrive
+            loadUnreadCount();
+          }
+        )
+        .subscribe();
+
+      // Recharger toutes les 30 secondes (fallback)
+      const interval = setInterval(loadUnreadCount, 30000);
+      
+      return () => {
+        clearInterval(interval);
+        supabase.removeChannel(channel);
+      };
+    }
   }, [user]);
 
   // Charger les notifications quand le dropdown est ouvert

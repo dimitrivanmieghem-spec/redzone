@@ -27,10 +27,13 @@ function invalidateAllCache() {
   revalidatePath("/recherche"); // Page de recherche
   revalidatePath("/search"); // Alias pour compatibilité
   revalidatePath("/dashboard");
+  revalidatePath("/admin");
   revalidatePath("/admin/moderation");
   revalidatePath("/admin/cars");
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin/users");
+  // Invalider aussi les routes dynamiques
+  revalidatePath("/cars", "page"); // Toutes les pages /cars/[id]
 }
 
 /**

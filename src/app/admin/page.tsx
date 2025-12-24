@@ -861,6 +861,10 @@ function ModerationTab({ user }: { user: any }) {
   const [brandFilter, setBrandFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>("");
+  
+  // Modal d'aperçu complet
+  const [previewModalOpen, setPreviewModalOpen] = useState<string | null>(null);
+  const [ownerInfo, setOwnerInfo] = useState<Map<string, any>>(new Map());
 
   function parseNumber(value: any): number | null {
     if (value === null || value === undefined) return null;
@@ -882,9 +886,19 @@ function ModerationTab({ user }: { user: any }) {
       try {
         setIsLoading(true);
         const supabase = createClient();
+        // Récupérer TOUTES les colonnes nécessaires pour l'affichage complet
         const { data, error } = await supabase
           .from("vehicles")
-          .select("id, created_at, owner_id, brand, model, price, year, mileage, fuel_type, transmission, body_type, power_hp, condition, euro_standard, car_pass, image, images, description, status, engine_architecture, admission, zero_a_cent, co2, city, postal_code")
+          .select(`
+            id, created_at, owner_id, type, brand, model, price, year, mileage, fuel_type, 
+            transmission, body_type, power_hp, condition, euro_standard, car_pass, 
+            image, images, description, status, engine_architecture, admission, 
+            zero_a_cent, co2, city, postal_code, phone, contact_email, contact_methods, 
+            guest_email, interior_color, seats_count, fiscal_horsepower, poids_kg,
+            displacement_cc, co2_wltp, drivetrain, top_speed, audio_file, history,
+            car_pass_url, is_manual_model, first_registration_date, is_hybrid, is_electric,
+            region_of_registration, engine_configuration, number_of_cylinders, torque_nm
+          `)
           .in("status", ["pending", "pending_validation", "waiting_email_verification"])
           .order("created_at", { ascending: false });
 
@@ -896,8 +910,36 @@ function ModerationTab({ user }: { user: any }) {
           year: parseNumber(v.year),
           mileage: parseNumber(v.mileage),
           power_hp: parseNumber(v.power_hp),
+          fiscal_horsepower: parseNumber(v.fiscal_horsepower),
+          poids_kg: parseNumber(v.poids_kg),
+          displacement_cc: parseNumber(v.displacement_cc),
+          co2_wltp: parseNumber(v.co2_wltp),
+          top_speed: parseNumber(v.top_speed),
+          torque_nm: parseNumber(v.torque_nm),
+          number_of_cylinders: parseNumber(v.number_of_cylinders),
+          seats_count: parseNumber(v.seats_count),
         })) as Vehicule[]) || [];
         setPendingVehicules(mappedVehicules);
+        
+        // Charger les informations des propriétaires
+        const ownerIds = mappedVehicules
+          .map(v => v.owner_id)
+          .filter((id): id is string => id !== null && id !== undefined);
+        
+        if (ownerIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, email, full_name, avatar_url")
+            .in("id", ownerIds);
+          
+          if (profiles) {
+            const ownersMap = new Map<string, any>();
+            profiles.forEach((profile: any) => {
+              ownersMap.set(profile.id, profile);
+            });
+            setOwnerInfo(ownersMap);
+          }
+        }
       } catch (error) {
         console.error("❌ Erreur chargement annonces en attente:", error);
         showToast("Erreur lors du chargement des annonces", "error");
@@ -963,7 +1005,8 @@ function ModerationTab({ user }: { user: any }) {
         { vehicule_id: id, brand: vehicule.brand || null, model: vehicule.model || null, action: "approve" }
       );
       showToast("Annonce approuvée avec succès ✓", "success");
-      router.refresh();
+      // Recharger les données au lieu de router.refresh() pour éviter le timeout
+      await loadPendingVehicules();
     } catch (error) {
       setPendingVehicules((prev) => {
         const updated = [...prev, vehicule];
@@ -1000,7 +1043,8 @@ function ModerationTab({ user }: { user: any }) {
         next.delete(id);
         return next;
       });
-      router.refresh();
+      // Recharger les données au lieu de router.refresh() pour éviter le timeout
+      await loadPendingVehicules();
     } catch (error) {
       setPendingVehicules((prev) => {
         const updated = [...prev, vehicule];
@@ -1066,7 +1110,8 @@ function ModerationTab({ user }: { user: any }) {
     setSelectedVehicles(new Set());
     showToast(`${successCount} annonce(s) approuvée(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`, successCount > 0 ? "success" : "error");
     setIsBulkProcessing(false);
-    router.refresh();
+    // Recharger les données au lieu de router.refresh() pour éviter le timeout
+    await loadPendingVehicules();
   };
 
   const handleBulkReject = async () => {
@@ -1099,7 +1144,8 @@ function ModerationTab({ user }: { user: any }) {
     setRejectReason("");
     showToast(`${successCount} annonce(s) rejetée(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`, successCount > 0 ? "success" : "error");
     setIsBulkProcessing(false);
-    router.refresh();
+    // Recharger les données au lieu de router.refresh() pour éviter le timeout
+    await loadPendingVehicules();
   };
 
   // Filtrer les véhicules
@@ -1381,13 +1427,13 @@ function ModerationTab({ user }: { user: any }) {
                         <XCircle size={16} />
                         Refuser
                       </button>
-                      <Link
-                        href={`/cars/${vehicule.id}`}
-                        target="_blank"
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded-xl transition-all"
+                      <button
+                        onClick={() => setPreviewModalOpen(vehicule.id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all"
                       >
-                        Voir l'annonce
-                      </Link>
+                        <Eye size={16} />
+                        Aperçu complet
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1397,6 +1443,183 @@ function ModerationTab({ user }: { user: any }) {
             )}
           </>
         )}
+
+        {/* Modal d'aperçu complet */}
+        {previewModalOpen && (() => {
+          const vehicule = pendingVehicules.find(v => v.id === previewModalOpen);
+          if (!vehicule) return null;
+          const owner = vehicule.owner_id ? ownerInfo.get(vehicule.owner_id) : null;
+          
+          return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 my-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-black text-slate-900">Aperçu de l'annonce</h3>
+                  <button
+                    onClick={() => setPreviewModalOpen(null)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                  >
+                    <X size={24} className="text-slate-600" />
+                  </button>
+                </div>
+                
+                <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2">
+                  {/* Images */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 mb-2">Photos</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {vehicule.images && vehicule.images.length > 0 ? (
+                        vehicule.images.map((img, idx) => (
+                          <div key={idx} className="relative w-full h-32 bg-slate-100 rounded-xl overflow-hidden">
+                            <Image src={img} alt={`Photo ${idx + 1}`} fill className="object-cover" />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="relative w-full h-32 bg-slate-100 rounded-xl overflow-hidden">
+                          <Image src={vehicule.image} alt="Photo principale" fill className="object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Informations principales */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 mb-2">Informations principales</h4>
+                      <div className="space-y-2 text-sm">
+                        <div><span className="font-bold">Marque/Modèle:</span> {vehicule.brand || 'N/A'} {vehicule.model || ''}</div>
+                        <div><span className="font-bold">Prix:</span> {vehicule.price ? vehicule.price.toLocaleString("fr-BE") : 'N/A'} €</div>
+                        <div><span className="font-bold">Année:</span> {vehicule.year || 'N/A'}</div>
+                        <div><span className="font-bold">Kilométrage:</span> {vehicule.mileage ? vehicule.mileage.toLocaleString("fr-BE") : 'N/A'} km</div>
+                        <div><span className="font-bold">Carburant:</span> {vehicule.fuel_type || 'N/A'}</div>
+                        <div><span className="font-bold">Transmission:</span> {vehicule.transmission || 'N/A'}</div>
+                        <div><span className="font-bold">Carrosserie:</span> {vehicule.body_type || 'N/A'}</div>
+                        <div><span className="font-bold">Puissance:</span> {vehicule.power_hp || 'N/A'} ch</div>
+                        <div><span className="font-bold">CV fiscaux:</span> {vehicule.fiscal_horsepower || 'N/A'}</div>
+                        <div><span className="font-bold">État:</span> {vehicule.condition || 'N/A'}</div>
+                        <div><span className="font-bold">Norme Euro:</span> {formatEuroNorm(vehicule.euro_standard)}</div>
+                        <div><span className="font-bold">Car-Pass:</span> {vehicule.car_pass ? 'Oui' : 'Non'}</div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 mb-2">Détails techniques</h4>
+                      <div className="space-y-2 text-sm">
+                        <div><span className="font-bold">Architecture moteur:</span> {vehicule.engine_architecture || 'N/A'}</div>
+                        <div><span className="font-bold">Admission:</span> {vehicule.admission || 'N/A'}</div>
+                        <div><span className="font-bold">0-100 km/h:</span> {vehicule.zero_a_cent ? `${vehicule.zero_a_cent}s` : 'N/A'}</div>
+                        <div><span className="font-bold">CO2:</span> {vehicule.co2 ? `${vehicule.co2} g/km` : 'N/A'}</div>
+                        <div><span className="font-bold">CO2 WLTP:</span> {vehicule.co2_wltp ? `${vehicule.co2_wltp} g/km` : 'N/A'}</div>
+                        <div><span className="font-bold">Poids:</span> {vehicule.poids_kg ? `${vehicule.poids_kg} kg` : 'N/A'}</div>
+                        <div><span className="font-bold">Cylindrée:</span> {vehicule.displacement_cc ? `${vehicule.displacement_cc} cm³` : 'N/A'}</div>
+                        <div><span className="font-bold">Drivetrain:</span> {vehicule.drivetrain || 'N/A'}</div>
+                        <div><span className="font-bold">Vitesse max:</span> {vehicule.top_speed ? `${vehicule.top_speed} km/h` : 'N/A'}</div>
+                        <div><span className="font-bold">Couple:</span> {vehicule.torque_nm ? `${vehicule.torque_nm} Nm` : 'N/A'}</div>
+                        <div><span className="font-bold">Configuration:</span> {vehicule.engine_configuration || 'N/A'}</div>
+                        <div><span className="font-bold">Cylindres:</span> {vehicule.number_of_cylinders || 'N/A'}</div>
+                        <div><span className="font-bold">Couleur intérieure:</span> {vehicule.interior_color || 'N/A'}</div>
+                        <div><span className="font-bold">Places:</span> {vehicule.seats_count || 'N/A'}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Description */}
+                  {vehicule.description && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 mb-2">Description</h4>
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{vehicule.description}</p>
+                    </div>
+                  )}
+                  
+                  {/* Contact */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 mb-2">Informations de contact</h4>
+                    <div className="space-y-2 text-sm">
+                      {owner ? (
+                        <>
+                          <div><span className="font-bold">Propriétaire:</span> {owner.full_name || owner.email || 'N/A'}</div>
+                          <div><span className="font-bold">Email:</span> {owner.email || 'N/A'}</div>
+                        </>
+                      ) : vehicule.guest_email ? (
+                        <div><span className="font-bold">Email invité:</span> {vehicule.guest_email}</div>
+                      ) : null}
+                      {vehicule.contact_email && (
+                        <div><span className="font-bold">Email de contact:</span> {vehicule.contact_email}</div>
+                      )}
+                      {vehicule.phone && (
+                        <div><span className="font-bold">Téléphone:</span> {vehicule.phone}</div>
+                      )}
+                      {vehicule.contact_methods && vehicule.contact_methods.length > 0 && (
+                        <div><span className="font-bold">Méthodes de contact:</span> {vehicule.contact_methods.join(', ')}</div>
+                      )}
+                      {vehicule.city && (
+                        <div><span className="font-bold">Localisation:</span> {vehicule.city} {vehicule.postal_code || ''}</div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Audio */}
+                  {vehicule.audio_file && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 mb-2">Sonorité moteur</h4>
+                      <audio controls className="w-full">
+                        <source src={vehicule.audio_file} type="audio/mpeg" />
+                        Votre navigateur ne supporte pas l'audio.
+                      </audio>
+                    </div>
+                  )}
+                  
+                  {/* Historique */}
+                  {vehicule.history && vehicule.history.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 mb-2">Historique</h4>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-slate-600">
+                        {vehicule.history.map((item, idx) => (
+                          <li key={idx}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-3 mt-6 pt-6 border-t border-slate-200">
+                  <button
+                    onClick={() => {
+                      setPreviewModalOpen(null);
+                      handleApprove(vehicule.id);
+                    }}
+                    disabled={isProcessing === vehicule.id}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                  >
+                    {isProcessing === vehicule.id ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <CheckCircle size={16} />
+                    )}
+                    Approuver
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPreviewModalOpen(null);
+                      setRejectModalOpen(vehicule.id);
+                    }}
+                    disabled={isProcessing === vehicule.id}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                  >
+                    <XCircle size={16} />
+                    Refuser
+                  </button>
+                  <button
+                    onClick={() => setPreviewModalOpen(null)}
+                    className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded-xl transition-all"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Modal de rejet */}
         {rejectModalOpen && (
