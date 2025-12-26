@@ -1,4 +1,4 @@
-// RedZone - Actions Supabase pour les Réglages Site
+// Octane98 - Actions Supabase pour les Réglages Site
 // REFACTORING: Gestion d'erreur exhaustive avec logging détaillé
 
 import { createClient } from "./client";

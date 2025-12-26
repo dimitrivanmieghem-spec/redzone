@@ -1,6 +1,6 @@
 "use server";
 
-// RedZone - Server Actions pour les Réglages Site (Admin)
+// Octane98 - Server Actions pour les Réglages Site (Admin)
 
 import { revalidatePath } from "next/cache";
 import { createClient as createServerClient } from "../server";

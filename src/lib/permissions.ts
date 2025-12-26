@@ -1,5 +1,6 @@
-// RedZone - Système de Permissions par Rôle
+// Octane98 - Système de Permissions par Rôle
 // Centralise la logique de vérification des permissions
+// Source de vérité unique pour tous les types de rôles dans le projet
 
 export type UserRole = 
   | "particulier" 
@@ -10,11 +11,47 @@ export type UserRole =
   | "editor" 
   | "viewer";
 
+// ========================================
+// CONSTANTES DE RÔLES
+// ========================================
+
+/**
+ * Rôles qui peuvent accéder au back-office admin
+ * Ces rôles ont le droit de voir le bouton '/admin' et d'accéder aux routes /admin
+ */
+export const BACKOFFICE_ROLES: UserRole[] = ["admin", "moderator", "support", "editor", "viewer"];
+
+// ========================================
+// FONCTIONS DE VÉRIFICATION D'ACCÈS
+// ========================================
+
+/**
+ * Vérifie si un rôle peut accéder au back-office (routes /admin)
+ * Utilise la constante BACKOFFICE_ROLES pour centraliser la logique
+ * 
+ * @param role - Le rôle à vérifier
+ * @returns true si le rôle peut accéder au back-office
+ * 
+ * @example
+ * canAccessBackOffice("admin") // true
+ * canAccessBackOffice("moderator") // true
+ * canAccessBackOffice("particulier") // false
+ */
+export function canAccessBackOffice(role: UserRole): boolean {
+  return BACKOFFICE_ROLES.includes(role);
+}
+
 /**
  * Vérifie si un rôle peut accéder à une route admin
+ * 
+ * @deprecated Utilisez canAccessBackOffice() pour plus de clarté
+ * Cette fonction est maintenue pour la rétrocompatibilité
+ * 
+ * @param role - Le rôle à vérifier
+ * @returns true si le rôle peut accéder aux routes admin
  */
 export function canAccessAdmin(role: UserRole): boolean {
-  return ["admin", "moderator", "support", "editor", "viewer"].includes(role);
+  return canAccessBackOffice(role);
 }
 
 /**
@@ -54,9 +91,10 @@ export function canManageContent(role: UserRole): boolean {
 
 /**
  * Vérifie si un rôle peut voir les données (lecture seule)
+ * Tous les rôles back-office ont accès en lecture
  */
 export function canViewData(role: UserRole): boolean {
-  return ["admin", "moderator", "support", "editor", "viewer"].includes(role);
+  return canAccessBackOffice(role);
 }
 
 /**
@@ -126,4 +164,29 @@ export function getRoleBadgeColor(role: UserRole): string {
   };
   return colors[role] || "bg-slate-100 text-slate-700";
 }
+
+/**
+ * Droits des modérateurs
+ * Les modérateurs peuvent :
+ * - Valider/rejeter les annonces (modération)
+ * - Voir les statistiques du dashboard
+ * - Gérer les tickets de support
+ * 
+ * Les modérateurs NE PEUVENT PAS :
+ * - Supprimer des utilisateurs
+ * - Modifier les paramètres du site
+ * - Accéder aux routes /admin/settings et /admin/users
+ */
+export const MODERATOR_RIGHTS = {
+  // Permissions accordées
+  canModerateVehicles: true,        // Validation d'annonces
+  canViewDashboard: true,           // Accès au dashboard admin
+  canManageSupport: true,           // Gestion des tickets
+  canViewData: true,                // Lecture des données
+  
+  // Permissions refusées
+  canManageUsers: false,            // ❌ Suppression d'utilisateurs
+  canManageSettings: false,         // ❌ Paramètres du site
+  canAccessAdminOnlyRoutes: false,  // ❌ Routes /admin/settings et /admin/users
+} as const;
 

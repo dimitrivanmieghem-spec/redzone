@@ -346,11 +346,13 @@ export default function PassionPostForm() {
         {/* Aperçu des photos */}
         {formData.photos.length > 0 && (
           <div className="grid grid-cols-3 gap-4 mt-4">
-            {formData.photos.map((photo, index) => (
-              <div key={index} className="relative group">
+            {formData.photos.map((photo, index) => {
+              const photoUrl = URL.createObjectURL(photo);
+              return (
+              <div key={`${photo.name}-${photo.size}-${index}`} className="relative group">
                 <img
-                  src={URL.createObjectURL(photo)}
-                  alt={`Preview ${index + 1}`}
+                  src={photoUrl}
+                  alt={`Preview photo`}
                   className="w-full h-32 object-cover rounded-xl"
                 />
                 <button
@@ -361,7 +363,7 @@ export default function PassionPostForm() {
                   <X size={16} />
                 </button>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

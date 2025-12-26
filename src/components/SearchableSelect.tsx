@@ -1,6 +1,6 @@
 "use client";
 
-// RedZone - Sélecteur Searchable (Recherchable au clavier)
+// Octane98 - Sélecteur Searchable (Recherchable au clavier)
 // Design harmonisé avec le thème Puriste
 
 import { useState, useRef, useEffect } from "react";

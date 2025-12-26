@@ -1,4 +1,4 @@
-// RedZone - Fonctions pour les Tickets (Utilisateur)
+// Octane98 - Fonctions pour les Tickets (Utilisateur)
 
 import { createClient } from "./client";
 

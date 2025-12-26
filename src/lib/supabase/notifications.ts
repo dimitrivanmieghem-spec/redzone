@@ -1,4 +1,4 @@
-// RedZone - Fonctions pour les Notifications (Client Components)
+// Octane98 - Fonctions pour les Notifications (Client Components)
 // ⚠️ Ce fichier utilise le client navigateur et peut être importé dans des Client Components
 // Pour créer des notifications depuis Server Actions, utilisez notifications-server.ts
 

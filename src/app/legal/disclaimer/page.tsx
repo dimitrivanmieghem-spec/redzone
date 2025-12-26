@@ -1,7 +1,17 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export default function DisclaimerPage() {
+  const [lastUpdateDate, setLastUpdateDate] = useState<string>("");
+
+  useEffect(() => {
+    // Calculer la date uniquement côté client pour éviter les problèmes d'hydratation
+    setLastUpdateDate(new Date().toLocaleDateString("fr-BE"));
+  }, []);
+
   return (
     <main className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -24,7 +34,7 @@ export default function DisclaimerPage() {
           </h1>
         </div>
         <p className="text-sm text-slate-900 mb-8">
-          Dernière mise à jour : {new Date().toLocaleDateString("fr-BE")}
+          Dernière mise à jour : {lastUpdateDate || "..."}
         </p>
 
         {/* Contenu */}
@@ -49,7 +59,7 @@ export default function DisclaimerPage() {
               AVERTISSEMENT IMPORTANT
             </h3>
             <p className="text-slate-900 leading-relaxed mb-3">
-              <strong>RedZone est une plateforme communautaire de mise en relation pour véhicules sportifs.</strong>{" "}
+              <strong>Octane98 est une plateforme communautaire de mise en relation pour véhicules sportifs.</strong>{" "}
               Nous ne vendons pas de véhicules et ne sommes pas revendeurs. Nous n&apos;intervenons
               pas dans les transactions entre vendeurs et acheteurs. Par conséquent, nous ne
               pouvons être tenus responsables des véhicules vendus via notre plateforme.
@@ -59,7 +69,7 @@ export default function DisclaimerPage() {
                 ⚖️ Clause Hébergeur
               </p>
               <p className="text-slate-800 text-sm mb-2">
-                RedZone agit en qualité d&apos;hébergeur technique. RedZone ne vérifie pas physiquement les véhicules 
+                Octane98 agit en qualité d&apos;hébergeur technique. Octane98 ne vérifie pas physiquement les véhicules 
                 et ne garantit pas l&apos;exactitude des informations fournies par les vendeurs (kilométrage, état, Car-Pass). 
                 Toute transaction se fait exclusivement entre l&apos;acheteur et le vendeur.
               </p>
@@ -71,7 +81,7 @@ export default function DisclaimerPage() {
               1. Nature du service
             </h2>
             <p className="text-slate-900 leading-relaxed mb-4">
-              RedZone est une <strong>plateforme communautaire de mise en relation pour véhicules sportifs</strong>, 
+              Octane98 est une <strong>plateforme communautaire de mise en relation pour véhicules sportifs</strong>, 
               permettant la publication d&apos;annonces de vente de véhicules automobiles et motocycles sportifs 
               par des particuliers et des professionnels en Belgique.
             </p>
@@ -134,7 +144,7 @@ export default function DisclaimerPage() {
               3. Absence de garantie sur les annonces
             </h2>
             <p className="text-slate-900 leading-relaxed mb-4">
-              RedZone ne garantit pas :
+              Octane98 ne garantit pas :
             </p>
             <ul className="list-disc pl-6 mb-4 text-slate-900 space-y-2">
               <li>
@@ -163,7 +173,7 @@ export default function DisclaimerPage() {
               4. Limitation de responsabilité
             </h2>
             <p className="text-slate-900 leading-relaxed mb-4">
-              <strong>RedZone ne pourra en aucun cas être tenu responsable :</strong>
+              <strong>Octane98 ne pourra en aucun cas être tenu responsable :</strong>
             </p>
             <ul className="list-disc pl-6 mb-4 text-slate-900 space-y-2">
               <li>
@@ -305,7 +315,7 @@ export default function DisclaimerPage() {
             </h2>
             <p className="text-slate-900 leading-relaxed mb-4">
               Si vous suspectez une annonce frauduleuse ou trompeuse, nous vous encourageons
-              à nous la signaler immédiatement en <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">contactant l&apos;administrateur</a>
+              à nous la signaler immédiatement en <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">contactant l&apos;administrateur</a>
             </p>
             <p className="text-slate-900 leading-relaxed mb-4">
               Nous ferons de notre mieux pour traiter les signalements rapidement, mais nous
@@ -346,13 +356,13 @@ export default function DisclaimerPage() {
                 <strong>Pour toute question ou signalement, contactez l&apos;administrateur :</strong>
               </p>
               <a
-                href="mailto:dimitri.vanmieghem@gmail.com"
+                href="mailto:admin@octane98.be"
                 className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-6 py-2.5 rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-red-900/20 hover:scale-105 mb-2"
               >
                 Contacter l&apos;administrateur
               </a>
               <p className="text-slate-900 leading-relaxed mt-2">
-                <strong>Courrier :</strong> RedZone, [Adresse à compléter]
+                <strong>Courrier :</strong> Octane98, [Adresse à compléter]
               </p>
             </div>
           </section>
@@ -360,7 +370,7 @@ export default function DisclaimerPage() {
           {/* Message final */}
           <div className="bg-slate-100 shadow-xl shadow-slate-100/50 border-0 p-6 rounded-2xl mt-8">
             <p className="text-slate-900 leading-relaxed text-center font-medium">
-              <strong>En utilisant RedZone, vous reconnaissez avoir lu et compris cet
+              <strong>En utilisant Octane98, vous reconnaissez avoir lu et compris cet
               avertissement et acceptez d&apos;assumer l&apos;entière responsabilité de vos
               transactions.</strong>
             </p>

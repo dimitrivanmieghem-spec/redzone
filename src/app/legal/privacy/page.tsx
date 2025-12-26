@@ -58,7 +58,7 @@ export default function PrivacyPage() {
                 📋 Statut de la Plateforme
               </p>
               <p className="text-red-800 text-sm font-semibold">
-                RedZone est une plateforme en phase Beta opérée à titre non-lucratif. Le site agit comme hébergeur d&apos;annonces et n&apos;intervient pas dans les transactions.
+                Octane98 est une plateforme en phase Beta opérée à titre non-lucratif. Le site agit comme hébergeur d&apos;annonces et n&apos;intervient pas dans les transactions.
               </p>
             </div>
           </div>
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
               🔒 <strong>Votre vie privée est notre priorité.</strong>
             </p>
             <p className="text-slate-700 text-sm">
-              RedZone respecte strictement le Règlement Général sur la Protection des Données (RGPD) 
+              Octane98 respecte strictement le Règlement Général sur la Protection des Données (RGPD) 
               et est soumis au contrôle de l&apos;Autorité de Protection des Données (APD) belge. 
               Cette politique vous explique quelles données nous collectons, pourquoi, et comment vous pouvez exercer vos droits.
             </p>
@@ -78,15 +78,23 @@ export default function PrivacyPage() {
             <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">1. Responsable du traitement</h2>
             <div className="bg-slate-50 p-6 rounded-2xl">
               <p className="text-slate-900 mb-2">
-                <strong>RedZone SPRL</strong> (À REMPLIR)
+                <strong>Responsable du traitement :</strong> Dimitri Van Mieghem
+              </p>
+              <p className="text-slate-700 text-sm mb-3">
+                Les données personnelles collectées sur ce site sont traitées par <strong>Dimitri Van Mieghem</strong>, 
+                éditeur du site à titre personnel, à des fins de fonctionnement du service uniquement.
               </p>
               <p className="text-slate-700 text-sm">
-                Adresse : [ADRESSE COMPLÈTE À REMPLIR]<br />
-                Numéro BCE : [NUMÉRO BCE À REMPLIR]<br />
-                Numéro TVA : BE [NUMÉRO TVA À REMPLIR]<br />
-                Email de contact : <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a><br />
-                Délégué à la Protection des Données (DPO) : [NOM DPO À REMPLIR]
+                <strong>Statut :</strong> Personne physique<br />
+                <strong>Domicilié en :</strong> Belgique<br />
+                <strong>Email de contact :</strong> <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">admin@octane98.be</a>
               </p>
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mt-4">
+                <p className="text-blue-900 text-sm">
+                  <strong>📌 Note :</strong> En phase de lancement, ce site est opéré à titre personnel. 
+                  Les données sont traitées uniquement pour le fonctionnement de la plateforme et ne sont ni vendues ni partagées avec des tiers à des fins commerciales.
+                </p>
+              </div>
             </div>
           </section>
 
@@ -185,8 +193,8 @@ export default function PrivacyPage() {
             <p className="text-slate-700 mb-4">
               Vos données personnelles peuvent être transmises aux catégories de destinataires suivants :
             </p>
-            <ul className="list-disc list-inside text-slate-700 space-y-2">
-              <li><strong>Personnel autorisé de RedZone</strong> : Équipe technique, support client, modération</li>
+              <ul className="list-disc list-inside text-slate-700 space-y-2">
+              <li><strong>Éditeur du site</strong> : Dimitri Van Mieghem (traitement des données pour le fonctionnement du service)</li>
               <li><strong>Acheteurs potentiels</strong> : Uniquement les informations de l&apos;annonce (jamais votre email direct)</li>
               <li><strong>Prestataires techniques</strong> : Hébergement (ex: Vercel, AWS), emailing (ex: SendGrid), paiement (si applicable)</li>
               <li><strong>Autorités compétentes</strong> : En cas de réquisition judiciaire ou obligation légale</li>
@@ -295,7 +303,7 @@ export default function PrivacyPage() {
             <div className="bg-red-100 p-6 rounded-2xl mt-6">
               <h4 className="font-bold text-slate-900 mb-2">📧 Comment exercer vos droits ?</h4>
               <p className="text-slate-900 mb-3">
-                Envoyez un email à : <strong><a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 underline">dimitri.vanmieghem@gmail.com</a></strong>
+                Envoyez un email à : <strong><a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 underline">admin@octane98.be</a></strong>
               </p>
               <p className="text-slate-700 text-sm mb-2">
                 Joignez une copie de votre carte d&apos;identité (pour vérification) et précisez votre demande.
@@ -384,14 +392,13 @@ export default function PrivacyPage() {
             </p>
             <div className="bg-red-50 p-6 rounded-2xl">
               <p className="text-slate-900 mb-2">
-                <strong>Email :</strong> <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a>
+                <strong>Responsable du traitement :</strong> Dimitri Van Mieghem
               </p>
               <p className="text-slate-900 mb-2">
-                <strong>Courrier :</strong> RedZone SPRL - Service Protection des Données<br />
-                [ADRESSE COMPLÈTE À REMPLIR]
+                <strong>Email :</strong> <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">admin@octane98.be</a>
               </p>
-              <p className="text-slate-900">
-                <strong>Délégué à la Protection des Données (DPO) :</strong> [NOM À REMPLIR]
+              <p className="text-slate-700 text-sm mt-3">
+                <em>En phase de lancement, les réponses aux demandes relatives aux données personnelles peuvent prendre quelques jours. Merci de votre compréhension.</em>
               </p>
             </div>
           </section>

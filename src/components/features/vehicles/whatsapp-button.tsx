@@ -15,7 +15,7 @@ export default function WhatsAppButton({ marque, modele, prix }: WhatsAppButtonP
   // Message pré-rempli
   const message = encodeURIComponent(
     `Bonjour ! 👋\n\n` +
-    `Je suis intéressé(e) par votre ${marque} ${modele} vue sur RedZone.\n\n` +
+    `Je suis intéressé(e) par votre ${marque} ${modele} vue sur Octane98.\n\n` +
     `Prix affiché : ${prix.toLocaleString("fr-BE")} €\n\n` +
     `Pourrions-nous en discuter ?\n\n` +
     `Merci ! 🏁`

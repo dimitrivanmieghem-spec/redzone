@@ -1,4 +1,4 @@
-// RedZone - Fonctions pour gérer les favoris dans la base de données
+// Octane98 - Fonctions pour gérer les favoris dans la base de données
 // Migration depuis localStorage vers Supabase
 
 import { createClient } from "./client";
@@ -96,9 +96,27 @@ export async function isFavorite(vehicleId: string): Promise<boolean> {
 /**
  * Récupérer tous les favoris d'un utilisateur
  */
-export async function getUserFavorites(): Promise<string[]> {
+export async function getUserFavorites(retryCount = 0): Promise<string[]> {
   try {
     const supabase = createClient();
+    
+    // Vérifier que la session Supabase est prête avant de lancer la requête
+    // Cela évite les erreurs 400 (Bad Request) dues à une session non-initialisée
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      // Si la session n'est pas encore disponible et qu'on n'a pas trop retenté
+      if (retryCount < 3) {
+        // Retry après un court délai (500ms)
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return getUserFavorites(retryCount + 1);
+      } else {
+        // Après 3 tentatives, retourner un tableau vide plutôt que de bloquer
+        return [];
+      }
+    }
+
+    // Vérifier que l'utilisateur existe maintenant que la session est prête
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Bell, TrendingUp, Building2, Shield, Sparkles } from "lucide-react";
+import { ArrowLeft, Bell, TrendingUp, Building2, Shield, Sparkles, Gauge, Calculator } from "lucide-react";
 import Link from "next/link";
 
 interface AuthLayoutProps {
@@ -29,6 +29,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div>
             <Link
               href="/"
+              className="flex items-center gap-3 mb-6 group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-lg shadow-red-900/30 group-hover:shadow-red-900/50 transition-all group-hover:scale-105">
+                <Gauge className="text-white" size={24} />
+              </div>
+              <span className="text-2xl font-black text-white tracking-tight">
+                Octane<span className="text-red-600">98</span>
+              </span>
+            </Link>
+            <Link
+              href="/"
               className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-8 transition-colors font-medium"
             >
               <ArrowLeft size={20} />
@@ -40,7 +51,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="max-w-lg space-y-8">
             {/* Badge Membre Fondateur */}
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500/20 via-yellow-600/20 to-yellow-500/20 border border-yellow-500/40 rounded-full backdrop-blur-sm">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400/20 via-yellow-500/20 to-yellow-600/20 border border-yellow-400/40 rounded-full backdrop-blur-sm">
                 <Sparkles className="text-yellow-400" size={18} />
                 <span className="text-yellow-400 text-sm font-black uppercase tracking-wider">
                   Offre Limitée
@@ -53,81 +64,52 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </span>
               </h1>
               <p className="text-xl text-neutral-300 leading-relaxed">
-                Réservé aux <span className="font-bold text-yellow-400">500 premiers inscrits</span>.
+                Rejoignez les <span className="font-bold text-yellow-400">500 premiers puristes</span> et profitez d'avantages exclusifs.
               </p>
               <p className="text-lg text-neutral-400">
-                Obtenez le badge exclusif à vie et un accès prioritaire aux futures fonctionnalités Pro.
+                Calculateur de taxes illimité • Historique de cote exclusif • Alertes en temps réel • Badge à vie
               </p>
             </div>
 
             {/* Séparateur */}
             <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-            {/* Avantages */}
-            <div className="space-y-8">
-              {/* Pour les Passionnés */}
-              <div>
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-red-600 rounded-full" />
-                  Pour les Passionnés
-                </h3>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
-                      <Bell className="text-red-400" size={14} />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">La Sentinelle</p>
-                      <p className="text-neutral-400 text-sm">
-                        Soyez alerté avant tout le monde des nouvelles annonces.
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
-                      <TrendingUp className="text-red-400" size={14} />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">Garage de Rêve</p>
-                      <p className="text-neutral-400 text-sm">
-                        Suivez l&apos;évolution des prix de vos favoris.
-                      </p>
-                    </div>
-                  </li>
-                </ul>
+            {/* Avantages Membre Fondateur */}
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-600/20 border border-red-500/40 rounded-xl flex items-center justify-center mt-0.5">
+                  <Calculator className="text-red-400" size={20} />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">Calculateur de Taxes Illimité</p>
+                  <p className="text-neutral-400 text-sm leading-relaxed">
+                    Calculez les taxes d'immatriculation belges pour tous vos véhicules, sans limite.
+                  </p>
+                </div>
               </div>
-
-              {/* Pour les Pros */}
-              <div>
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded-full" />
-                  Pour les Pros
-                </h3>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 border border-blue-500/40 rounded-full flex items-center justify-center mt-0.5">
-                      <Building2 className="text-blue-400" size={14} />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">Showroom Digital</p>
-                      <p className="text-neutral-400 text-sm">
-                        Votre page vitrine dédiée{" "}
-                        <span className="text-yellow-400">(Bientôt disponible)</span>.
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 border border-blue-500/40 rounded-full flex items-center justify-center mt-0.5">
-                      <Shield className="text-blue-400" size={14} />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">Badge Vérifié</p>
-                      <p className="text-neutral-400 text-sm">
-                        Rassurez vos acheteurs avec le statut Pro.
-                      </p>
-                    </div>
-                  </li>
-                </ul>
+              
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-600/20 border border-red-500/40 rounded-xl flex items-center justify-center mt-0.5">
+                  <TrendingUp className="text-red-400" size={20} />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">Historique de Cote Exclusif</p>
+                  <p className="text-neutral-400 text-sm leading-relaxed">
+                    Accédez aux données historiques de cote de vos modèles favoris.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-600/20 border border-red-500/40 rounded-xl flex items-center justify-center mt-0.5">
+                  <Bell className="text-red-400" size={20} />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">Alertes en Temps Réel</p>
+                  <p className="text-neutral-400 text-sm leading-relaxed">
+                    Soyez alerté en premier des nouvelles annonces correspondant à vos critères.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -146,6 +128,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="lg:hidden mb-8">
             <Link
               href="/"
+              className="flex items-center gap-3 mb-4 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-lg shadow-red-900/30">
+                <Gauge className="text-white" size={20} />
+              </div>
+              <span className="text-xl font-black text-white tracking-tight">
+                Octane<span className="text-red-600">98</span>
+              </span>
+            </Link>
+            <Link
+              href="/"
               className="inline-flex items-center gap-2 text-neutral-400 hover:text-white mb-6 transition-colors font-medium"
             >
               <ArrowLeft size={20} />
@@ -157,7 +150,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="lg:hidden mb-8 space-y-6">
             {/* Badge Membre Fondateur */}
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500/20 via-yellow-600/20 to-yellow-500/20 border border-yellow-500/40 rounded-full">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400/20 via-yellow-500/20 to-yellow-600/20 border border-yellow-400/40 rounded-full">
                 <Sparkles className="text-yellow-400" size={16} />
                 <span className="text-yellow-400 text-xs font-black uppercase tracking-wider">
                   Offre Limitée
@@ -170,39 +163,34 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </span>
               </h1>
               <p className="text-neutral-400">
-                Réservé aux <span className="font-bold text-yellow-400">500 premiers inscrits</span>.
-                Obtenez le badge exclusif à vie.
+                Rejoignez les <span className="font-bold text-yellow-400">500 premiers puristes</span>.
+              </p>
+              <p className="text-sm text-neutral-500">
+                Taxes illimité • Cote exclusif • Alertes temps réel • Badge à vie
               </p>
             </div>
 
             {/* Avantages condensés (Mobile) */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="space-y-3 text-sm">
               <div className="flex items-start gap-2">
-                <Bell className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
+                <Calculator className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
-                  <p className="text-white font-medium text-xs">La Sentinelle</p>
-                  <p className="text-neutral-500 text-xs">Alertes exclusives</p>
+                  <p className="text-white font-medium text-xs">Calculateur Taxes</p>
+                  <p className="text-neutral-500 text-xs">Illimité</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <TrendingUp className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
-                  <p className="text-white font-medium text-xs">Garage de Rêve</p>
-                  <p className="text-neutral-500 text-xs">Suivi des prix</p>
+                  <p className="text-white font-medium text-xs">Historique Cote</p>
+                  <p className="text-neutral-500 text-xs">Exclusif</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Building2 className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />
+                <Bell className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
                 <div>
-                  <p className="text-white font-medium text-xs">Showroom Pro</p>
-                  <p className="text-neutral-500 text-xs">Bientôt disponible</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Shield className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />
-                <div>
-                  <p className="text-white font-medium text-xs">Badge Vérifié</p>
-                  <p className="text-neutral-500 text-xs">Statut Pro</p>
+                  <p className="text-white font-medium text-xs">Alertes Temps Réel</p>
+                  <p className="text-neutral-500 text-xs">Notifications</p>
                 </div>
               </div>
             </div>

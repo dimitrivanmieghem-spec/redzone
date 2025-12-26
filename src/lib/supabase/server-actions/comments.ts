@@ -1,6 +1,6 @@
 "use server";
 
-// RedZone - Server Actions pour les Commentaires (Admin)
+// Octane98 - Server Actions pour les Commentaires (Admin)
 
 import { revalidatePath } from "next/cache";
 import { createClient as createServerClient } from "../server";

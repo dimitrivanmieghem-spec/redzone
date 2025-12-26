@@ -1,4 +1,4 @@
-// RedZone - Constantes pour les véhicules
+// Octane98 - Constantes pour les véhicules
 // Garantit la cohérence entre le formulaire de vente et la recherche
 
 /**
@@ -37,6 +37,7 @@ export type InteriorColor = typeof INTERIOR_COLORS[number];
 
 /**
  * Types de carrosserie disponibles
+ * SOURCE DE VÉRITÉ UNIQUE - Utiliser cette constante partout
  */
 export const CARROSSERIE_TYPES = [
   'Coupé',
@@ -49,6 +50,76 @@ export const CARROSSERIE_TYPES = [
 ] as const;
 
 export type CarrosserieType = typeof CARROSSERIE_TYPES[number];
+
+/**
+ * Types de transmission (drivetrain)
+ * SOURCE DE VÉRITÉ UNIQUE - Utiliser cette constante partout
+ */
+export const DRIVETRAIN_TYPES = [
+  'RWD',
+  'FWD',
+  'AWD',
+  '4WD',
+] as const;
+
+export type DrivetrainType = typeof DRIVETRAIN_TYPES[number];
+
+/**
+ * Mapping des drivetrains vers des labels lisibles
+ */
+export const DRIVETRAIN_LABELS: Record<DrivetrainType, string> = {
+  'RWD': 'RWD (Propulsion)',
+  'FWD': 'FWD (Traction)',
+  'AWD': 'AWD (4x4)',
+  '4WD': '4WD (4x4)',
+};
+
+/**
+ * Architectures moteur disponibles
+ * SOURCE DE VÉRITÉ UNIQUE - Utiliser cette constante partout
+ */
+export const ENGINE_ARCHITECTURE_TYPES = [
+  'L4',
+  'L5',
+  'L6',
+  'V6',
+  'V8',
+  'V10',
+  'V12',
+  'Flat-6',
+  'Moteur Rotatif',
+] as const;
+
+export type EngineArchitectureType = typeof ENGINE_ARCHITECTURE_TYPES[number];
+
+/**
+ * Mapping des architectures moteur vers des labels détaillés
+ */
+export const ENGINE_ARCHITECTURE_LABELS: Record<EngineArchitectureType, { label: string; subtitle: string }> = {
+  'L4': { label: 'L4', subtitle: '4 cyl. ligne' },
+  'L5': { label: 'L5', subtitle: '5 cyl. ligne' },
+  'L6': { label: 'L6', subtitle: '6 cyl. ligne' },
+  'V6': { label: 'V6', subtitle: '' },
+  'V8': { label: 'V8', subtitle: '' },
+  'V10': { label: 'V10', subtitle: '' },
+  'V12': { label: 'V12', subtitle: '' },
+  'Flat-6': { label: 'Flat-6', subtitle: 'Boxer 6' },
+  'Moteur Rotatif': { label: 'Rotatif', subtitle: '' },
+};
+
+/**
+ * Normes Euro disponibles
+ * SOURCE DE VÉRITÉ UNIQUE - Utiliser cette constante partout
+ */
+export const EURO_STANDARDS = [
+  { value: 'euro3', label: 'Euro 3' },
+  { value: 'euro4', label: 'Euro 4' },
+  { value: 'euro5', label: 'Euro 5' },
+  { value: 'euro6b', label: 'Euro 6b' },
+  { value: 'euro6d', label: 'Euro 6d' },
+] as const;
+
+export type EuroStandard = typeof EURO_STANDARDS[number]['value'];
 
 /**
  * Mapping des couleurs extérieures vers des codes couleur CSS/hex

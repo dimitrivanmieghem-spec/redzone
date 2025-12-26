@@ -1,13 +1,13 @@
 "use server";
 
-// RedZone - Server Actions pour la Vérification Admin
+// Octane98 - Server Actions pour la Vérification Admin
 // Vérifie le statut admin de manière robuste avec fallback
 
 import { createClient as createServerClient } from "../server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Email admin de secours (fallback si la DB est inaccessible)
-const ADMIN_FALLBACK_EMAIL = "dimitri.vanmieghem@gmail.com";
+const ADMIN_FALLBACK_EMAIL = "admin@octane98.be";
 
 /**
  * Vérifier si l'utilisateur actuel est administrateur (Server Action)

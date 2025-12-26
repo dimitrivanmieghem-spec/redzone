@@ -1,6 +1,6 @@
 "use client";
 
-// RedZone - Bannière fixe en haut pour le mode simulation (Admin uniquement)
+// Octane98 - Bannière fixe en haut pour le mode simulation (Admin uniquement)
 
 import { XCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";

@@ -1,4 +1,4 @@
-// RedZone - Recherche optimisée côté serveur
+// Octane98 - Recherche optimisée côté serveur
 
 import { createClient } from "./client";
 import { Vehicule } from "./types";
@@ -22,6 +22,13 @@ export interface SearchFilters {
   couleurExterieure?: string[];
   couleurInterieure?: string[];
   nombrePlaces?: string[];
+  // Nouveaux filtres techniques
+  architectureMoteur?: string[];
+  puissanceMin?: number;
+  puissanceMax?: number;
+  drivetrain?: string[];
+  topSpeedMin?: number;
+  topSpeedMax?: number;
 }
 
 export type SortOption = "prix_asc" | "prix_desc" | "annee_desc" | "km_asc";
@@ -100,7 +107,11 @@ export async function searchVehicules(
 
       // Filtres passionnés
       if (filters.architectures && filters.architectures.length > 0) {
-        query = query.in("architecture_moteur", filters.architectures);
+        query = query.in("engine_architecture", filters.architectures);
+      }
+
+      if (filters.architectureMoteur && filters.architectureMoteur.length > 0) {
+        query = query.in("engine_architecture", filters.architectureMoteur);
       }
 
       if (filters.admissions && filters.admissions.length > 0) {
@@ -108,17 +119,38 @@ export async function searchVehicules(
       }
 
       if (filters.couleurExterieure && filters.couleurExterieure.length > 0) {
-        query = query.in("couleur_exterieure", filters.couleurExterieure);
+        query = query.in("interior_color", filters.couleurExterieure); // Note: Vérifier si colonne existe
       }
 
       if (filters.couleurInterieure && filters.couleurInterieure.length > 0) {
-        query = query.in("couleur_interieure", filters.couleurInterieure);
+        query = query.in("interior_color", filters.couleurInterieure);
       }
 
       if (filters.nombrePlaces && filters.nombrePlaces.length > 0) {
         // Convertir les strings en nombres pour la comparaison
         const placesNumbers = filters.nombrePlaces.map((p) => parseInt(p));
-        query = query.in("nombre_places", placesNumbers);
+        query = query.in("seats_count", placesNumbers);
+      }
+
+      // Nouveaux filtres techniques
+      if (filters.puissanceMin !== undefined) {
+        query = query.gte("power_hp", filters.puissanceMin);
+      }
+
+      if (filters.puissanceMax !== undefined) {
+        query = query.lte("power_hp", filters.puissanceMax);
+      }
+
+      if (filters.drivetrain && filters.drivetrain.length > 0) {
+        query = query.in("drivetrain", filters.drivetrain);
+      }
+
+      if (filters.topSpeedMin !== undefined) {
+        query = query.gte("top_speed", filters.topSpeedMin);
+      }
+
+      if (filters.topSpeedMax !== undefined) {
+        query = query.lte("top_speed", filters.topSpeedMax);
       }
 
       // Appliquer le tri

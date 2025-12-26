@@ -1,4 +1,4 @@
-// RedZone - Moniteur de Connexion Supabase
+// Octane98 - Moniteur de Connexion Supabase
 // Détecte et gère les problèmes de connexion
 
 import { resetClient } from "./client-singleton";

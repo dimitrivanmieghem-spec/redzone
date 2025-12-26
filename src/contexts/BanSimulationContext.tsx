@@ -1,6 +1,6 @@
 "use client";
 
-// RedZone - Contexte de Simulation de Bannissement (Admin uniquement)
+// Octane98 - Contexte de Simulation de Bannissement (Admin uniquement)
 // Utilise des cookies pour persister l'état entre les rafraîchissements
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
@@ -14,7 +14,7 @@ interface BanSimulationContextType {
 
 const BanSimulationContext = createContext<BanSimulationContextType | undefined>(undefined);
 
-const COOKIE_NAME = "redzone_ban_simulation";
+const COOKIE_NAME = "octane98_ban_simulation";
 
 // Fonctions utilitaires pour gérer les cookies
 function getCookie(name: string): string | null {

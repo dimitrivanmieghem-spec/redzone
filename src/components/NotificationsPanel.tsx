@@ -1,6 +1,6 @@
 "use client";
 
-// RedZone - Panneau de Notifications
+// Octane98 - Panneau de Notifications
 
 import { useState, useEffect } from "react";
 import { Bell, BellRing, X, Check, ExternalLink, Loader2 } from "lucide-react";

@@ -22,6 +22,7 @@ import {
   Save,
   Heart as HeartIcon,
   XCircle,
+  Bell,
 } from "lucide-react";
 import Link from "next/link";
 import CarCard from "@/components/features/vehicles/car-card";
@@ -31,8 +32,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
 import VehicleComparisonModal from "@/components/features/vehicles/VehicleComparisonModal";
 import { saveSearch } from "@/app/actions/search";
+import { createSearchAlert } from "@/app/actions/search-alerts";
 import type { Vehicule } from "@/lib/supabase/types";
 import SaveSearchModal from "@/components/features/search/SaveSearchModal";
+// Constantes unifiées - Source de vérité unique
+import {
+  CARROSSERIE_TYPES,
+  DRIVETRAIN_TYPES,
+  DRIVETRAIN_LABELS,
+  ENGINE_ARCHITECTURE_TYPES,
+  ENGINE_ARCHITECTURE_LABELS,
+  EURO_STANDARDS,
+} from "@/lib/vehicleData";
 
 // Options pour les filtres
 const MARQUES = [
@@ -61,24 +72,20 @@ const TRANSMISSIONS = [
   { value: "sequentielle", label: "Séquentielle" },
 ];
 
-const CARROSSERIES = [
-  "Berline",
-  "Coupé",
-  "Cabriolet",
-  "Roadster",
-  "SUV",
-  "Break",
-  "Monospace",
-  "Pick-up",
-];
-
+// Utilisation des constantes unifiées
+const CARROSSERIES = CARROSSERIE_TYPES;
+const DRIVETRAINS = DRIVETRAIN_TYPES.map((value) => ({
+  value,
+  label: DRIVETRAIN_LABELS[value],
+}));
+const ENGINE_ARCHITECTURES = ENGINE_ARCHITECTURE_TYPES.map((value) => ({
+  value,
+  label: ENGINE_ARCHITECTURE_LABELS[value].label,
+  subtitle: ENGINE_ARCHITECTURE_LABELS[value].subtitle,
+}));
 const NORME_EURO = [
   { value: "", label: "Toutes" },
-  { value: "euro6d", label: "Euro 6d" },
-  { value: "euro6b", label: "Euro 6b" },
-  { value: "euro5", label: "Euro 5" },
-  { value: "euro4", label: "Euro 4" },
-  { value: "euro3", label: "Euro 3" },
+  ...EURO_STANDARDS.map((std) => ({ value: std.value, label: std.label })),
 ];
 
 const SORT_OPTIONS = [
@@ -87,12 +94,6 @@ const SORT_OPTIONS = [
   { value: "price_desc", label: "Prix décroissant" },
   { value: "year_desc", label: "Année récente" },
   { value: "mileage_asc", label: "Kilométrage faible" },
-];
-
-const DRIVETRAINS = [
-  { value: "RWD", label: "RWD (Propulsion)" },
-  { value: "FWD", label: "FWD (Traction)" },
-  { value: "AWD", label: "AWD (4x4)" },
 ];
 
 
@@ -118,6 +119,10 @@ interface Filters {
   drivetrain: string[];
   topSpeedMin: string;
   topSpeedMax: string;
+  // Nouveaux filtres techniques
+  architectureMoteur: string[];
+  puissanceMin: string;
+  puissanceMax: string;
 }
 
 type SortOption = "date_desc" | "price_asc" | "price_desc" | "year_desc" | "mileage_asc";
@@ -145,6 +150,7 @@ function SearchContent() {
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
   const [isSavingSearch, setIsSavingSearch] = useState(false);
   const [isSaveSearchModalOpen, setIsSaveSearchModalOpen] = useState(false);
+  const [isCreatingAlert, setIsCreatingAlert] = useState(false);
 
   // Récupérer les véhicules depuis Supabase
   const { vehicules, isLoading } = useVehicules({
@@ -171,10 +177,14 @@ function SearchContent() {
     city: searchParams.get("city") || "",
     postalCode: searchParams.get("postalCode") || "",
     favoritesOnly: searchParams.get("favoritesOnly") === "true",
-    // Nouveaux filtres
+    // Filtres pour véhicules sportifs
     drivetrain: searchParams.get("drivetrain")?.split(",").filter(Boolean) || [],
     topSpeedMin: searchParams.get("topSpeedMin") || "",
     topSpeedMax: searchParams.get("topSpeedMax") || "",
+    // Nouveaux filtres techniques
+    architectureMoteur: searchParams.get("architectureMoteur")?.split(",").filter(Boolean) || [],
+    puissanceMin: searchParams.get("puissanceMin") || "",
+    puissanceMax: searchParams.get("puissanceMax") || "",
   });
 
   // Sauvegarder la préférence de vue
@@ -209,6 +219,10 @@ function SearchContent() {
     if (filters.drivetrain.length > 0) params.set("drivetrain", filters.drivetrain.join(","));
     if (filters.topSpeedMin) params.set("topSpeedMin", filters.topSpeedMin);
     if (filters.topSpeedMax) params.set("topSpeedMax", filters.topSpeedMax);
+    // Nouveaux filtres techniques
+    if (filters.architectureMoteur.length > 0) params.set("architectureMoteur", filters.architectureMoteur.join(","));
+    if (filters.puissanceMin) params.set("puissanceMin", filters.puissanceMin);
+    if (filters.puissanceMax) params.set("puissanceMax", filters.puissanceMax);
     if (currentPage > 1) params.set("page", currentPage.toString());
 
     const newUrl = params.toString() ? `?${params.toString()}` : "/search";
@@ -295,6 +309,19 @@ function SearchContent() {
         if (!vehicule.top_speed || vehicule.top_speed > parseInt(filters.topSpeedMax)) return false;
       }
 
+      // Nouveaux filtres techniques
+      if (filters.architectureMoteur.length > 0) {
+        if (!vehicule.engine_architecture || !filters.architectureMoteur.includes(vehicule.engine_architecture)) return false;
+      }
+
+      if (filters.puissanceMin) {
+        if (!vehicule.power_hp || vehicule.power_hp < parseInt(filters.puissanceMin)) return false;
+      }
+
+      if (filters.puissanceMax) {
+        if (!vehicule.power_hp || vehicule.power_hp > parseInt(filters.puissanceMax)) return false;
+      }
+
       return true;
     });
 
@@ -366,6 +393,15 @@ function SearchContent() {
     }));
   };
 
+  const handleArchitectureMoteurToggle = (value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      architectureMoteur: prev.architectureMoteur.includes(value)
+        ? prev.architectureMoteur.filter((a) => a !== value)
+        : [...prev.architectureMoteur, value],
+    }));
+  };
+
 
   // Réinitialiser les filtres
   const handleResetFilters = () => {
@@ -391,6 +427,10 @@ function SearchContent() {
       drivetrain: [],
       topSpeedMin: "",
       topSpeedMax: "",
+      // Nouveaux filtres techniques
+      architectureMoteur: [],
+      puissanceMin: "",
+      puissanceMax: "",
     });
     setSearchQuery("");
     setIsFiltersOpen(false);
@@ -450,6 +490,36 @@ function SearchContent() {
     }
   };
 
+  // Créer une alerte de recherche
+  const handleCreateAlert = async () => {
+    if (!user) {
+      showToast("Vous devez être connecté pour créer une alerte", "error");
+      router.push("/login?redirect=/search");
+      return;
+    }
+
+    setIsCreatingAlert(true);
+    try {
+      // Préparer les critères de recherche
+      const criteria: Record<string, any> = {
+        ...filters,
+        searchQuery: searchQuery || undefined,
+      };
+
+      const result = await createSearchAlert(criteria);
+      if (result.success) {
+        showToast("Alerte créée ! Vous serez notifié des nouvelles annonces correspondantes.", "success");
+      } else {
+        showToast(result.error || "Erreur lors de la création de l'alerte", "error");
+      }
+    } catch (error) {
+      console.error("Erreur création alerte:", error);
+      showToast("Erreur lors de la création de l'alerte", "error");
+    } finally {
+      setIsCreatingAlert(false);
+    }
+  };
+
   // Compter les filtres actifs
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -473,6 +543,10 @@ function SearchContent() {
     if (filters.drivetrain.length > 0) count++;
     if (filters.topSpeedMin) count++;
     if (filters.topSpeedMax) count++;
+    // Nouveaux filtres techniques
+    if (filters.architectureMoteur.length > 0) count++;
+    if (filters.puissanceMin) count++;
+    if (filters.puissanceMax) count++;
     if (searchQuery) count++;
     return count;
   }, [filters, searchQuery]);
@@ -512,10 +586,34 @@ function SearchContent() {
 
           {/* Compteur et contrôles */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <p className="text-neutral-400">
                 {sortedVehicules.length} résultat{sortedVehicules.length > 1 ? "s" : ""}
               </p>
+              {/* Bouton Alerte */}
+              {user ? (
+                <button
+                  onClick={handleCreateAlert}
+                  disabled={isCreatingAlert}
+                  className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 font-bold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Créer une alerte pour être notifié des nouvelles annonces correspondantes"
+                >
+                  <Bell size={18} className={isCreatingAlert ? "animate-pulse" : ""} />
+                  {isCreatingAlert ? "Création..." : "🔔 M'alerter des nouveautés"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    showToast("Vous devez être connecté pour créer une alerte", "error");
+                    router.push("/login?redirect=/search");
+                  }}
+                  className="px-4 py-2 bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700 text-neutral-400 font-bold rounded-xl transition-all flex items-center gap-2"
+                  title="Connectez-vous pour créer une alerte"
+                >
+                  <Bell size={18} />
+                  🔔 M'alerter des nouveautés
+                </button>
+              )}
               {selectedVehicles.length > 0 && (
                 <button
                   onClick={handleCompare}
@@ -918,6 +1016,54 @@ function SearchContent() {
                                 {dt.label}
                               </button>
                             ))}
+                          </div>
+                        </div>
+
+                        {/* Architecture Moteur */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-bold mb-2 text-neutral-300">
+                            Architecture Moteur
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {ENGINE_ARCHITECTURES.map((arch) => (
+                              <button
+                                key={arch.value}
+                                onClick={() => handleArchitectureMoteurToggle(arch.value)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                  filters.architectureMoteur.includes(arch.value)
+                                    ? "bg-red-600 text-white"
+                                    : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                                }`}
+                                title={arch.subtitle}
+                              >
+                                {arch.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Puissance (ch) */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-bold mb-2 text-neutral-300">
+                            Puissance (ch)
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="number"
+                              value={filters.puissanceMin}
+                              onChange={(e) => handleFilterChange("puissanceMin", e.target.value)}
+                              placeholder="Min"
+                              min="0"
+                              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all"
+                            />
+                            <input
+                              type="number"
+                              value={filters.puissanceMax}
+                              onChange={(e) => handleFilterChange("puissanceMax", e.target.value)}
+                              placeholder="Max"
+                              min="0"
+                              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all"
+                            />
                           </div>
                         </div>
 

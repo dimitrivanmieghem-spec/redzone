@@ -1,10 +1,10 @@
-// RedZone - Utilitaires d'authentification (CLIENT SIDE ONLY)
+// Octane98 - Utilitaires d'authentification (CLIENT SIDE ONLY)
 // Ce fichier ne doit JAMAIS importer next/headers ou le client serveur
 
 import { createClient } from "./client";
 
 // Email admin de secours (fallback)
-const ADMIN_FALLBACK_EMAIL = "dimitri.vanmieghem@gmail.com";
+const ADMIN_FALLBACK_EMAIL = "admin@octane98.be";
 
 /**
  * Vérifier si l'utilisateur actuel est administrateur (version client)

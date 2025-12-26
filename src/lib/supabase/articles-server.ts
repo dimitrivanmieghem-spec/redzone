@@ -1,4 +1,4 @@
-// RedZone - Actions Supabase pour les Articles (Server Components uniquement)
+// Octane98 - Actions Supabase pour les Articles (Server Components uniquement)
 
 import { createClient } from "./server";
 import { Article } from "./articles";

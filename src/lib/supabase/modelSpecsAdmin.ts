@@ -1,4 +1,4 @@
-// RedZone - Fonctions Admin pour CRUD model_specs_db
+// Octane98 - Fonctions Admin pour CRUD model_specs_db
 
 import { createClient } from "./client";
 // ⚠️ Ce fichier ne doit JAMAIS importer auth-utils-server ou server.ts

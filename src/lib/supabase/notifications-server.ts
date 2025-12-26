@@ -1,4 +1,4 @@
-// RedZone - Fonctions pour les Notifications (Server Actions uniquement)
+// Octane98 - Fonctions pour les Notifications (Server Actions uniquement)
 // ⚠️ Ce fichier utilise le client serveur et ne doit PAS être importé dans des Client Components
 
 import { createClient } from "./server";

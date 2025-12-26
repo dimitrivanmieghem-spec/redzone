@@ -1,4 +1,4 @@
-// RedZone - Système d'Auto-Modération "Le Videur"
+// Octane98 - Système d'Auto-Modération "Le Videur"
 
 /**
  * Liste noire de mots interdits (véhicules non-sportifs)
@@ -155,11 +155,11 @@ export function checkVehicleModeration(
  * Messages d'alerte selon le type de détection
  */
 export const MODERATION_MESSAGES = {
-  diesel: "⛔ Hop là ! RedZone est réservé aux sportives ESSENCE uniquement. Les diesels ne sont pas acceptés.",
-  utilitaire: "⛔ Hop là ! RedZone est réservé aux sportives. Les utilitaires ne sont pas acceptés.",
-  familiale: "⛔ Hop là ! RedZone est dédié aux voitures de sport et plaisir. Les familiales ne correspondent pas à notre concept.",
-  electric: "⛔ Hop là ! RedZone célèbre le moteur thermique. Les électriques ne sont pas acceptées.",
-  generic: "⛔ Hop là ! RedZone est réservé aux sportives. Ce véhicule ne semble pas correspondre à notre concept.",
+  diesel: "⛔ Hop là ! Octane98 est réservé aux sportives ESSENCE uniquement. Les diesels ne sont pas acceptés.",
+  utilitaire: "⛔ Hop là ! Octane98 est réservé aux sportives. Les utilitaires ne sont pas acceptés.",
+  familiale: "⛔ Hop là ! Octane98 est dédié aux voitures de sport et plaisir. Les familiales ne correspondent pas à notre concept.",
+  electric: "⛔ Hop là ! Octane98 célèbre le moteur thermique. Les électriques ne sont pas acceptées.",
+  generic: "⛔ Hop là ! Octane98 est réservé aux sportives. Ce véhicule ne semble pas correspondre à notre concept.",
 };
 
 /**

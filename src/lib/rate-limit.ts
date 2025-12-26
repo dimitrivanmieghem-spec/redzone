@@ -1,5 +1,5 @@
 /**
- * RedZone - Rate Limiting
+ * Octane98 - Rate Limiting
  * Protection contre les attaques par force brute et abus
  */
 

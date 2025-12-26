@@ -41,7 +41,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ### **5. `ADMIN_EMAIL`**
 **Utilité** : Email pour recevoir les tickets de support
 **Action** : 
-- ✅ **GARDER** si vous voulez personnaliser l'email (actuellement: `dimitri@gmail.com`)
+- ✅ **GARDER** si vous voulez personnaliser l'email (actuellement: `admin@octane98.be`)
 - ❌ **SUPPRIMER** si vous êtes d'accord avec le fallback dans le code
 
 ---
@@ -108,8 +108,8 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=votre-clé-turnstile
 # Email Resend (OPTIONNEL - Mode simulation si absente)
 RESEND_API_KEY=re_votre-clé-resend
 
-# Email Admin (OPTIONNEL - Fallback: dimitri@gmail.com)
-ADMIN_EMAIL=dimitri.vanmieghem@gmail.com
+# Email Admin (OPTIONNEL - Fallback: admin@octane98.be)
+ADMIN_EMAIL=admin@octane98.be
 ```
 
 ---

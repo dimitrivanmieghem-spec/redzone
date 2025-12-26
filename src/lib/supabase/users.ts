@@ -1,14 +1,15 @@
-// RedZone - Actions Supabase pour la Gestion des Utilisateurs (CLIENT SIDE)
+// Octane98 - Actions Supabase pour la Gestion des Utilisateurs (CLIENT SIDE)
 // ⚠️ Ce fichier ne doit JAMAIS importer auth-utils-server ou server.ts
 // Les fonctions admin sont dans server-actions/users.ts
 
 import { createClient } from "./client";
+import type { UserRole } from "@/lib/permissions";
 
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer";
+  role: UserRole;
   is_banned: boolean;
   ban_reason: string | null;
   ban_until: string | null;

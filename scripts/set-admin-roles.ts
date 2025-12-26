@@ -3,7 +3,7 @@
  * RedZone - Script d'Attribution des Rôles Admin & Modérateur
  * 
  * Ce script met à jour les rôles de deux utilisateurs spécifiques :
- * - dimitri.vanmieghem@gmail.com -> rôle 'admin'
+ * - admin@octane98.be -> rôle 'admin'
  * - antoine.binias@test.com -> rôle 'moderator' (créé s'il n'existe pas)
  * 
  * Usage: npx tsx scripts/set-admin-roles.ts
@@ -72,7 +72,7 @@ interface UserRole {
 
 const usersToSet: UserRole[] = [
   {
-    email: "dimitri.vanmieghem@gmail.com",
+    email: "admin@octane98.be",
     role: "admin",
     fullName: "Dimitri Vanmieghem",
   },
@@ -249,7 +249,7 @@ async function main() {
     log("\n" + "=".repeat(60), "cyan");
     log("✅ Script terminé avec succès !", "green");
     log("\n📝 Rôles attribués :", "cyan");
-    log("   • dimitri.vanmieghem@gmail.com → admin (Super Admin)", "reset");
+    log("   • admin@octane98.be → admin (Super Admin)", "reset");
     log("   • antoine.binias@test.com → moderator (Modérateur/Support)", "reset");
     log("\n💡 Les utilisateurs peuvent maintenant se connecter avec leurs comptes", "yellow");
     log("🔒 Les permissions sont gérées par le middleware et la navigation", "cyan");

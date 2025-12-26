@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
       } else if (typeof window !== "undefined" && window.location.origin && !window.location.origin.includes("localhost")) {
         siteUrl = window.location.origin;
       } else {
-        siteUrl = "https://redzone2.netlify.app";
+        siteUrl = "https://octane98.netlify.app";
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {

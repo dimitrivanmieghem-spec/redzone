@@ -1,4 +1,4 @@
-// RedZone - Utilitaires de vérification email pour les invités
+// Octane98 - Utilitaires de vérification email pour les invités
 
 /**
  * Génère un code de vérification à 6 chiffres
@@ -52,19 +52,19 @@ export async function sendVerificationEmail(
       const { error } = await resend.emails.send({
         from: 'onboarding@resend.dev', // Email par défaut gratuit de Resend
         to: email,
-        subject: 'Vérifiez votre annonce RedZone',
+        subject: 'Vérifiez votre annonce Octane98',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #dc2626;">Vérifiez votre annonce RedZone</h1>
+            <h1 style="color: #dc2626;">Vérifiez votre annonce Octane98</h1>
             <p>Bonjour,</p>
-            <p>Vous avez déposé une annonce sur RedZone. Pour confirmer votre annonce, veuillez entrer le code suivant :</p>
+            <p>Vous avez déposé une annonce sur Octane98. Pour confirmer votre annonce, veuillez entrer le code suivant :</p>
             <div style="background: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
               <h2 style="color: #dc2626; font-size: 32px; letter-spacing: 4px; margin: 0;">${code}</h2>
             </div>
             <p>Ce code est valide pendant <strong>15 minutes</strong>.</p>
             <p>Si vous n'avez pas déposé d'annonce, ignorez cet email.</p>
             <p style="margin-top: 30px; color: #6b7280; font-size: 12px;">
-              L'équipe RedZone
+              L'équipe Octane98
             </p>
           </div>
         `,

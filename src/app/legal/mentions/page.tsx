@@ -33,43 +33,31 @@ export default function MentionsPage() {
             <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">1. Éditeur du site</h2>
             <div className="bg-slate-50 p-6 rounded-2xl">
               <p className="text-slate-900 mb-2">
-                <strong>Dénomination sociale :</strong> RedZone SPRL (À REMPLIR)
+                <strong>Le site est édité à titre personnel par :</strong>
               </p>
               <p className="text-slate-700 text-sm mb-2">
-                <strong>Forme juridique :</strong> Société Privée à Responsabilité Limitée (SPRL)
+                <strong>Nom :</strong> Dimitri Van Mieghem
               </p>
               <p className="text-slate-700 text-sm mb-2">
-                <strong>Siège social :</strong> [ADRESSE COMPLÈTE À REMPLIR]<br />
-                [CODE POSTAL] [VILLE]<br />
-                Belgique
+                <strong>Statut :</strong> Personne physique
               </p>
               <p className="text-slate-700 text-sm mb-2">
-                <strong>Numéro d&apos;entreprise (BCE) :</strong> [NUMÉRO BCE À REMPLIR]
+                <strong>Domicilié en :</strong> Belgique
               </p>
               <p className="text-slate-700 text-sm mb-2">
-                <strong>Numéro de TVA :</strong> BE [NUMÉRO TVA À REMPLIR]
+                <strong>Email de contact :</strong> <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">admin@octane98.be</a>
               </p>
-              <p className="text-slate-700 text-sm mb-2">
-                <strong>Email :</strong> <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a>
-              </p>
-              <p className="text-slate-700 text-sm">
-                <strong>Téléphone :</strong> [NUMÉRO DE TÉLÉPHONE À REMPLIR]
-              </p>
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mt-4">
+                <p className="text-blue-900 text-sm">
+                  <strong>📌 Note :</strong> Ce site est actuellement opéré à titre personnel dans le cadre d&apos;un projet en phase de lancement. 
+                  L&apos;éditeur se réserve le droit de créer une structure juridique (société) à l&apos;avenir, moyennant information préalable des utilisateurs.
+                </p>
+              </div>
             </div>
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">2. Directeur de la publication</h2>
-            <div className="bg-slate-50 p-6 rounded-2xl">
-              <p className="text-slate-700 text-sm">
-                <strong>Nom :</strong> [NOM DU DIRECTEUR À REMPLIR]<br />
-                <strong>Fonction :</strong> Gérant / Administrateur Délégué
-              </p>
-            </div>
-          </section>
-
-          <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">3. Hébergement</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">2. Hébergement</h2>
             <div className="bg-slate-50 p-6 rounded-2xl">
               <p className="text-slate-900 mb-2">
                 <strong>Hébergeur :</strong> Vercel Inc.
@@ -86,15 +74,12 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">4. Protection des données personnelles</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">3. Protection des données personnelles</h2>
             <p className="text-slate-700 mb-4">
-              Le responsable du traitement des données personnelles est RedZone SPRL.
+              Le responsable du traitement des données personnelles est <strong>Dimitri Van Mieghem</strong>, éditeur du site à titre personnel.
             </p>
             <p className="text-slate-700 mb-4">
-              <strong>Délégué à la Protection des Données (DPO) :</strong> [NOM DPO À REMPLIR]
-            </p>
-            <p className="text-slate-700 mb-4">
-              <strong>Contact DPO :</strong> <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a>
+              <strong>Contact pour toute question relative aux données personnelles :</strong> <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">admin@octane98.be</a>
             </p>
             <p className="text-slate-700 mb-4">
               Pour plus d&apos;informations sur le traitement de vos données, consultez notre{" "}
@@ -105,16 +90,16 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">5. Propriété intellectuelle</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">4. Propriété intellectuelle</h2>
             <p className="text-slate-700 mb-4">
-              L&apos;ensemble des contenus présents sur le site www.RedZone.be (textes, graphiques, logo, icônes, images, 
-              sons, logiciels) est la propriété exclusive de RedZone SPRL ou de ses partenaires, 
+              L&apos;ensemble des contenus présents sur le site www.Octane98.be (textes, graphiques, logo, icônes, images, 
+              sons, logiciels) est la propriété exclusive de Dimitri Van Mieghem ou de ses partenaires, 
               sauf mention contraire.
             </p>
             <p className="text-slate-700 mb-4">
               Toute reproduction, représentation, modification, publication, adaptation de tout ou partie 
               des éléments du site, quel que soit le moyen ou le procédé utilisé, est interdite, 
-              sauf autorisation écrite préalable de RedZone SPRL.
+              sauf autorisation écrite préalable de Dimitri Van Mieghem.
             </p>
             <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded">
               <p className="text-orange-900 text-sm">
@@ -126,13 +111,13 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">6. Liens hypertextes</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">5. Liens hypertextes</h2>
             <p className="text-slate-700 mb-4">
-              Le site www.RedZone.be peut contenir des liens vers d&apos;autres sites internet. 
-              RedZone SPRL ne peut être tenu responsable du contenu de ces sites externes.
+              Le site www.Octane98.be peut contenir des liens vers d&apos;autres sites internet. 
+              Dimitri Van Mieghem ne peut être tenu responsable du contenu de ces sites externes.
             </p>
             <p className="text-slate-700 mb-4">
-              La création de liens hypertextes vers le site www.RedZone.be est autorisée sous réserve :
+              La création de liens hypertextes vers le site www.Octane98.be est autorisée sous réserve :
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
               <li>Que les pages ne soient pas imbriquées dans un cadre (frame)</li>
@@ -142,9 +127,9 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">7. Cookies</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">6. Cookies</h2>
             <p className="text-slate-700 mb-4">
-              Le site www.RedZone.be utilise des cookies pour améliorer l&apos;expérience utilisateur 
+              Le site www.Octane98.be utilise des cookies pour améliorer l&apos;expérience utilisateur 
               et analyser le trafic. Vous pouvez gérer vos préférences via le bandeau cookies ou 
               le lien &quot;Gestion des cookies&quot; en bas de page.
             </p>
@@ -157,7 +142,7 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">8. Droit applicable</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">7. Droit applicable</h2>
             <div className="bg-slate-50 p-6 rounded-2xl">
               <p className="text-slate-900 font-bold mb-2">
                 ⚖️ Loi belge
@@ -175,7 +160,7 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">9. Médiateur de la consommation</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">8. Médiateur de la consommation</h2>
             <p className="text-slate-700 mb-4">
               Conformément à l&apos;article XVI.2 du Code de droit économique belge, 
               en cas de litige avec un consommateur, vous pouvez faire appel à un service de médiation agréé :
@@ -197,26 +182,25 @@ export default function MentionsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">10. Contact</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">9. Contact</h2>
             <p className="text-slate-700 mb-4">
               Pour toute question ou réclamation concernant le site :
             </p>
             <div className="bg-red-50 p-6 rounded-2xl">
               <p className="text-slate-900 mb-4">
-                <strong>Pour toute question, contactez l&apos;administrateur :</strong>
+                <strong>Pour toute question, contactez l&apos;éditeur :</strong>
               </p>
               <a
-                href="mailto:dimitri.vanmieghem@gmail.com"
+                href="mailto:admin@octane98.be"
                 className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-6 py-2.5 rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-red-900/20 hover:scale-105"
               >
-                Contacter l&apos;administrateur
+                Contacter l&apos;éditeur
               </a>
-              <p className="text-slate-900">
-                <strong>Courrier postal :</strong><br />
-                RedZone SPRL<br />
-                [ADRESSE COMPLÈTE À REMPLIR]<br />
-                [CODE POSTAL] [VILLE]<br />
-                Belgique
+              <p className="text-slate-900 mt-4">
+                <strong>Email :</strong> <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">admin@octane98.be</a>
+              </p>
+              <p className="text-slate-700 text-sm mt-3">
+                <em>En phase de lancement, les réponses aux demandes peuvent prendre quelques jours. Merci de votre compréhension.</em>
               </p>
             </div>
           </section>

@@ -1,0 +1,15 @@
+# Octane98 - Robots.txt
+# Phase Coming Soon : Autoriser uniquement l'indexation de la page d'accueil
+
+User-agent: *
+Allow: /coming-soon
+Allow: /$
+Disallow: /
+
+# Autoriser les ressources statiques
+Allow: /_next/static/
+Allow: /favicon.ico
+
+# Sitemap (sera activé après le lancement)
+# Sitemap: https://octane98.be/sitemap.xml
+

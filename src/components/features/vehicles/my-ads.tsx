@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Ban,
 } from "lucide-react";
+import VehicleFlyer from "./VehicleFlyer";
 
 interface StatusConfig {
   label: string;
@@ -129,6 +130,7 @@ export default function MyAds() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ garage_name: string | null } | null>(null);
 
   // Helper function pour convertir les valeurs numériques
   function parseNumber(value: any): number | null {
@@ -141,10 +143,37 @@ export default function MyAds() {
     return null;
   }
 
+  // Récupérer le profil utilisateur (pour garage_name)
+  useEffect(() => {
+    async function fetchUserProfile() {
+      if (!user) {
+        setUserProfile(null);
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        const { data, error: profileError } = await supabase
+          .from("profiles")
+          .select("garage_name")
+          .eq("id", user.id)
+          .single();
+
+        if (!profileError && data) {
+          setUserProfile({ garage_name: data.garage_name });
+        }
+      } catch (err) {
+        console.error("Erreur récupération profil:", err);
+      }
+    }
+
+    fetchUserProfile();
+  }, [user]);
+
   // Récupérer les véhicules de l'utilisateur
   useEffect(() => {
-    async function fetchMyVehicules() {
-      if (!user) {
+    async function fetchMyVehicules(retryCount = 0) {
+      if (!user?.id) {
         setIsLoading(false);
         return;
       }
@@ -154,6 +183,23 @@ export default function MyAds() {
 
       try {
         const supabase = createClient();
+        
+        // Vérifier que la session Supabase est prête avant de lancer la requête
+        // Cela évite les erreurs 400 (Bad Request) dues à une session non-initialisée
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+          // Si la session n'est pas encore disponible et qu'on n'a pas trop retenté
+          if (retryCount < 3) {
+            console.log(`Session non prête, retry dans 500ms (tentative ${retryCount + 1}/3)`);
+            setTimeout(() => fetchMyVehicules(retryCount + 1), 500);
+            return;
+          } else {
+            throw new Error("Session Supabase non disponible après plusieurs tentatives");
+          }
+        }
+
+        // La session est prête, lancer la requête
         const { data, error: fetchError } = await supabase
           .from("vehicles")
           .select("*")
@@ -382,6 +428,18 @@ export default function MyAds() {
 
                   {/* Actions */}
                   <div className="flex flex-wrap items-center gap-3">
+                    {/* Bouton Imprimer la Fiche (uniquement pour les Pros) */}
+                    {user?.role === "pro" && vehicule.status === "active" && (
+                      <VehicleFlyer
+                        vehicule={vehicule}
+                        garageName={userProfile?.garage_name || null}
+                        vehicleUrl={
+                          typeof window !== "undefined"
+                            ? `${window.location.origin}/cars/${vehicule.id}`
+                            : `https://octane98.be/cars/${vehicule.id}`
+                        }
+                      />
+                    )}
                     <Link
                       href={`/sell?edit=${vehicule.id}`}
                       className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium text-sm rounded-lg transition-all"

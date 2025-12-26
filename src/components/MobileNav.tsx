@@ -42,7 +42,7 @@ export default function MobileNav() {
             const isPrimary = item.isPrimary;
 
             if (isPrimary) {
-              // Bouton central en relief (Rouge RedZone) - Bloqué si banni ou simulation
+              // Bouton central en relief (Rouge Octane98) - Bloqué si banni ou simulation
               if (isEffectivelyBanned) {
                 return (
                   <div

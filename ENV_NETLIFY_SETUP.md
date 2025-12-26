@@ -49,9 +49,9 @@ Ces variables activent des fonctionnalités supplémentaires :
 - **Quand l'ajouter** : Si vous voulez un CAPTCHA réel (au lieu de la clé de test)
 
 ### 7. `ADMIN_EMAIL` (Optionnel)
-- **Valeur** : `dimitri.vanmieghem@gmail.com` (ou votre email)
+- **Valeur** : `admin@octane98.be` (ou votre email)
 - **Utilité** : Email pour recevoir les tickets de support
-- **Quand l'ajouter** : Si vous voulez personnaliser l'email (fallback: `dimitri@gmail.com`)
+- **Quand l'ajouter** : Si vous voulez personnaliser l'email (fallback: `admin@octane98.be`)
 
 ---
 
@@ -93,7 +93,7 @@ NEXT_PUBLIC_SITE_URL = https://redzone2.netlify.app
 SUPABASE_SERVICE_ROLE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 RESEND_API_KEY = re_votre-clé-resend
 NEXT_PUBLIC_TURNSTILE_SITE_KEY = votre-clé-turnstile
-ADMIN_EMAIL = dimitri.vanmieghem@gmail.com
+ADMIN_EMAIL = admin@octane98.be
 ```
 
 ### **Étape 3 : Déployer**
@@ -145,7 +145,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 NEXT_PUBLIC_SITE_URL=https://redzone2.netlify.app
 RESEND_API_KEY=re_...
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=...
-ADMIN_EMAIL=dimitri.vanmieghem@gmail.com
+ADMIN_EMAIL=admin@octane98.be
 ```
 
 **Note** : Les mêmes clés Supabase peuvent être utilisées en local et en production (c'est normal).

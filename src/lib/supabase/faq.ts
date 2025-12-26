@@ -1,4 +1,4 @@
-// RedZone - Actions Supabase pour la Gestion de la FAQ
+// Octane98 - Actions Supabase pour la Gestion de la FAQ
 
 import { createClient } from "./client";
 

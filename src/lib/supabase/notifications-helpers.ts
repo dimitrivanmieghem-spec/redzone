@@ -1,4 +1,4 @@
-// RedZone - Fonctions utilitaires pour créer des notifications typées
+// Octane98 - Fonctions utilitaires pour créer des notifications typées
 // Centralise la logique de création de notifications pour éviter la duplication
 
 import { createNotification } from "./notifications-server";

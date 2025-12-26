@@ -1,6 +1,6 @@
 "use server";
 
-// RedZone - Système d'alertes automatiques pour les recherches sauvegardées (Sentinelle)
+// Octane98 - Système d'alertes automatiques pour les recherches sauvegardées (Sentinelle)
 // Cette fonction doit être appelée périodiquement (cron job, edge function, etc.)
 
 import { createClient } from "@/lib/supabase/server";

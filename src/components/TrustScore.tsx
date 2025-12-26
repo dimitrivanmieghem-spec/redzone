@@ -29,7 +29,7 @@ export default function TrustScore({ vehicule }: TrustScoreProps) {
         </div>
         <div className="flex-1">
           <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-1">
-            Score de Confiance RedZone
+            Score de Confiance Octane98
           </h3>
           <p className="text-xs text-slate-600">
             Basé sur la transparence et la qualité de l'annonce

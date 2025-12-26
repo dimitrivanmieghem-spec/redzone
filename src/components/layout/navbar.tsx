@@ -114,7 +114,7 @@ function Navbar() {
       {/* Navbar Premium - Design Sombre Glassmorphism */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-[#0a0a0b]/80 backdrop-blur-xl border-b border-white/10 z-[90] hidden md:block">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          {/* Logo RedZone */}
+          {/* Logo Octane98 */}
           <Link 
             href="/" 
             className="flex items-center gap-2 group"
@@ -123,7 +123,7 @@ function Navbar() {
               <Gauge className="text-white" size={20} />
             </div>
             <span className="text-white font-semibold text-lg tracking-tight">
-              Red<span className="text-red-500">Zone</span>
+              Octane<span className="text-red-500">98</span>
             </span>
           </Link>
 
@@ -159,17 +159,6 @@ function Navbar() {
             {/* Utilisateur connecté ou non */}
             {user ? (
               <div className="flex items-center gap-3">
-                {/* Badge Admin cliquable (visible uniquement pour les admins) */}
-                {user.role === "admin" && (
-                  <Link
-                    href="/admin"
-                    className="px-3 py-1.5 bg-red-600/20 text-red-400 text-xs font-bold rounded-full border border-red-600/40 hover:bg-red-600/30 transition-colors flex items-center gap-1.5"
-                    title="Accéder au panneau d'administration"
-                  >
-                    <Shield size={14} />
-                    ADMIN
-                  </Link>
-                )}
                 {/* Cloche de notifications */}
                 <div className="relative">
                   <button
@@ -297,25 +286,32 @@ function Navbar() {
 
                 {/* Menu utilisateur */}
                 <div className="relative">
-                  <button
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300"
-                  >
-                    <div className="w-9 h-9 rounded-full border-2 border-white/20 overflow-hidden ring-2 ring-white/10 relative">
-                      <Image
-                        src={user.avatar}
-                        alt={user.name}
-                        width={36}
-                        height={36}
-                        className="w-full h-full object-cover"
-                      />
-                      {user.role === "admin" && (
-                        <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-950">
-                          ADMIN
-                        </div>
-                      )}
-                    </div>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                      className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300"
+                    >
+                      <div className="w-9 h-9 rounded-full border-2 border-white/20 overflow-hidden ring-2 ring-white/10 relative">
+                        <Image
+                          src={user.avatar}
+                          alt={user.name}
+                          width={36}
+                          height={36}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </button>
+                    {/* Badge Admin cliquable (visible uniquement pour les admins) */}
+                    {user.role === "admin" && (
+                      <Link
+                        href="/admin"
+                        className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors flex items-center gap-1"
+                        title="Accéder au panneau d'administration"
+                      >
+                        ADMIN
+                      </Link>
+                    )}
+                  </div>
 
                 {/* Menu déroulant utilisateur */}
                 {isUserMenuOpen && (
@@ -537,7 +533,7 @@ function Navbar() {
                 <Gauge className="text-white" size={18} />
               </div>
               <h2 className="text-white font-semibold text-lg tracking-tight">
-                Red<span className="text-red-500">Zone</span>
+                Octane<span className="text-red-500">98</span>
               </h2>
             </div>
             <button
@@ -561,19 +557,19 @@ function Navbar() {
                     height={48}
                     className="w-full h-full object-cover"
                   />
-                  {user.role === "admin" && (
-                    <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-950">
-                      ADMIN
-                    </div>
-                  )}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-white text-sm">{user.name}</p>
                     {user.role === "admin" && (
-                      <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                      <Link
+                        href="/admin"
+                        onClick={closeMenu}
+                        className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors"
+                        title="Accéder au panneau d'administration"
+                      >
                         ADMIN
-                      </span>
+                      </Link>
                     )}
                   </div>
                   <p className="text-slate-400 text-xs">{user.email}</p>

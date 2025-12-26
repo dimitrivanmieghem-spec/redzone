@@ -1,5 +1,5 @@
 /**
- * RedZone - Système de Logs d'Audit RGPD (Client)
+ * Octane98 - Système de Logs d'Audit RGPD (Client)
  * Version client pour les composants React
  * 
  * IMPORTANT : Ce fichier ne doit être utilisé QUE dans les composants clients

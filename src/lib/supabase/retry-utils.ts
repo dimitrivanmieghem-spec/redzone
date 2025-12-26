@@ -1,4 +1,4 @@
-// RedZone - Utilitaires de Retry pour les Requêtes Supabase
+// Octane98 - Utilitaires de Retry pour les Requêtes Supabase
 // Gère les erreurs réseau temporaires avec retry automatique
 
 export interface RetryOptions {

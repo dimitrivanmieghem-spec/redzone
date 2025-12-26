@@ -1,6 +1,6 @@
 "use server";
 
-// RedZone - Server Actions pour les messages admin/moderator vers propriétaires
+// Octane98 - Server Actions pour les messages admin/moderator vers propriétaires
 
 import { createClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/supabase/notifications-server";

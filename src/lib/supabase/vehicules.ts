@@ -1,4 +1,4 @@
-// RedZone - Actions Supabase pour les Véhicules
+// Octane98 - Actions Supabase pour les Véhicules
 
 import { createClient } from "./client";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -134,9 +134,6 @@ export async function createVehicule(
     );
   }
 
-  // Sanitization des données
-  const sanitized = sanitizeVehiculeData(vehicule);
-
   // Utiliser le client fourni (serveur) ou créer un client navigateur
   const supabase = supabaseClient || createClient();
 
@@ -145,18 +142,85 @@ export async function createVehicule(
   // Pour les utilisateurs connectés : pending (en attente de validation admin)
   const status = userId ? "pending" : "pending_validation";
 
-  // Convertir les colonnes françaises en anglaises pour la table vehicles
-  const mappedData = mapFrenchToEnglishColumns({
-    ...sanitized,
-    user_id: userId || null,
-    guest_email: guestEmail || null, // Utiliser guest_email directement (pas email_contact)
+  // IMPORTANT: Les données sont déjà en anglais (brand, model, etc.)
+  // vehicule est de type VehiculeInsert (colonnes anglaises)
+  // Ne pas appeler mapFrenchToEnglishColumns ni sanitizeVehiculeData (qui attend des colonnes françaises)
+  // Préparer directement les données pour l'insertion avec tous les champs requis
+  const insertData: any = {
+    // Champs de base (déjà en anglais) - TOUS REQUIS
+    type: vehicule.type,
+    brand: vehicule.brand, // ✅ CRITIQUE: brand (pas marque)
+    model: vehicule.model, // ✅ CRITIQUE: model (pas modele)
+    price: vehicule.price,
+    year: vehicule.year,
+    mileage: vehicule.mileage, // ✅ CRITIQUE: mileage (pas km)
+    fuel_type: vehicule.fuel_type, // ✅ CRITIQUE: fuel_type (pas carburant)
+    transmission: vehicule.transmission,
+    body_type: vehicule.body_type,
+    power_hp: vehicule.power_hp, // ✅ CRITIQUE: power_hp (pas puissance)
+    condition: vehicule.condition,
+    euro_standard: vehicule.euro_standard,
+    car_pass: vehicule.car_pass,
+    image: vehicule.image,
+    images: vehicule.images,
+    description: vehicule.description,
+    
+    // Champs techniques
+    engine_architecture: vehicule.engine_architecture,
+    admission: vehicule.admission,
+    zero_a_cent: vehicule.zero_a_cent,
+    co2: vehicule.co2,
+    poids_kg: vehicule.poids_kg,
+    fiscal_horsepower: vehicule.fiscal_horsepower, // ✅ CRITIQUE: fiscal_horsepower (pas cv_fiscaux)
+    
+    // Champs passion
+    audio_file: vehicule.audio_file,
+    history: vehicule.history,
+    car_pass_url: vehicule.car_pass_url,
+    is_manual_model: vehicule.is_manual_model,
+    
+    // Contact
+    phone: vehicule.phone,
+    contact_email: vehicule.contact_email,
+    contact_methods: vehicule.contact_methods,
+    city: vehicule.city,
+    postal_code: vehicule.postal_code,
+    interior_color: vehicule.interior_color,
+    seats_count: vehicule.seats_count,
+    
+    // Champs pour taxes
+    displacement_cc: (vehicule as any).displacement_cc,
+    co2_wltp: (vehicule as any).co2_wltp,
+    first_registration_date: (vehicule as any).first_registration_date,
+    is_hybrid: (vehicule as any).is_hybrid,
+    is_electric: (vehicule as any).is_electric,
+    region_of_registration: (vehicule as any).region_of_registration,
+    
+    // Champs pour véhicules sportifs
+    drivetrain: (vehicule as any).drivetrain,
+    top_speed: (vehicule as any).top_speed,
+    torque_nm: (vehicule as any).torque_nm,
+    engine_configuration: (vehicule as any).engine_configuration,
+    number_of_cylinders: (vehicule as any).number_of_cylinders,
+    redline_rpm: (vehicule as any).redline_rpm,
+    limited_edition: (vehicule as any).limited_edition,
+    number_produced: (vehicule as any).number_produced,
+    racing_heritage: (vehicule as any).racing_heritage,
+    modifications: (vehicule as any).modifications,
+    track_ready: (vehicule as any).track_ready,
+    warranty_remaining: (vehicule as any).warranty_remaining,
+    service_history_count: (vehicule as any).service_history_count,
+    
+    // Champs système
+    owner_id: userId || null, // ✅ CRITIQUE: utiliser owner_id, pas user_id
+    guest_email: guestEmail || null,
     status: status,
     is_email_verified: false,
-  });
+  };
 
   const { data, error } = await supabase
     .from("vehicles")
-    .insert(mappedData)
+    .insert(insertData)
     .select("id")
     .single();
 
@@ -181,12 +245,12 @@ export async function updateVehicule(
   // Utiliser le client fourni (serveur) ou créer un client navigateur
   const supabase = supabaseClient || createClient();
 
-  // Convertir les colonnes françaises en anglaises
-  const mappedUpdates = mapFrenchToEnglishColumns(updates);
-
+  // IMPORTANT: Les données sont déjà en anglais (VehiculeUpdate utilise les colonnes anglaises)
+  // Ne pas appeler mapFrenchToEnglishColumns car updates est déjà en anglais
+  // Utiliser directement les updates (déjà en anglais)
   const { error } = await supabase
     .from("vehicles")
-    .update(mappedUpdates)
+    .update(updates)
     .eq("id", id);
 
   if (error) {
@@ -351,9 +415,10 @@ export async function getVehiculesPaginated(
 ): Promise<{ data: Vehicule[]; total: number }> {
   const supabase = createClient();
 
+  // Sélection explicite pour s'assurer que les champs de contact sont inclus
   let query = supabase
     .from("vehicles")
-    .select("*", { count: "exact" })
+    .select("*, contact_email, phone, contact_methods, guest_email, owner_id", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (filters?.status) {

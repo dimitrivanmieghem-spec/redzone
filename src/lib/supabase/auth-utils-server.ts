@@ -1,11 +1,11 @@
-// RedZone - Utilitaires d'authentification (SERVER SIDE ONLY)
+// Octane98 - Utilitaires d'authentification (SERVER SIDE ONLY)
 // Ce fichier utilise next/headers et ne doit JAMAIS être importé dans des Client Components
 
 import { createClient as createServerClient } from "./server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Email admin de secours (fallback)
-const ADMIN_FALLBACK_EMAIL = "dimitri.vanmieghem@gmail.com";
+const ADMIN_FALLBACK_EMAIL = "admin@octane98.be";
 
 /**
  * Vérifier si l'utilisateur actuel est administrateur (version serveur)

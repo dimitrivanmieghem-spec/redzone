@@ -97,17 +97,18 @@ export default function ImageGallery({ images, alt }: ImageGalleryProps) {
         {/* 4 petites images à droite */}
         {validImages.slice(1, 5).map((image, index) => (
           <div
-            key={index}
+            key={image}
             className="col-span-2 md:col-span-1 row-span-1 relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 shadow-xl shadow-slate-200/50 cursor-zoom-in group"
             onClick={() => openLightbox(index + 1)}
           >
-            <Image
-              src={image}
-              alt={`${alt} - Vue ${index + 2}`}
-              fill
-              sizes="(max-width: 768px) 50vw, 25vw"
-              className="object-cover hover:scale-110 transition-transform duration-500"
-            />
+          <Image
+            src={image}
+            alt={`${alt} - Vue ${index + 2}`}
+            fill
+            sizes="(max-width: 768px) 50vw, 25vw"
+            className="object-cover hover:scale-110 transition-transform duration-500"
+            loading="lazy"
+          />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
           </div>
         ))}

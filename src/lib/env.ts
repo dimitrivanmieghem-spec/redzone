@@ -1,5 +1,5 @@
 /**
- * RedZone - Validation des Variables d'Environnement
+ * Octane98 - Validation des Variables d'Environnement
  * 
  * Ce module valide que toutes les variables d'environnement critiques sont présentes
  * au démarrage de l'application. Si une variable manque, l'application refuse de démarrer.

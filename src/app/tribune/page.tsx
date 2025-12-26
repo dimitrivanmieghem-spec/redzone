@@ -56,7 +56,7 @@ function TribuneContent() {
             Tribune <span className="text-red-600">Passion</span>
           </h1>
           <p className="text-xl text-neutral-300 max-w-2xl mx-auto mb-6">
-            L&apos;espace communautaire RedZone. Questions, présentations et partages entre puristes.
+            L&apos;espace communautaire Octane98. Questions, présentations et partages entre puristes.
           </p>
           {user && (
             <button

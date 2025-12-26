@@ -17,7 +17,7 @@ export default async function RecitsPage() {
             Récits de <span className="text-red-600">Puristes</span>
           </h1>
           <p className="text-xl text-neutral-300 max-w-2xl mx-auto">
-            Histoires, témoignages et passion automobile. La communauté RedZone partage ses expériences.
+            Histoires, témoignages et passion automobile. La communauté Octane98 partage ses expériences.
           </p>
         </div>
       </div>

@@ -20,8 +20,8 @@ export default function CookieBanner() {
     // Attendre que le composant soit monté côté client
     if (typeof window !== "undefined") {
       // Vérifier directement dans localStorage pour éviter les problèmes d'hydratation
-      const consentKey = "redzone_cookie_consent";
-      const consentDateKey = "redzone_cookie_consent_date";
+      const consentKey = "octane98_cookie_consent";
+      const consentDateKey = "octane98_cookie_consent_date";
       const storedConsent = localStorage.getItem(consentKey);
       const storedDate = localStorage.getItem(consentDateKey);
 

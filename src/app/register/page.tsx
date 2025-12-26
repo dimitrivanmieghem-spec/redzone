@@ -1,5 +1,44 @@
 "use client";
 
+/**
+ * ⚠️ VÉRIFICATION DU TRIGGER SQL
+ * 
+ * Pour vérifier que le trigger handle_new_user() fonctionne correctement dans Supabase,
+ * exécutez ce script dans le SQL Editor :
+ * 
+ * ```sql
+ * -- Vérifier que le trigger existe
+ * SELECT tgname, tgtype, tgenabled 
+ * FROM pg_trigger 
+ * WHERE tgname = 'on_auth_user_created';
+ * 
+ * -- Vérifier la fonction
+ * SELECT proname, prosrc 
+ * FROM pg_proc 
+ * WHERE proname = 'handle_new_user';
+ * 
+ * -- Si le trigger n'existe pas, exécutez ceci :
+ * CREATE OR REPLACE FUNCTION public.handle_new_user()
+ * RETURNS TRIGGER AS $$
+ * BEGIN
+ *   INSERT INTO public.profiles (id, email, full_name, role)
+ *   VALUES (
+ *     NEW.id,
+ *     NEW.email,
+ *     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+ *     'user'
+ *   )
+ *   ON CONFLICT (id) DO NOTHING;
+ *   RETURN NEW;
+ * END;
+ * $$ LANGUAGE plpgsql SECURITY DEFINER;
+ * 
+ * CREATE TRIGGER on_auth_user_created
+ *   AFTER INSERT ON auth.users
+ *   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+ * ```
+ */
+
 import { Loader2, Lock, Mail, User, UserPlus, CheckCircle, ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -27,14 +66,17 @@ export default function RegisterPage() {
     confirmPassword: "",
     accountType: "particulier",
     vatNumber: "",
+    acceptTerms: false,
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }));
     // Effacer l'erreur du champ modifié
     if (fieldErrors[name]) {
@@ -87,7 +129,7 @@ export default function RegisterPage() {
         siteUrl = window.location.origin;
       } else {
         // Fallback vers l'URL de production par défaut
-        siteUrl = "https://redzone2.netlify.app";
+        siteUrl = "https://octane98.netlify.app";
       }
       
       const { data, error: supabaseError } = await supabase.auth.signUp({
@@ -112,16 +154,44 @@ export default function RegisterPage() {
 
       // 3. Créer le profil si l'utilisateur existe
       if (data.user) {
-        const { error: profileError } = await supabase.from("profiles").insert({
+        const profileData: {
+          id: string;
+          email: string;
+          full_name: string;
+          role: string;
+          vat_number?: string | null;
+        } = {
           id: data.user.id,
           email: validatedData.email,
           full_name: fullName,
           role: validatedData.accountType,
-        });
+        };
 
+        // Ajouter le numéro de TVA si l'utilisateur est un Pro
+        if (validatedData.accountType === "pro" && validatedData.vatNumber) {
+          profileData.vat_number = validatedData.vatNumber.trim();
+        }
+
+        // Tenter d'insérer le profil. Si le trigger SQL a déjà créé le profil,
+        // on ignore l'erreur de conflit (code 23505) car c'est normal.
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert(profileData)
+          .select()
+          .single();
+
+        // Code 23505 = violation de contrainte unique (le profil existe déjà via le trigger)
         if (profileError) {
-          console.warn("Erreur création profil (peut déjà exister):", profileError);
-        } else {
+          if (profileError.code === '23505') {
+            // Le trigger SQL a déjà créé le profil, c'est OK
+            console.log("Profil créé par le trigger SQL, insertion ignorée");
+          } else {
+            console.warn("Erreur création profil:", profileError);
+          }
+        }
+        
+        // Logger la création de compte (que le profil soit créé par le trigger ou manuellement)
+        if (!profileError || profileError.code === '23505') {
           // Logger la création de compte
           try {
             const { logAuditEvent } = await import("@/lib/supabase/audit-logs-client");
@@ -197,7 +267,7 @@ export default function RegisterPage() {
   if (pendingVerification) {
     return (
       <AuthLayout>
-        <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+        <div className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
           {/* Icône de succès */}
           <div className="text-center mb-6">
             <div className="w-20 h-20 bg-green-600/20 border-2 border-green-500/50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -206,7 +276,7 @@ export default function RegisterPage() {
             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">
               Vérifiez votre boîte mail
             </h2>
-            <p className="text-slate-400 text-lg">
+            <p className="text-neutral-400 text-lg">
               Un lien de confirmation a été envoyé à
             </p>
             <p className="text-yellow-400 font-bold text-xl mt-2 break-all">
@@ -224,19 +294,19 @@ export default function RegisterPage() {
 
           {/* Instructions */}
           <div className="space-y-3 mb-6">
-            <div className="flex items-start gap-3 text-slate-300">
+            <div className="flex items-start gap-3 text-neutral-300">
               <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
                 <span className="text-red-400 text-xs font-bold">1</span>
               </div>
               <p className="text-sm">Vérifiez votre boîte de réception (et les spams si nécessaire)</p>
             </div>
-            <div className="flex items-start gap-3 text-slate-300">
+            <div className="flex items-start gap-3 text-neutral-300">
               <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
                 <span className="text-red-400 text-xs font-bold">2</span>
               </div>
               <p className="text-sm">Cliquez sur le lien de confirmation dans l&apos;email</p>
             </div>
-            <div className="flex items-start gap-3 text-slate-300">
+            <div className="flex items-start gap-3 text-neutral-300">
               <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
                 <span className="text-red-400 text-xs font-bold">3</span>
               </div>
@@ -255,7 +325,7 @@ export default function RegisterPage() {
 
           {/* Message d'aide */}
           <div className="mt-6 text-center">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-neutral-500">
               Vous n&apos;avez pas reçu l&apos;email ? Vérifiez vos spams ou{" "}
               <button
                 onClick={() => setPendingVerification(false)}
@@ -273,13 +343,13 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       {/* Formulaire */}
-      <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+      <div className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
         {/* Titre */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-black text-white mb-2 tracking-tight">
             Créer un compte
           </h2>
-          <p className="text-slate-400">Rejoignez RedZone en quelques clics</p>
+          <p className="text-neutral-400">Rejoignez Octane98 en quelques clics</p>
         </div>
 
         {/* Formulaire */}
@@ -289,13 +359,13 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="firstName"
-                className="block text-sm font-bold text-slate-300 mb-3"
+                className="block text-sm font-bold text-neutral-300 mb-3"
               >
                 Prénom *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User size={20} className="text-slate-500" />
+                  <User size={20} className="text-neutral-500" />
                 </div>
                 <input
                   type="text"
@@ -306,7 +376,7 @@ export default function RegisterPage() {
                   placeholder="Jean"
                   required
                   disabled={isLoading}
-                  className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`w-full pl-12 pr-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     fieldErrors.firstName ? "border-red-500" : "border-white/10"
                   }`}
                 />
@@ -319,7 +389,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="lastName"
-                className="block text-sm font-bold text-slate-300 mb-3"
+                className="block text-sm font-bold text-neutral-300 mb-3"
               >
                 Nom *
               </label>
@@ -332,7 +402,7 @@ export default function RegisterPage() {
                 placeholder="Dupont"
                 required
                 disabled={isLoading}
-                className={`w-full px-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full px-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   fieldErrors.lastName ? "border-red-500" : "border-white/10"
                 }`}
               />
@@ -346,13 +416,13 @@ export default function RegisterPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-bold text-slate-300 mb-3"
+              className="block text-sm font-bold text-neutral-300 mb-3"
             >
               Email *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail size={20} className="text-slate-500" />
+                <Mail size={20} className="text-neutral-500" />
               </div>
               <input
                 type="email"
@@ -363,7 +433,7 @@ export default function RegisterPage() {
                 placeholder="votre@email.be"
                 required
                 disabled={isLoading}
-                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full pl-12 pr-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   fieldErrors.email ? "border-red-500" : "border-white/10"
                 }`}
               />
@@ -377,13 +447,13 @@ export default function RegisterPage() {
           <div>
             <label
               htmlFor="confirmEmail"
-              className="block text-sm font-bold text-slate-300 mb-3"
+              className="block text-sm font-bold text-neutral-300 mb-3"
             >
               Confirmer l&apos;email *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail size={20} className="text-slate-500" />
+                <Mail size={20} className="text-neutral-500" />
               </div>
               <input
                 type="email"
@@ -394,7 +464,7 @@ export default function RegisterPage() {
                 placeholder="votre@email.be"
                 required
                 disabled={isLoading}
-                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full pl-12 pr-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   fieldErrors.confirmEmail ? "border-red-500" : "border-white/10"
                 }`}
               />
@@ -406,7 +476,7 @@ export default function RegisterPage() {
 
           {/* Type de compte */}
           <div>
-            <label className="block text-sm font-bold text-slate-300 mb-3">
+            <label className="block text-sm font-bold text-neutral-300 mb-3">
               Type de compte *
             </label>
             <div className="grid grid-cols-2 gap-4">
@@ -416,12 +486,12 @@ export default function RegisterPage() {
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   formData.accountType === "particulier"
                     ? "border-red-600 bg-red-600/20"
-                    : "border-white/10 bg-slate-800/50 hover:border-white/20"
+                    : "border-white/10 bg-neutral-800/50 hover:border-white/20"
                 }`}
                 disabled={isLoading}
               >
                 <div className="font-bold text-white mb-1">Particulier</div>
-                <div className="text-xs text-slate-400">Vente personnelle</div>
+                <div className="text-xs text-neutral-400">Vente personnelle</div>
               </button>
               <button
                 type="button"
@@ -429,7 +499,7 @@ export default function RegisterPage() {
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   formData.accountType === "pro"
                     ? "border-red-600 bg-red-600/20"
-                    : "border-white/10 bg-slate-800/50 hover:border-white/20"
+                    : "border-white/10 bg-neutral-800/50 hover:border-white/20"
                 }`}
                 disabled={isLoading}
               >
@@ -437,7 +507,7 @@ export default function RegisterPage() {
                   <Building2 size={16} />
                   Professionnel
                 </div>
-                <div className="text-xs text-slate-400">Garage / Concessionnaire</div>
+                <div className="text-xs text-neutral-400">Garage / Concessionnaire</div>
               </button>
             </div>
           </div>
@@ -447,13 +517,13 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="vatNumber"
-                className="block text-sm font-bold text-slate-300 mb-3"
+                className="block text-sm font-bold text-neutral-300 mb-3"
               >
-                Numéro de TVA * <span className="text-slate-500 font-normal">(Format: BE0123456789)</span>
+                Numéro de TVA * <span className="text-neutral-500 font-normal">(Format: BE0123456789)</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Building2 size={20} className="text-slate-500" />
+                  <Building2 size={20} className="text-neutral-500" />
                 </div>
                 <input
                   type="text"
@@ -479,7 +549,7 @@ export default function RegisterPage() {
                   placeholder="BE0123456789"
                   required={formData.accountType === "pro"}
                   disabled={isLoading}
-                  className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase ${
+                  className={`w-full pl-12 pr-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase ${
                     fieldErrors.vatNumber ? "border-red-500" : "border-white/10"
                   }`}
                   maxLength={12}
@@ -488,7 +558,7 @@ export default function RegisterPage() {
               {fieldErrors.vatNumber && (
                 <p className="text-xs text-red-400 mt-1">{fieldErrors.vatNumber}</p>
               )}
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-xs text-neutral-400 mt-2">
                 Format belge requis : BE suivi de 10 chiffres
               </p>
             </div>
@@ -498,13 +568,13 @@ export default function RegisterPage() {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-bold text-slate-300 mb-3"
+              className="block text-sm font-bold text-neutral-300 mb-3"
             >
-              Mot de passe * <span className="text-slate-500 font-normal">(min. 8 caractères, 1 chiffre, 1 majuscule, 1 caractère spécial)</span>
+              Mot de passe * <span className="text-neutral-500 font-normal">(min. 8 caractères, 1 chiffre, 1 majuscule, 1 caractère spécial)</span>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock size={20} className="text-slate-500" />
+                <Lock size={20} className="text-neutral-500" />
               </div>
               <input
                 type="password"
@@ -516,7 +586,7 @@ export default function RegisterPage() {
                 required
                 minLength={8}
                 disabled={isLoading}
-                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full pl-12 pr-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   fieldErrors.password ? "border-red-500" : "border-white/10"
                 }`}
               />
@@ -525,16 +595,16 @@ export default function RegisterPage() {
               <p className="text-xs text-red-400 mt-1">{fieldErrors.password}</p>
             )}
             <div className="mt-2 space-y-1">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-neutral-400">
                 ✓ Minimum 8 caractères
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-neutral-400">
                 ✓ Au moins 1 chiffre (0-9)
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-neutral-400">
                 ✓ Au moins 1 majuscule (A-Z)
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-neutral-400">
                 ✓ Au moins 1 caractère spécial (!@#$%^&*...)
               </p>
             </div>
@@ -544,13 +614,13 @@ export default function RegisterPage() {
           <div>
             <label
               htmlFor="confirmPassword"
-              className="block text-sm font-bold text-slate-300 mb-3"
+              className="block text-sm font-bold text-neutral-300 mb-3"
             >
               Confirmer le mot de passe *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock size={20} className="text-slate-500" />
+                <Lock size={20} className="text-neutral-500" />
               </div>
               <input
                 type="password"
@@ -561,7 +631,7 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 required
                 disabled={isLoading}
-                className={`w-full pl-12 pr-4 py-4 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full pl-12 pr-4 py-4 bg-neutral-800/50 border rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   fieldErrors.confirmPassword ? "border-red-500" : "border-white/10"
                 }`}
               />
@@ -578,10 +648,52 @@ export default function RegisterPage() {
             </div>
           )}
 
+          {/* Case à cocher CGU (Obligatoire - Conformité RGPD) */}
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="acceptTerms"
+              name="acceptTerms"
+              checked={formData.acceptTerms}
+              onChange={handleInputChange}
+              required
+              className="mt-1 w-5 h-5 rounded border-white/20 bg-neutral-800/50 text-red-600 focus:ring-2 focus:ring-red-600/50 focus:ring-offset-2 focus:ring-offset-neutral-900 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <label
+              htmlFor="acceptTerms"
+              className="text-sm text-neutral-300 leading-relaxed cursor-pointer"
+            >
+              J&apos;accepte les{" "}
+              <Link
+                href="/legal/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-red-500 hover:text-red-400 underline font-medium transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Conditions Générales d&apos;Utilisation
+              </Link>
+              {" "}et la{" "}
+              <Link
+                href="/legal/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-red-500 hover:text-red-400 underline font-medium transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Politique de Confidentialité
+              </Link>
+              {" "}*
+            </label>
+          </div>
+          {fieldErrors.acceptTerms && (
+            <p className="text-xs text-red-400 mt-1">{fieldErrors.acceptTerms}</p>
+          )}
+
           {/* Bouton Créer un compte */}
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !formData.acceptTerms}
             className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-red-400 disabled:to-red-500 disabled:cursor-not-allowed text-white font-black py-4 px-8 rounded-xl transition-all shadow-lg shadow-red-900/20 hover:shadow-red-900/40 hover:scale-[1.02] flex items-center justify-center gap-3"
           >
             {isLoading ? (
@@ -603,7 +715,7 @@ export default function RegisterPage() {
               <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/50 text-slate-400 font-medium">
+              <span className="px-4 bg-neutral-900/50 text-neutral-400 font-medium">
                 Déjà un compte ?
               </span>
             </div>
@@ -617,26 +729,6 @@ export default function RegisterPage() {
             Se connecter
           </Link>
         </form>
-
-        {/* Message RGPD avec liens légaux */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-slate-400">
-            🔒 En créant un compte, vous acceptez nos{" "}
-            <Link
-              href="/legal/terms"
-              className="text-red-500 hover:text-red-400 underline font-medium transition-colors"
-            >
-              conditions d&apos;utilisation
-            </Link>
-            {" "}et notre{" "}
-            <Link
-              href="/legal/privacy"
-              className="text-red-500 hover:text-red-400 underline font-medium transition-colors"
-            >
-              politique de confidentialité
-            </Link>
-          </p>
-        </div>
       </div>
     </AuthLayout>
   );

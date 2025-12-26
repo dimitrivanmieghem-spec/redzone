@@ -1,4 +1,4 @@
-// RedZone - Algorithme d'Analyse de Prix Intelligent
+// Octane98 - Algorithme d'Analyse de Prix Intelligent
 
 import { Vehicule } from "./supabase/types";
 
@@ -140,11 +140,11 @@ export function getPriceAnalysisText(
   const diffText = formatPriceDifference(analysis.difference);
   
   if (analysis.label === "Super Affaire") {
-    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% moins cher que la moyenne des ${vehicule.model} actuellement en vente sur RedZone (${diffText} sous la cote).`;
+    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% moins cher que la moyenne des ${vehicule.model} actuellement en vente sur Octane98 (${diffText} sous la cote).`;
   } else if (analysis.label === "Prix Élevé") {
-    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% plus cher que la moyenne des ${vehicule.model} actuellement en vente sur RedZone (${diffText} au-dessus de la cote).`;
+    return `Ce véhicule est ${Math.abs(analysis.percentageDiff).toFixed(1)}% plus cher que la moyenne des ${vehicule.model} actuellement en vente sur Octane98 (${diffText} au-dessus de la cote).`;
   } else {
-    return `Ce véhicule est au prix du marché (${percentText} par rapport à la moyenne des ${vehicule.model} en vente sur RedZone).`;
+    return `Ce véhicule est au prix du marché (${percentText} par rapport à la moyenne des ${vehicule.model} en vente sur Octane98).`;
   }
 }
 

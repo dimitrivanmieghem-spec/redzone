@@ -488,7 +488,7 @@ export default function TaxCalculator({
           {/* Info Complémentaire Flandre */}
           <div className="bg-blue-900/20 p-4 rounded-2xl border border-blue-500/30">
             <p className="text-xs text-slate-300 leading-relaxed">
-              <strong className="text-blue-400">💡 Info :</strong> RedZone se concentre sur la
+              <strong className="text-blue-400">💡 Info :</strong> Octane98 se concentre sur la
               Wallonie et Bruxelles pour des calculs précis. La Flandre nécessite des données WLTP
               spécifiques. {co2Wltp ? "Les données WLTP sont disponibles pour ce véhicule." : "Les données WLTP ne sont pas encore disponibles pour ce véhicule."}
             </p>

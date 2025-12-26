@@ -34,22 +34,23 @@ CREATE INDEX IF NOT EXISTS idx_profiles_is_founder ON profiles(is_founder) WHERE
 CREATE OR REPLACE FUNCTION assign_founder_badge()
 RETURNS TRIGGER AS $$
 DECLARE
-  founder_count INTEGER;
+  total_profiles_count INTEGER;
 BEGIN
-  -- Compter le nombre actuel de membres fondateurs
-  SELECT COUNT(*) INTO founder_count
-  FROM profiles
-  WHERE is_founder = TRUE;
+  -- Compter le nombre total de profils (y compris celui qui vient d'être créé)
+  SELECT COUNT(*) INTO total_profiles_count
+  FROM profiles;
   
-  -- Si moins de 500 membres fondateurs, attribuer le badge au nouvel utilisateur
-  IF founder_count < 500 THEN
+  -- Si le nombre total de profils est <= 500, cet utilisateur est dans les 500 premiers
+  IF total_profiles_count <= 500 THEN
+    -- Attribuer le badge fondateur au nouvel utilisateur
     UPDATE profiles
     SET is_founder = TRUE
     WHERE id = NEW.id;
     
-    RAISE NOTICE 'Badge fondateur attribué à l''utilisateur % (Total: %)', NEW.id, founder_count + 1;
+    RAISE NOTICE 'Badge fondateur attribué à l''utilisateur % (Rang: % / 500)', NEW.id, total_profiles_count;
   ELSE
-    RAISE NOTICE 'Limite de 500 membres fondateurs atteinte. Badge non attribué.';
+    -- L'utilisateur n'est pas dans les 500 premiers, pas de badge (déjà FALSE par défaut)
+    RAISE NOTICE 'Limite de 500 membres fondateurs atteinte. Utilisateur % n''est pas dans les 500 premiers (Rang: %)', NEW.id, total_profiles_count;
   END IF;
   
   RETURN NEW;
@@ -166,24 +167,41 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ========================================
 
 -- Cette fonction attribue le badge aux 500 premiers utilisateurs (par date de création)
+-- IMPORTANT: Exécutez cette section une seule fois après avoir créé la colonne is_founder
 DO $$
 DECLARE
   user_record RECORD;
   founder_count INTEGER := 0;
+  total_profiles INTEGER := 0;
+  users_to_assign INTEGER := 0;
 BEGIN
+  -- Compter le nombre total de profils
+  SELECT COUNT(*) INTO total_profiles FROM profiles;
+  
   -- Compter les membres fondateurs existants
   SELECT COUNT(*) INTO founder_count
   FROM profiles
   WHERE is_founder = TRUE;
   
-  -- Si moins de 500, attribuer aux plus anciens utilisateurs
-  IF founder_count < 500 THEN
+  -- Si moins de 500 profils au total, tous les profils existants sont fondateurs
+  IF total_profiles <= 500 THEN
+    -- Attribuer le badge à tous les profils qui ne l'ont pas encore
+    UPDATE profiles
+    SET is_founder = TRUE
+    WHERE is_founder = FALSE OR is_founder IS NULL;
+    
+    RAISE NOTICE 'Badge fondateur attribué à tous les % utilisateurs existants (dans les 500 premiers)', total_profiles;
+  ELSIF founder_count < 500 THEN
+    -- Il y a plus de 500 profils, mais moins de 500 fondateurs
+    -- Attribuer le badge aux 500 premiers (par date de création)
+    users_to_assign := 500 - founder_count;
+    
     FOR user_record IN
       SELECT id, email, created_at
       FROM profiles
-      WHERE is_founder = FALSE
+      WHERE is_founder = FALSE OR is_founder IS NULL
       ORDER BY created_at ASC
-      LIMIT (500 - founder_count)
+      LIMIT users_to_assign
     LOOP
       UPDATE profiles
       SET is_founder = TRUE
@@ -192,10 +210,23 @@ BEGIN
       founder_count := founder_count + 1;
     END LOOP;
     
-    RAISE NOTICE 'Badge fondateur attribué à % utilisateurs existants (Total: %)', (500 - (SELECT COUNT(*) FROM profiles WHERE is_founder = TRUE) + founder_count), founder_count;
+    RAISE NOTICE 'Badge fondateur attribué à % utilisateurs existants parmi les 500 premiers (Total fondateurs: %)', users_to_assign, founder_count;
   ELSE
-    RAISE NOTICE 'Limite de 500 membres fondateurs déjà atteinte. Aucune attribution supplémentaire.';
+    RAISE NOTICE 'Limite de 500 membres fondateurs déjà atteinte. Aucune attribution supplémentaire nécessaire.';
   END IF;
+  
+  -- S'assurer que les profils au-delà des 500 premiers n'ont pas le badge
+  UPDATE profiles
+  SET is_founder = FALSE
+  WHERE id IN (
+    SELECT id
+    FROM profiles
+    WHERE is_founder = TRUE
+    ORDER BY created_at ASC
+    OFFSET 500
+  );
+  
+  RAISE NOTICE 'Vérification terminée: seuls les 500 premiers utilisateurs (par date de création) ont le badge fondateur.';
 END $$;
 
 -- ========================================

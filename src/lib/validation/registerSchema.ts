@@ -1,5 +1,5 @@
 /**
- * RedZone - Schéma de Validation pour l'Inscription
+ * Octane98 - Schéma de Validation pour l'Inscription
  * Utilise Zod pour valider les données du formulaire d'inscription
  */
 
@@ -70,6 +70,13 @@ export const registerSchema = z
           message: "Le numéro de TVA doit être au format belge (BE0123456789)",
         }
       ),
+
+    // Acceptation des CGU (obligatoire pour conformité RGPD)
+    acceptTerms: z
+      .boolean()
+      .refine((val) => val === true, {
+        message: "Vous devez accepter les conditions d'utilisation et la politique de confidentialité",
+      }),
   })
   .refine((data) => data.email === data.confirmEmail, {
     message: "Les emails ne correspondent pas",

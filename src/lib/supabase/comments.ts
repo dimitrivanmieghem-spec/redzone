@@ -1,4 +1,4 @@
-// RedZone - Actions Supabase pour les Commentaires
+// Octane98 - Actions Supabase pour les Commentaires
 
 import { createClient } from "./client";
 // ⚠️ Les fonctions admin (approveComment, rejectComment) sont dans server-actions/comments.ts

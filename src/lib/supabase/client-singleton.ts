@@ -1,4 +1,4 @@
-// RedZone - Client Supabase Singleton (Browser)
+// Octane98 - Client Supabase Singleton (Browser)
 // Évite la création multiple de clients et les problèmes de connexion
 
 import { createBrowserClient } from "@supabase/ssr";

@@ -1,4 +1,4 @@
-// RedZone - Client Supabase (Server)
+// Octane98 - Client Supabase (Server)
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";

@@ -45,10 +45,14 @@ export default function TermsPage() {
             </p>
             <div className="bg-white/50 p-4 rounded-lg mt-4">
               <p className="text-red-900 font-semibold mb-2">
-                📌 Clause de Gratuité
+                📌 Services et Gratuité
+              </p>
+              <p className="text-red-800 text-sm mb-2">
+                L&apos;utilisation de Octane98 est actuellement <strong>100% gratuite</strong>. L&apos;éditeur se réserve le droit d&apos;introduire des fonctionnalités payantes à l&apos;avenir, moyennant une information préalable des utilisateurs.
               </p>
               <p className="text-red-800 text-sm">
-                L&apos;utilisation de RedZone est actuellement <strong>100% gratuite</strong>. L&apos;éditeur se réserve le droit de modifier ce modèle économique dans le futur, moyennant une information préalable des utilisateurs.
+                <strong>Programme Pionniers :</strong> Les comptes créés durant la phase de lancement (les 500 premiers inscrits) bénéficieront du maintien gratuit de certaines fonctionnalités futures (Statut Early Adopter). 
+                Ces avantages seront conservés à vie lors du passage éventuel à un modèle économique payant.
               </p>
             </div>
             <div className="bg-white/50 p-4 rounded-lg mt-3">
@@ -64,7 +68,7 @@ export default function TermsPage() {
                 📋 Statut de la Plateforme
               </p>
               <p className="text-red-800 text-sm font-semibold">
-                RedZone est une plateforme en phase Beta opérée à titre non-lucratif. Le site agit comme hébergeur d&apos;annonces et n&apos;intervient pas dans les transactions.
+                Octane98 est une plateforme en phase Beta opérée à titre non-lucratif. Le site agit comme hébergeur d&apos;annonces et n&apos;intervient pas dans les transactions.
               </p>
             </div>
           </div>
@@ -74,7 +78,7 @@ export default function TermsPage() {
               ⚠️ <strong>Important : Lisez attentivement ces conditions</strong>
             </p>
             <p className="text-slate-700 text-sm">
-              En utilisant la plateforme RedZone, vous acceptez sans réserve les présentes Conditions Générales d&apos;Utilisation. 
+              En utilisant la plateforme Octane98, vous acceptez sans réserve les présentes Conditions Générales d&apos;Utilisation. 
               Si vous n&apos;acceptez pas ces conditions, veuillez ne pas utiliser notre service.
             </p>
           </div>
@@ -82,7 +86,7 @@ export default function TermsPage() {
           <section className="mb-10">
             <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">1. Définitions</h2>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
-              <li><strong>&quot;RedZone&quot;</strong> ou <strong>&quot;la Plateforme&quot;</strong> : Service en ligne accessible via www.RedZone.be, exploité par RedZone SPRL</li>
+              <li><strong>&quot;Octane98&quot;</strong> ou <strong>&quot;la Plateforme&quot;</strong> : Service en ligne accessible via www.Octane98.be, édité à titre personnel par Dimitri Van Mieghem</li>
               <li><strong>&quot;Utilisateur&quot;</strong> : Toute personne physique ou morale utilisant la Plateforme</li>
               <li><strong>&quot;Vendeur&quot;</strong> : Utilisateur publiant une annonce de vente de véhicule</li>
               <li><strong>&quot;Acheteur&quot;</strong> : Utilisateur consultant les annonces dans l&apos;objectif d&apos;acquérir un véhicule</li>
@@ -96,7 +100,7 @@ export default function TermsPage() {
             
             <h3 className="text-xl font-bold text-slate-900 mb-3">2.1. Plateforme communautaire</h3>
             <p className="text-slate-700 mb-4">
-              RedZone est une <strong>plateforme communautaire de mise en relation pour véhicules sportifs</strong>. 
+              Octane98 est une <strong>plateforme communautaire de mise en relation pour véhicules sportifs</strong>. 
               Notre service permet aux passionnés d&apos;automobiles de publier et consulter des annonces de véhicules 
               sportifs (voitures et motos) en Belgique.
             </p>
@@ -104,24 +108,24 @@ export default function TermsPage() {
             <h3 className="text-xl font-bold text-slate-900 mb-3">2.2. Clause Hébergeur</h3>
             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-4">
               <p className="text-red-900 font-semibold mb-2">
-                ⚖️ <strong>RedZone agit en qualité d&apos;hébergeur technique bénévole</strong>
+                ⚖️ <strong>Octane98 agit en qualité d&apos;hébergeur technique bénévole</strong>
               </p>
               <p className="text-red-800 text-sm mb-2">
                 Conformément à la loi belge du 11 mars 2003 et à la directive européenne 2000/31/CE, 
-                RedZone agit en qualité d&apos;hébergeur technique des contenus publiés par les utilisateurs.
+                Octane98 agit en qualité d&apos;hébergeur technique des contenus publiés par les utilisateurs.
                 <strong> En phase bêta, ce service est fourni à titre bénévole et non commercial.</strong>
               </p>
               <ul className="list-disc list-inside text-red-800 text-sm space-y-1 mt-2">
-                <li><strong>RedZone ne vérifie pas physiquement les véhicules</strong> et ne garantit pas l&apos;exactitude des informations fournies par les vendeurs (kilométrage, état, Car-Pass).</li>
-                <li><strong>Toute transaction se fait exclusivement entre l&apos;acheteur et le vendeur.</strong> RedZone n&apos;intervient pas dans la négociation, le paiement ou la livraison.</li>
-                <li>RedZone n&apos;est ni propriétaire, ni vendeur, ni mandataire des véhicules annoncés.</li>
+                <li><strong>Octane98 ne vérifie pas physiquement les véhicules</strong> et ne garantit pas l&apos;exactitude des informations fournies par les vendeurs (kilométrage, état, Car-Pass).</li>
+                <li><strong>Toute transaction se fait exclusivement entre l&apos;acheteur et le vendeur.</strong> Octane98 n&apos;intervient pas dans la négociation, le paiement ou la livraison.</li>
+                <li>Octane98 n&apos;est ni propriétaire, ni vendeur, ni mandataire des véhicules annoncés.</li>
                 <li><strong>L&apos;éditeur ne peut être tenu responsable des litiges entre acheteurs et vendeurs</strong>, ni des dommages résultant de l&apos;utilisation de la plateforme en phase bêta.</li>
               </ul>
             </div>
 
             <h3 className="text-xl font-bold text-slate-900 mb-3">2.3. Responsabilité limitée</h3>
             <p className="text-slate-700 mb-4">
-              RedZone ne peut être tenu responsable de :
+              Octane98 ne peut être tenu responsable de :
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
               <li>L&apos;exactitude des informations fournies dans les annonces (prix, kilométrage, état du véhicule)</li>
@@ -192,7 +196,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-bold text-slate-900 mb-3">4.2. Modération des annonces</h3>
             <p className="text-slate-700 mb-4">
-              RedZone se réserve le droit de :
+              Octane98 se réserve le droit de :
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
               <li><strong>Valider</strong> toute annonce avant publication (délai : 24-48h ouvrables)</li>
@@ -217,7 +221,7 @@ export default function TermsPage() {
             
             <h3 className="text-xl font-bold text-slate-900 mb-3">5.1. Mise en relation</h3>
             <p className="text-slate-700 mb-4">
-              RedZone fournit un système de messagerie interne pour permettre aux Acheteurs de contacter les Vendeurs. 
+              Octane98 fournit un système de messagerie interne pour permettre aux Acheteurs de contacter les Vendeurs. 
               Les coordonnées personnelles (email, téléphone) ne sont communiquées qu&apos;après accord explicite du Vendeur.
             </p>
 
@@ -235,9 +239,9 @@ export default function TermsPage() {
               </ul>
             </div>
 
-            <h3 className="text-xl font-bold text-slate-900 mb-3">5.3. RedZone n&apos;intervient pas dans la transaction</h3>
+            <h3 className="text-xl font-bold text-slate-900 mb-3">5.3. Octane98 n&apos;intervient pas dans la transaction</h3>
             <p className="text-slate-700 mb-4">
-              <strong>RedZone ne gère pas :</strong>
+              <strong>Octane98 ne gère pas :</strong>
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
               <li>Le paiement (aucune transaction financière sur la plateforme)</li>
@@ -251,11 +255,11 @@ export default function TermsPage() {
             <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">6. Propriété intellectuelle</h2>
             <p className="text-slate-700 mb-4">
               Tous les éléments de la Plateforme (logo, design, textes, graphismes, code source) sont la propriété exclusive 
-              de RedZone SPRL ou de ses partenaires. Toute reproduction, même partielle, est interdite sans autorisation écrite.
+              de Dimitri Van Mieghem ou de ses partenaires. Toute reproduction, même partielle, est interdite sans autorisation écrite.
             </p>
             <p className="text-slate-700 mb-4">
               Les photos et descriptions publiées par les Vendeurs restent leur propriété. En publiant une annonce, 
-              le Vendeur accorde à RedZone une licence non-exclusive pour afficher et promouvoir l&apos;annonce sur la Plateforme.
+              le Vendeur accorde à Octane98 une licence non-exclusive pour afficher et promouvoir l&apos;annonce sur la Plateforme.
             </p>
           </section>
 
@@ -275,7 +279,7 @@ export default function TermsPage() {
             
             <h3 className="text-xl font-bold text-slate-900 mb-3">8.1. Limitation de responsabilité</h3>
             <p className="text-slate-700 mb-4">
-              RedZone ne pourra être tenu responsable des dommages directs ou indirects résultant de :
+              Octane98 ne pourra être tenu responsable des dommages directs ou indirects résultant de :
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
               <li>L&apos;utilisation ou de l&apos;impossibilité d&apos;utiliser la Plateforme</li>
@@ -286,7 +290,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-bold text-slate-900 mb-3">8.2. Disponibilité du service</h3>
             <p className="text-slate-700 mb-4">
-              RedZone s&apos;efforce d&apos;assurer un accès 24h/24, 7j/7 à la Plateforme, mais ne garantit pas une disponibilité 
+              Octane98 s&apos;efforce d&apos;assurer un accès 24h/24, 7j/7 à la Plateforme, mais ne garantit pas une disponibilité 
               ininterrompue (maintenance, pannes, force majeure).
             </p>
           </section>
@@ -296,12 +300,12 @@ export default function TermsPage() {
             
             <h3 className="text-xl font-bold text-slate-900 mb-3">9.1. Résiliation par l&apos;Utilisateur</h3>
             <p className="text-slate-700 mb-4">
-              L&apos;Utilisateur peut supprimer son compte à tout moment via les paramètres ou en <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">contactant l&apos;administrateur</a>.
+              L&apos;Utilisateur peut supprimer son compte à tout moment via les paramètres ou en <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">contactant l&apos;administrateur</a>.
             </p>
 
-            <h3 className="text-xl font-bold text-slate-900 mb-3">9.2. Suspension ou résiliation par RedZone</h3>
+            <h3 className="text-xl font-bold text-slate-900 mb-3">9.2. Suspension ou résiliation par Octane98</h3>
             <p className="text-slate-700 mb-4">
-              RedZone se réserve le droit de suspendre ou supprimer un compte sans préavis en cas de :
+              Octane98 se réserve le droit de suspendre ou supprimer un compte sans préavis en cas de :
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-2">
               <li>Violation des présentes CGU</li>
@@ -353,7 +357,7 @@ export default function TermsPage() {
           <section className="mb-10">
             <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">12. Modification des CGU</h2>
             <p className="text-slate-700 mb-4">
-              RedZone se réserve le droit de modifier les présentes CGU à tout moment. Les modifications 
+              Octane98 se réserve le droit de modifier les présentes CGU à tout moment. Les modifications 
               seront notifiées aux Utilisateurs par email et/ou via une bannière sur le site.
             </p>
             <p className="text-slate-700">
@@ -367,36 +371,24 @@ export default function TermsPage() {
               <p className="text-slate-900 font-bold mb-4">
                 Pour toute question concernant ces CGU :
               </p>
-              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded mb-4">
-                <p className="text-yellow-900 font-semibold mb-2">
-                  ⚠️ <strong>Important - Phase Bêta</strong>
-                </p>
-                <p className="text-yellow-800 text-sm">
-                  Les adresses email professionnelles (type @redzone.be) ne sont pas encore actives. 
-                  Pour toute demande, veuillez utiliser le formulaire de contact disponible sur le site 
-                  ou contacter l&apos;administrateur via les moyens de communication alternatifs indiqués ci-dessous.
-                </p>
-              </div>
               <p className="text-slate-900 mb-2">
-                <strong>RedZone SPRL</strong> (À REMPLIR)
+                <strong>Éditeur :</strong> Dimitri Van Mieghem
               </p>
               <p className="text-slate-700 text-sm">
-                Adresse : [ADRESSE COMPLÈTE À REMPLIR]<br />
-                Numéro BCE : [NUMÉRO BCE À REMPLIR]<br />
-                Numéro TVA : BE [NUMÉRO TVA À REMPLIR]<br />
-                Email : <a href="mailto:dimitri.vanmieghem@gmail.com" className="text-red-600 hover:text-red-700 font-bold underline">dimitri.vanmieghem@gmail.com</a><br />
-                Téléphone : [NUMÉRO À REMPLIR]
+                <strong>Statut :</strong> Personne physique<br />
+                <strong>Domicilié en :</strong> Belgique<br />
+                <strong>Email :</strong> <a href="mailto:admin@octane98.be" className="text-red-600 hover:text-red-700 font-bold underline">admin@octane98.be</a>
               </p>
               <p className="text-slate-600 text-xs mt-3 italic">
-                En phase bêta, les réponses aux demandes peuvent prendre plus de temps. 
-                Nous vous remercions de votre compréhension.
+                En phase de lancement, les réponses aux demandes peuvent prendre quelques jours. 
+                Merci de votre compréhension.
               </p>
             </div>
           </section>
 
           <div className="bg-green-100 p-6 rounded-2xl mt-8">
             <p className="text-green-900 text-center font-bold">
-              ✅ En utilisant RedZone, vous reconnaissez avoir lu, compris et accepté ces Conditions Générales d&apos;Utilisation.
+              ✅ En utilisant Octane98, vous reconnaissez avoir lu, compris et accepté ces Conditions Générales d&apos;Utilisation.
             </p>
           </div>
         </div>

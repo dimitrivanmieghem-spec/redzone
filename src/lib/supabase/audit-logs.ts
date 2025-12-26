@@ -1,5 +1,5 @@
 /**
- * RedZone - Système de Logs d'Audit RGPD (Serveur)
+ * Octane98 - Système de Logs d'Audit RGPD (Serveur)
  * Version serveur pour les Server Components, Server Actions, et Route Handlers
  * 
  * IMPORTANT : Ce fichier ne doit être utilisé QUE côté serveur

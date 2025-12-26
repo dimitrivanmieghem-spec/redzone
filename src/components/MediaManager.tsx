@@ -1,6 +1,6 @@
 "use client";
 
-// RedZone - Gestionnaire de Médias Pro (Photos & Audio)
+// Octane98 - Gestionnaire de Médias Pro (Photos & Audio)
 // Design harmonisé avec le thème Puriste
 
 import { useState, useCallback, useRef } from "react";

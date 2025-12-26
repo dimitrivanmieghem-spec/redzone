@@ -56,16 +56,40 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: vehiculeRaw } = await supabase
+  // Vérifier si l'utilisateur est admin ou moderator pour autoriser la prévisualisation
+  let canViewInactiveVehicles = false;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile && (profile.role === "admin" || profile.role === "moderator")) {
+        canViewInactiveVehicles = true;
+      }
+    }
+  } catch (error) {
+    // En cas d'erreur, on reste en mode visiteur (sécurité par défaut)
+  }
+
+  // Construire la requête avec ou sans filtre de status selon le rôle
+  let query = supabase
     .from("vehicles")
     .select("*")
-    .eq("id", id)
-    .eq("status", "active")
-    .single();
+    .eq("id", id);
+
+  if (!canViewInactiveVehicles) {
+    query = query.eq("status", "active");
+  }
+
+  const { data: vehiculeRaw } = await query.single();
 
   if (!vehiculeRaw) {
     return {
-      title: "Véhicule introuvable | RedZone",
+      title: "Véhicule introuvable | Octane98",
       description: "Ce véhicule n'existe pas ou a été vendu.",
     };
   }
@@ -76,12 +100,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const year = parseNumber(vehicule.year);
   const powerHp = parseNumber(vehicule.power_hp);
 
-  // Format selon les spécifications : [Marque] [Modèle] - [Prix]€ | RedZone
+  // Format selon les spécifications : [Marque] [Modèle] - [Prix]€ | Octane98
   const prixFormatted = price ? price.toLocaleString("fr-BE") : 'N/A';
-  const title = `${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} - ${prixFormatted}€ | RedZone`;
+  const title = `${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} - ${prixFormatted}€ | Octane98`;
   
   // Description selon les spécifications
-  const description = `Découvrez cette ${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} de ${year || 'N/A'}, ${powerHp || 'N/A'}ch. En vente sur RedZone, le sanctuaire du moteur thermique.`;
+  const description = `Découvrez cette ${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} de ${year || 'N/A'}, ${powerHp || 'N/A'}ch. En vente sur Octane98, le sanctuaire du moteur thermique.`;
   
   // Image OpenGraph : première photo du véhicule (stockée sur Supabase)
   // Si images est un tableau, prendre la première, sinon utiliser image
@@ -93,7 +117,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   
   // URL dynamique basée sur la variable d'environnement ou localhost en dev
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://redzone.be";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://octane98.be";
   const url = `${baseUrl}/cars/${id}`;
 
   return {
@@ -103,7 +127,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       url,
-      siteName: "RedZone",
+      siteName: "Octane98",
       images: [
         {
           url: imageUrl,
@@ -133,13 +157,39 @@ export default async function CarDetailPage({ params }: PageProps) {
   
   const supabase = await createClient();
 
-  // Récupérer le véhicule depuis Supabase
-  const { data: vehiculeRaw, error } = await supabase
+  // Vérifier si l'utilisateur est admin ou moderator pour autoriser la prévisualisation
+  let canViewInactiveVehicles = false;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Récupérer le profil pour vérifier le rôle
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile && (profile.role === "admin" || profile.role === "moderator")) {
+        canViewInactiveVehicles = true;
+      }
+    }
+  } catch (error) {
+    // En cas d'erreur, on reste en mode visiteur (sécurité par défaut)
+    console.warn("Erreur vérification rôle utilisateur:", error);
+  }
+
+  // Construire la requête avec ou sans filtre de status selon le rôle
+  let query = supabase
     .from("vehicles")
     .select("*")
-    .eq("id", id)
-    .eq("status", "active") // Seulement les véhicules actifs
-    .single();
+    .eq("id", id);
+
+  // Si l'utilisateur n'est pas admin/moderator, filtrer uniquement les véhicules actifs
+  if (!canViewInactiveVehicles) {
+    query = query.eq("status", "active");
+  }
+
+  const { data: vehiculeRaw, error } = await query.single();
 
   // Si erreur ou pas de données, afficher 404
   if (error || !vehiculeRaw || !vehiculeRaw.id) {
@@ -208,10 +258,83 @@ export default async function CarDetailPage({ params }: PageProps) {
 
   // URL pour le partage (sera utilisée côté client)
   const shareTitle = `${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} - ${price ? price.toLocaleString("fr-BE") : 'N/A'}€`;
-  const shareDescription = `Découvrez cette ${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} de ${year || 'N/A'} sur RedZone`;
+  const shareDescription = `Découvrez cette ${vehicule.brand || 'Véhicule'} ${vehicule.model || ''} de ${year || 'N/A'} sur Octane98`;
+
+  // URL de base pour les liens absolus
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://octane98.be';
+  const vehicleUrl = `${baseUrl}/cars/${id}`;
+
+  // Données structurées JSON-LD (Schema.org) pour SEO
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: `${vehicule.brand || 'Véhicule'} ${vehicule.model || ''}`,
+    description: vehicule.description || shareDescription,
+    image: images.length > 0 ? images : [vehicule.image || ''],
+    brand: {
+      '@type': 'Brand',
+      name: vehicule.brand || 'Unknown',
+    },
+    category: vehicule.type === 'car' ? 'Automobile' : 'Motorcycle',
+    offers: {
+      '@type': 'Offer',
+      price: price || 0,
+      priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      url: vehicleUrl,
+      seller: {
+        '@type': 'Organization',
+        name: 'Octane98',
+        url: baseUrl,
+      },
+    },
+    // Propriétés spécifiques au véhicule (extension Car)
+    vehicleIdentificationNumber: vehicule.vin || undefined,
+    productionDate: year ? `${year}-01-01` : undefined,
+    mileageFromOdometer: {
+      '@type': 'QuantitativeValue',
+      value: mileage || 0,
+      unitCode: 'KMT', // Kilomètres
+    },
+    fuelType: vehicule.fuel_type === 'essence' 
+      ? 'https://schema.org/Gasoline' 
+      : vehicule.fuel_type === 'e85'
+      ? 'https://schema.org/E85'
+      : 'https://schema.org/LPG',
+    numberOfDoors: vehicule.seats_count ? vehicule.seats_count.toString() : undefined,
+    vehicleEngine: vehicule.engine_architecture ? {
+      '@type': 'EngineSpecification',
+      name: vehicule.engine_architecture,
+    } : undefined,
+    // Propriétés additionnelles
+    ...(vehicule.power_hp && {
+      additionalProperty: [
+        {
+          '@type': 'PropertyValue',
+          name: 'Puissance',
+          value: `${vehicule.power_hp} CH`,
+        },
+        ...(vehicule.co2 ? [{
+          '@type': 'PropertyValue',
+          name: 'Émissions CO2',
+          value: `${vehicule.co2} g/km`,
+        }] : []),
+        ...(vehicule.transmission ? [{
+          '@type': 'PropertyValue',
+          name: 'Transmission',
+          value: vehicule.transmission,
+        }] : []),
+      ],
+    }),
+  };
 
   return (
     <main className="min-h-screen bg-neutral-950">
+      {/* Données structurées JSON-LD pour SEO (Schema.org) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Navigation Retour */}
         <Link
@@ -476,9 +599,9 @@ export default async function CarDetailPage({ params }: PageProps) {
               >
                 <div className="p-6 bg-neutral-900 border border-orange-600/30 rounded-3xl shadow-xl">
                   <div className="flex flex-wrap gap-3">
-                    {vehicule.modifications.map((mod: string, index: number) => (
+                    {vehicule.modifications.map((mod: string) => (
                       <span
-                        key={index}
+                        key={mod}
                         className="inline-flex items-center gap-2 bg-orange-600/20 text-orange-400 border border-orange-600/50 px-4 py-2 rounded-full text-sm font-bold"
                       >
                         {mod}
@@ -513,9 +636,9 @@ export default async function CarDetailPage({ params }: PageProps) {
                 <div className="p-6 bg-neutral-900 border border-green-600/30 rounded-3xl shadow-xl">
                   <p className="text-green-400 text-sm mb-6">Documentation & garanties ✓</p>
                   <div className="flex flex-wrap gap-3">
-                    {vehicule.history.map((item: string, index: number) => (
+                    {vehicule.history.map((item: string) => (
                       <div
-                        key={index}
+                        key={item}
                         className="flex items-center gap-2 bg-neutral-800 border border-green-600/30 px-5 py-3 rounded-full hover:border-green-600/50 hover:scale-105 transition-all"
                       >
                         <Shield className="text-green-400" size={20} />
@@ -525,7 +648,7 @@ export default async function CarDetailPage({ params }: PageProps) {
                     ))}
                   </div>
                   <p className="text-green-400 text-sm mt-6 bg-green-600/10 border border-green-600/30 p-4 rounded-2xl">
-                    ✅ <strong className="text-green-300">Confiance RedZone</strong> : Tous les documents sont vérifiables. Le vendeur s&apos;engage sur l&apos;authenticité de l&apos;historique.
+                    ✅ <strong className="text-green-300">Confiance Octane98</strong> : Tous les documents sont vérifiables. Le vendeur s&apos;engage sur l&apos;authenticité de l&apos;historique.
                   </p>
                 </div>
               </CollapsibleSection>
@@ -649,7 +772,7 @@ export default async function CarDetailPage({ params }: PageProps) {
 
               {/* Boutons de Partage Social */}
               <ShareButtons
-                url={`https://redzone.be/cars/${id}`}
+                url={`https://octane98.be/cars/${id}`}
                 title={shareTitle}
                 description={shareDescription}
               />

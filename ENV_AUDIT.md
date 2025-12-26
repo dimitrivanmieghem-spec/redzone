@@ -84,14 +84,14 @@ Ce document liste toutes les variables d'environnement utilisées dans RedZone, 
 - **Note** : En développement, les emails sont simulés (pas d'envoi réel) si cette clé est absente.
 
 ### 7. `ADMIN_EMAIL`
-- **Type** : Optionnel (fallback: `"dimitri@gmail.com"`) ⚙️
+- **Type** : Optionnel (fallback: `"admin@octane98.be"`) ⚙️
 - **Utilité** : Email de l'administrateur pour recevoir les tickets de support
 - **Utilisée dans** : `src/app/actions/tickets.ts`
 - **Sécurité** : ⚠️ **PUBLIQUE** - Email visible dans le code (fallback)
 - **Risque** : Aucun - C'est juste un email
 - **Action** : 
   - ✅ **GARDER** si vous voulez personnaliser l'email admin
-  - ❌ **SUPPRIMER** si vous êtes d'accord avec `"dimitri@gmail.com"` (déjà dans le code)
+  - ❌ **SUPPRIMER** si vous êtes d'accord avec `"admin@octane98.be"` (déjà dans le code)
 
 ---
 
@@ -151,7 +151,7 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=votre-clé-turnstile
 RESEND_API_KEY=re_votre-clé-resend
 
 # Email Admin (OPTIONNEL)
-ADMIN_EMAIL=dimitri.vanmieghem@gmail.com
+ADMIN_EMAIL=admin@octane98.be
 ```
 
 **Total : 2-7 variables** (selon vos besoins)
@@ -203,7 +203,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 - ❌ `RESEND_API_KEY` - Si vous ne testez pas l'envoi d'emails
 - ❌ `NEXT_PUBLIC_TURNSTILE_SITE_KEY` - Si vous êtes d'accord avec la clé de test
-- ❌ `ADMIN_EMAIL` - Si vous êtes d'accord avec le fallback `"dimitri@gmail.com"`
+- ❌ `ADMIN_EMAIL` - Si vous êtes d'accord avec le fallback `"admin@octane98.be"`
 
 ---
 

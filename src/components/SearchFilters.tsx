@@ -20,7 +20,7 @@ export interface FiltersState {
   normeEuro: string;
   carPassOnly: boolean;
   
-  // FILTRES PASSIONNÉS (RedZone)
+  // FILTRES PASSIONNÉS (Octane98)
   architectures: string[];
   admissions: string[];
   couleurExterieure: string[];
@@ -43,6 +43,12 @@ export default function SearchFilters({
   activeFiltersCount,
   onClose,
 }: SearchFiltersProps) {
+  const [currentYear, setCurrentYear] = useState<number>(2024); // Valeur par défaut pour éviter l'hydratation
+
+  // Calculer l'année actuelle uniquement côté client pour éviter les problèmes d'hydratation
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
   
   // Composant Tag/Pilule cliquable avec couleur personnalisable
   const renderTag = (active: boolean, onClick: () => void, children: React.ReactNode, color: "red" | "green" | "slate" = "red") => {
@@ -268,7 +274,7 @@ export default function SearchFilters({
           ))}
         </div>
         <p className="text-xs text-slate-600 bg-red-50 p-2 rounded-lg">
-          🏁 RedZone = Sportives thermiques uniquement
+          🏁 Octane98 = Sportives thermiques uniquement
         </p>
       </div>
 
@@ -430,7 +436,7 @@ export default function SearchFilters({
             className="w-full p-3 bg-white shadow-lg shadow-slate-100/50 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-red-600 transition-all text-sm placeholder:text-slate-900"
           >
             <option value="">Min</option>
-            {Array.from({ length: 25 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+            {Array.from({ length: 25 }, (_, i) => currentYear - i).map((year) => (
               <option key={year} value={year}>
                 {year}
               </option>
@@ -442,7 +448,7 @@ export default function SearchFilters({
             className="w-full p-3 bg-white shadow-lg shadow-slate-100/50 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-red-600 transition-all text-sm placeholder:text-slate-900"
           >
             <option value="">Max</option>
-            {Array.from({ length: 25 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+            {Array.from({ length: 25 }, (_, i) => currentYear - i).map((year) => (
               <option key={year} value={year}>
                 {year}
               </option>

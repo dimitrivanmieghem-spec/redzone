@@ -17,7 +17,7 @@ function Footer() {
           <div>
             <h3 className="text-white font-black text-lg mb-4 flex items-center gap-2">
               <Gauge className="text-red-600" size={24} />
-              RedZone
+              Octane98
             </h3>
             <p className="text-sm leading-relaxed">
               Le sanctuaire du moteur thermique. Supercars, youngtimers, GTI...
@@ -115,7 +115,7 @@ function Footer() {
           <div>
             <h3 className="text-white font-bold text-lg mb-4">Contact</h3>
             <a
-              href="mailto:dimitri.vanmieghem@gmail.com"
+              href="mailto:admin@octane98.be"
               className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-6 py-2.5 rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-red-900/20 hover:scale-105"
             >
               Contacter l&apos;administrateur
@@ -127,7 +127,7 @@ function Footer() {
         <div className="border-t border-neutral-800 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
             <p>
-              © {currentYear} RedZone. Tous droits réservés.
+              © {currentYear} Octane98. Tous droits réservés.
             </p>
             <p className="text-slate-400">
               Le sanctuaire du thermique • Belgique 🇧🇪 🏁
@@ -147,7 +147,7 @@ function Footer() {
           <p>
             Version Alpha/Beta - En cas de bug, merci de prévenir l&apos;
             <a
-              href="mailto:dimitri.vanmieghem@gmail.com"
+              href="mailto:admin@octane98.be"
               className="text-red-500 hover:text-red-400 font-medium underline transition-colors"
             >
               administrateur
@@ -163,7 +163,7 @@ function Footer() {
               Version Beta v0.1 - Projet indépendant non commercial.
             </p>
             <p className="text-xs text-slate-500">
-              RedZone est un projet indépendant développé par des passionnés. 
+              Octane98 est un projet indépendant développé par des passionnés. 
               Site à but non lucratif durant la phase de test.
             </p>
           </div>

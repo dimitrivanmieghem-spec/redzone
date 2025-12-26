@@ -55,7 +55,7 @@ Ajoutez dans votre `.env.local` :
 RESEND_API_KEY=re_votre_api_key_ici
 
 # Email admin (pour recevoir les notifications de tickets)
-ADMIN_EMAIL=dimitri@gmail.com
+ADMIN_EMAIL=admin@octane98.be
 
 # URL du site (pour les métadonnées SEO)
 NEXT_PUBLIC_SITE_URL=https://redzone.be

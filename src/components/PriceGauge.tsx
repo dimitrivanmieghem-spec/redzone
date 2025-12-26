@@ -23,7 +23,7 @@ export default function PriceGauge({ analysis, currentPrice, analysisText }: Pri
             Analyse de Prix Intelligente
           </h3>
           <p className="text-xs text-slate-600">
-            Basée sur {analysis.sampleSize} véhicules similaires sur RedZone
+            Basée sur {analysis.sampleSize} véhicules similaires sur Octane98
           </p>
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function PriceGauge({ analysis, currentPrice, analysisText }: Pri
         <p className="text-xs text-slate-700 leading-relaxed">
           <strong className="text-blue-700">💡 Comment ça marche ?</strong> Notre algorithme compare ce véhicule 
           à {analysis.sampleSize} autres {analysis.sampleSize > 1 ? "véhicules identiques" : "véhicule identique"} actuellement 
-          en vente sur RedZone pour vous donner une estimation objective du prix.
+          en vente sur Octane98 pour vous donner une estimation objective du prix.
         </p>
       </div>
     </div>

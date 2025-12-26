@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AudioPlayerProps {
   audioSrc: string;
@@ -14,7 +15,9 @@ export default function AudioPlayer({ audioSrc, architecture }: AudioPlayerProps
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const { showToast } = useToast();
 
   // Mettre à jour le temps actuel
   useEffect(() => {
@@ -24,29 +27,95 @@ export default function AudioPlayer({ audioSrc, architecture }: AudioPlayerProps
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
+    const handleError = () => {
+      console.error("Erreur de chargement audio");
+      setHasError(true);
+      setIsPlaying(false);
+      showToast("Impossible de lire l'audio", "error");
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
     };
-  }, []);
+  }, [showToast]);
 
-  // Play/Pause
-  const togglePlay = () => {
+  // Play/Pause avec gestion d'erreur robuste
+  const togglePlay = async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      showToast("Lecteur audio non disponible", "error");
+      return;
+    }
 
     if (isPlaying) {
-      audio.pause();
+      try {
+        audio.pause();
+        setIsPlaying(false);
+      } catch (error) {
+        console.error("Erreur lors de la pause:", error);
+        setIsPlaying(false);
+      }
     } else {
-      audio.play();
+      try {
+        // Vérifier si le fichier est chargé
+        if (audio.readyState === 0) {
+          // Le fichier n'est pas encore chargé, attendre qu'il soit prêt
+          audio.load();
+          await new Promise<void>((resolve, reject) => {
+            const handleCanPlay = () => {
+              audio.removeEventListener("canplay", handleCanPlay);
+              audio.removeEventListener("error", handleError);
+              resolve();
+            };
+            const handleError = () => {
+              audio.removeEventListener("canplay", handleCanPlay);
+              audio.removeEventListener("error", handleError);
+              reject(new Error("Erreur de chargement"));
+            };
+            audio.addEventListener("canplay", handleCanPlay);
+            audio.addEventListener("error", handleError);
+            // Timeout après 5 secondes
+            setTimeout(() => {
+              audio.removeEventListener("canplay", handleCanPlay);
+              audio.removeEventListener("error", handleError);
+              reject(new Error("Timeout de chargement"));
+            }, 5000);
+          });
+        }
+
+        // Tenter de jouer l'audio
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          await playPromise;
+          setIsPlaying(true);
+          setHasError(false);
+        }
+      } catch (error: any) {
+        console.error("Erreur lors de la lecture audio:", error);
+        setHasError(true);
+        setIsPlaying(false);
+        
+        // Messages d'erreur spécifiques selon le type d'erreur
+        if (error?.name === "NotSupportedError" || error?.name === "NotAllowedError") {
+          showToast("Impossible de lire l'audio (fichier non supporté ou bloqué)", "error");
+        } else if (error?.message?.includes("timeout") || error?.message?.includes("Timeout")) {
+          showToast("Le chargement de l'audio prend trop de temps", "error");
+        } else if (error?.message?.includes("CSP") || error?.message?.includes("Content Security Policy")) {
+          showToast("L'audio est bloqué par les paramètres de sécurité", "error");
+        } else {
+          showToast("Impossible de lire l'audio", "error");
+        }
+      }
     }
-    setIsPlaying(!isPlaying);
   };
 
   // Changer le temps
@@ -113,7 +182,17 @@ export default function AudioPlayer({ audioSrc, architecture }: AudioPlayerProps
       </div>
 
       {/* Audio HTML5 (caché) */}
-      <audio ref={audioRef} src={audioSrc} preload="metadata" />
+      <audio 
+        ref={audioRef} 
+        src={audioSrc} 
+        preload="metadata"
+        onError={(e) => {
+          console.error("Erreur audio HTML5:", e);
+          setHasError(true);
+          setIsPlaying(false);
+          showToast("Impossible de charger l'audio", "error");
+        }}
+      />
 
       {/* Lecteur Custom */}
       <div className="space-y-4">
@@ -158,7 +237,11 @@ export default function AudioPlayer({ audioSrc, architecture }: AudioPlayerProps
           {/* Bouton Play/Pause */}
           <button
             onClick={togglePlay}
-            className="group relative w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-2xl shadow-red-600/50"
+            disabled={hasError}
+            className={`group relative w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-2xl shadow-red-600/50 ${
+              hasError ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            aria-label={hasError ? "Audio non disponible" : isPlaying ? "Pause" : "Lecture"}
           >
             {isPlaying ? (
               <Pause className="text-white" size={28} />

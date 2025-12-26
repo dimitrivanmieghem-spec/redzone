@@ -1,4 +1,4 @@
-// RedZone - Fonctions pour gérer les conversations (Client Components)
+// Octane98 - Fonctions pour gérer les conversations (Client Components)
 
 import { createClient } from "./client";
 

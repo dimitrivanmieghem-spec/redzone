@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calculator, Info } from "lucide-react";
 import TaxCalculator from "@/components/TaxCalculator";
 
 export default function CalculateurPage() {
   const [region, setRegion] = useState<"wallonie" | "flandre">("wallonie");
-  const [annee, setAnnee] = useState<number>(new Date().getFullYear());
+  const [currentYear, setCurrentYear] = useState<number>(2024); // Valeur par défaut pour éviter l'hydratation
+  const [annee, setAnnee] = useState<number>(2024);
   const [puissanceKw, setPuissanceKw] = useState<number>(0);
   const [co2, setCo2] = useState<number>(0);
   const [cvFiscaux, setCvFiscaux] = useState<number>(0);
   const [carburant, setCarburant] = useState<string>("essence");
+
+  // Calculer l'année actuelle uniquement côté client pour éviter les problèmes d'hydratation
+  useEffect(() => {
+    const year = new Date().getFullYear();
+    setCurrentYear(year);
+    setAnnee(year);
+  }, []);
 
   // Conversion kW vers CV (1 kW ≈ 1.36 CV) - UNIQUEMENT pour l'affichage
   const puissanceCv = Math.round(puissanceKw * 1.3596);
@@ -89,9 +97,9 @@ export default function CalculateurPage() {
                   type="number"
                   id="annee"
                   min="1900"
-                  max={new Date().getFullYear() + 1}
+                  max={currentYear + 1}
                   value={annee}
-                  onChange={(e) => setAnnee(parseInt(e.target.value) || new Date().getFullYear())}
+                  onChange={(e) => setAnnee(parseInt(e.target.value) || currentYear)}
                   className="w-full px-4 py-3 rounded-2xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
                   placeholder="2020"
                 />
@@ -185,7 +193,7 @@ export default function CalculateurPage() {
                   <option value="lpg" className="bg-slate-800">LPG (GPL)</option>
                 </select>
                 <p className="text-xs text-red-500 mt-2 font-bold">
-                  🏁 RedZone = Sportives thermiques uniquement
+                  🏁 Octane98 = Sportives thermiques uniquement
                 </p>
               </div>
 

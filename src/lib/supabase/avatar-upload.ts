@@ -1,4 +1,4 @@
-// RedZone - Upload d'avatar/logo vers Supabase Storage
+// Octane98 - Upload d'avatar/logo vers Supabase Storage
 
 import { createClient } from "./client";
 

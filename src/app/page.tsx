@@ -12,9 +12,11 @@ export default function Home() {
   const router = useRouter();
 
   // Récupérer les annonces actives depuis Supabase
+  // Limit optimisé : on n'affiche que 9 véhicules, donc on limite la requête à 9
   const { vehicules, isLoading } = useVehicules({
     status: "active",
     type: "car",
+    limit: 9, // Optimisation : ne charger que ce dont on a besoin
   });
 
   // 9 dernières annonces (les plus récentes) pour la vitrine
@@ -34,14 +36,27 @@ export default function Home() {
     <main className="min-h-screen bg-neutral-950 text-white">
       {/* HERO SECTION */}
       <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
-        {/* Fond avec dégradé noir/rouge profond */}
-        <div className="absolute inset-0 bg-gradient-to-br from-neutral-950 via-red-950/20 to-neutral-950">
+        {/* Image de fond - Supercar Octane98 */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/hero-bg.png"
+            alt="Supercar Octane98 ambiance"
+            fill
+            className="object-cover opacity-60"
+            priority
+            sizes="100vw"
+            unoptimized
+          />
+        </div>
+
+        {/* Fond avec dégradé noir/rouge profond - Par-dessus l'image */}
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-neutral-950 via-red-950/20 to-neutral-950">
           {/* Pattern subtil */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(220,38,38,0.1),transparent_70%)]" />
         </div>
 
         {/* Overlay pour améliorer la lisibilité du texte */}
-        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 z-0 bg-black/40" />
 
         {/* Contenu central */}
         <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
@@ -53,7 +68,7 @@ export default function Home() {
             .
           </h1>
           <p className="text-xl md:text-2xl lg:text-3xl text-neutral-300 mb-16 max-w-4xl mx-auto font-light leading-relaxed tracking-wide">
-            Le sanctuaire digital dédié aux puristes de la mécanique thermique. De la GTI à la Supercar, entrez dans le cercle RedZone.
+            Le sanctuaire digital dédié aux puristes de la mécanique thermique. De la GTI à la Supercar, entrez dans le cercle Octane98.
           </p>
 
           {/* Boutons CTA */}
@@ -124,7 +139,7 @@ export default function Home() {
                 Soyez le premier à publier !
               </h2>
               <p className="text-neutral-400 text-lg mb-8">
-                Aucune annonce disponible pour le moment. Partagez votre passion automobile et soyez le premier à publier une annonce sur RedZone.
+                Aucune annonce disponible pour le moment. Partagez votre passion automobile et soyez le premier à publier une annonce sur Octane98.
               </p>
               <Link
                 href="/sell"

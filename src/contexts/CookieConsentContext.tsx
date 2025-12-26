@@ -19,8 +19,8 @@ interface CookieConsentContextType {
 
 const CookieConsentContext = createContext<CookieConsentContextType | undefined>(undefined);
 
-const CONSENT_KEY = "redzone_cookie_consent";
-const CONSENT_DATE_KEY = "redzone_cookie_consent_date";
+const CONSENT_KEY = "octane98_cookie_consent";
+const CONSENT_DATE_KEY = "octane98_cookie_consent_date";
 const CONSENT_DURATION_MONTHS = 6;
 
 // Fonction pour charger le consentement initial depuis localStorage

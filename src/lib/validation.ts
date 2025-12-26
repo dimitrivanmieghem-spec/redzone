@@ -1,5 +1,5 @@
 /**
- * RedZone - Validation et Sanitization des Données
+ * Octane98 - Validation et Sanitization des Données
  * Protection contre injection, XSS, et données malformées
  */
 

@@ -1,4 +1,4 @@
-// RedZone - Actions Supabase pour les Articles (Blog)
+// Octane98 - Actions Supabase pour les Articles (Blog)
 // Note: Ce fichier est pour les Client Components
 // Pour les Server Components, utilisez articles-server.ts
 

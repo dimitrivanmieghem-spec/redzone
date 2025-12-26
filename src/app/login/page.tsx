@@ -162,10 +162,14 @@ function LoginContent() {
           .then(({ logFailedLogin }) => logFailedLogin(formData.email, error.message))
           .catch((logError) => console.error("Erreur lors du logging d'audit:", logError));
 
-        // Messages d'erreur plus clairs
+        // Messages d'erreur plus clairs et spécifiques
         let errorMessage = "Erreur de connexion";
         if (error.message?.includes("Invalid login credentials")) {
           errorMessage = "Email ou mot de passe incorrect";
+        } else if (error.message?.includes("Email not confirmed") || error.message?.includes("email_not_confirmed")) {
+          errorMessage = "Veuillez vérifier votre email avant de vous connecter. Consultez votre boîte mail et cliquez sur le lien de confirmation.";
+        } else if (error.message?.includes("Too many requests") || error.message?.includes("too_many_requests")) {
+          errorMessage = "Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.";
         } else if (error.message?.includes("timeout") || error.message?.includes("trop de temps")) {
           errorMessage = "La connexion prend trop de temps. Vérifiez votre connexion internet et réessayez.";
         } else if (error.message?.includes("network") || error.message?.includes("fetch")) {
@@ -237,9 +241,9 @@ function LoginContent() {
         {/* Titre */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-black text-white mb-2 tracking-tight">
-            Bienvenue sur RedZone
+            Bienvenue sur Octane98
           </h2>
-          <p className="text-slate-400">Connectez-vous à votre compte</p>
+          <p className="text-neutral-400">Connectez-vous à votre compte</p>
         </div>
 
         {/* Formulaire */}

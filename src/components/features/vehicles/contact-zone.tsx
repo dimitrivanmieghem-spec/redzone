@@ -48,17 +48,17 @@ export default function ContactZone({
   // Message WhatsApp pré-rempli
   const whatsappMessage = encodeURIComponent(
     `Bonjour ! 👋\n\n` +
-    `Je suis intéressé(e) par votre ${marque} ${modele} vue sur RedZone.\n\n` +
+    `Je suis intéressé(e) par votre ${marque} ${modele} vue sur Octane98.\n\n` +
     `Prix affiché : ${prix.toLocaleString("fr-BE")} €\n\n` +
     `Pourrions-nous en discuter ?\n\n` +
     `Merci ! 🏁`
   );
 
   // Email pré-rempli
-  const emailSubject = encodeURIComponent(`Intéressé par votre ${marque} ${modele} sur RedZone`);
+  const emailSubject = encodeURIComponent(`Intéressé par votre ${marque} ${modele} sur Octane98`);
   const emailBody = encodeURIComponent(
     `Bonjour,\n\n` +
-    `Je suis intéressé(e) par votre ${marque} ${modele} vue sur RedZone.\n\n` +
+    `Je suis intéressé(e) par votre ${marque} ${modele} vue sur Octane98.\n\n` +
     `Prix affiché : ${prix.toLocaleString("fr-BE")} €\n\n` +
     `Pourrions-nous en discuter ?\n\n` +
     `Merci,\n\n` +
@@ -129,7 +129,7 @@ export default function ContactZone({
     return (
       <div className="space-y-4">
         <a
-          href={`mailto:dimitri.vanmieghem@gmail.com?subject=${emailSubject}&body=${emailBody}`}
+          href={`mailto:admin@octane98.be?subject=${emailSubject}&body=${emailBody}`}
           className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black py-5 px-6 rounded-2xl transition-all hover:scale-105 shadow-2xl shadow-red-600/50 flex items-center justify-center gap-3 text-lg"
         >
           <Mail size={24} />
@@ -138,7 +138,7 @@ export default function ContactZone({
         <div className="flex items-center justify-center gap-2 text-neutral-400 text-sm">
           <Shield size={16} className="text-red-600" />
           <span className="font-medium">
-            <strong className="text-red-600">Contact sécurisé</strong> via RedZone
+            <strong className="text-red-600">Contact sécurisé</strong> via Octane98
           </span>
         </div>
       </div>
@@ -212,7 +212,7 @@ export default function ContactZone({
       <div className="flex items-center justify-center gap-2 text-neutral-400 text-sm pt-2">
         <Shield size={16} className="text-red-600" />
         <span className="font-medium">
-          <strong className="text-red-600">Sécurisé</strong> via RedZone • Réponse rapide garantie
+          <strong className="text-red-600">Sécurisé</strong> via Octane98 • Réponse rapide garantie
         </span>
       </div>
     </div>

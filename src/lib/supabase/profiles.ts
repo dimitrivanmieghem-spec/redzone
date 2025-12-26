@@ -1,12 +1,13 @@
-// RedZone - Fonctions pour récupérer les profils publics
+// Octane98 - Fonctions pour récupérer les profils publics
 
 import { createClient } from "./client";
+import type { UserRole } from "@/lib/permissions";
 
 export interface PublicProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "particulier" | "pro" | "admin";
+  role: UserRole;
   avatar_url: string | null;
   garage_name: string | null;
   garage_description: string | null;

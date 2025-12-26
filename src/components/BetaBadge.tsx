@@ -36,7 +36,7 @@ export default function BetaBadge() {
               <p className="text-xs text-slate-300 leading-relaxed">
                 Des bugs peuvent survenir. Un problème ? Contactez :{" "}
                 <a
-                  href="mailto:dimitri.vanmieghem@gmail.com"
+                  href="mailto:admin@octane98.be"
                   className="text-red-500 hover:text-red-400 font-bold underline"
                 >
                   l&apos;administrateur

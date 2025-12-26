@@ -1,4 +1,4 @@
-// RedZone - Client Supabase Admin (Service Role)
+// Octane98 - Client Supabase Admin (Service Role)
 // ⚠️ ATTENTION : Ce client utilise la SERVICE_ROLE_KEY et contourne toutes les politiques RLS
 // Utiliser UNIQUEMENT pour les opérations critiques nécessitant des privilèges élevés
 

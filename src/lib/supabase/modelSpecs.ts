@@ -1,4 +1,4 @@
-// RedZone - Fonctions pour récupérer les specs de véhicules depuis Supabase
+// Octane98 - Fonctions pour récupérer les specs de véhicules depuis Supabase
 // REFACTORING: Gestion d'erreur exhaustive avec logging détaillé
 
 import { createClient } from "./client";
@@ -147,11 +147,13 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
   try {
     const { data, error } = await supabaseQueryWithRetry(
       async () => {
+        // Utiliser ilike pour la casse (tolérant aux différences de casse)
+        // Cela permet de matcher "Abarth" avec "abarth" ou "ABARTH"
         const query = supabase
           .from(table)
           .select('modele')
           .eq('type', type)
-          .eq('marque', brand)
+          .ilike('marque', brand.trim())
           .eq('is_active', true)
           .order('modele');
         
@@ -168,15 +170,23 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
 
     if (error) {
       logError(context, table, operation, error, { type, brand });
+      console.error(`❌ [${context}] Erreur lors de la récupération des modèles pour ${brand} (${type}):`, error);
       return [];
     }
 
     if (!data || !Array.isArray(data)) {
-      console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null ou pas un tableau)`);
+      console.warn(`⚠️ [${context}] Aucune donnée retournée (data = null ou pas un tableau) pour ${brand} (${type})`);
       return [];
     }
 
     const models = data.map((item: any) => item.modele).filter(Boolean);
+    
+    if (models.length === 0) {
+      console.warn(`⚠️ [${context}] Aucun modèle trouvé pour la marque "${brand}" (type: ${type}). Vérifiez que la marque existe dans model_specs_db avec la même casse.`);
+    } else {
+      console.log(`✅ [${context}] ${models.length} modèle(s) trouvé(s) pour ${brand} (${type}):`, models.slice(0, 5), models.length > 5 ? '...' : '');
+    }
+    
     return models;
   } catch (err) {
     logError(context, table, operation, err, { type, brand });

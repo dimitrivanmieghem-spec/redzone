@@ -1,6 +1,6 @@
 "use server";
 
-// RedZone - Server Actions pour la Gestion des Utilisateurs (Admin)
+// Octane98 - Server Actions pour la Gestion des Utilisateurs (Admin)
 // Ces actions utilisent le service_role pour les opérations sensibles
 
 import { revalidatePath } from "next/cache";
@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "../server";
 import { createAdminClient } from "../admin";
 import { requireAdmin } from "../auth-utils-server";
+import type { UserRole } from "@/lib/permissions";
 import { createNotification } from "../notifications-server";
 
 // Utiliser le client admin centralisé
@@ -108,7 +109,7 @@ export async function unbanUser(userId: string) {
   await createNotification(
     userId,
     "Compte réactivé",
-    "Votre compte a été réactivé. Vous pouvez à nouveau utiliser RedZone.",
+    "Votre compte a été réactivé. Vous pouvez à nouveau utiliser Octane98.",
     "success",
     "/dashboard",
     { action: "unban" }
@@ -245,7 +246,7 @@ export async function createUserManually(
   email: string,
   password: string,
   fullName: string,
-  role: "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer"
+  role: UserRole
 ): Promise<{ success: boolean; userId: string | null; error?: string }> {
   try {
     // Vérification admin avec le client serveur
@@ -288,7 +289,12 @@ export async function createUserManually(
 
     const userId = authData.user.id;
 
+    // Attendre un peu pour que le trigger s'exécute (si présent)
+    // Le trigger handle_new_user() s'exécute immédiatement après l'INSERT dans auth.users
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Créer ou mettre à jour le profil dans la table profiles
+    // Le trigger peut avoir déjà créé le profil, donc on utilise upsert avec onConflict
     const { error: profileError } = await serviceClient
       .from("profiles")
       .upsert({
@@ -301,19 +307,48 @@ export async function createUserManually(
       });
 
     if (profileError) {
-      // Si l'erreur est due à un profil déjà existant (créé par trigger), on le met à jour
-      const { error: updateError } = await serviceClient
-        .from("profiles")
-        .update({
-          email: email.trim().toLowerCase(),
-          full_name: fullName.trim(),
-          role: role,
-        })
-        .eq("id", userId);
+      // Détecter le type d'erreur
+      const isDuplicateError = 
+        profileError.code === '23505' || // PostgreSQL unique violation
+        profileError.message?.toLowerCase().includes('duplicate') ||
+        profileError.message?.toLowerCase().includes('unique') ||
+        profileError.message?.toLowerCase().includes('already exists');
 
-      if (updateError) {
-        console.error("Erreur mise à jour profil:", updateError);
-        // Ne pas échouer si le profil existe déjà (créé par trigger)
+      if (isDuplicateError) {
+        // Le profil existe déjà (créé par trigger), faire un UPDATE
+        const { error: updateError } = await serviceClient
+          .from("profiles")
+          .update({
+            email: email.trim().toLowerCase(),
+            full_name: fullName.trim(),
+            role: role,
+          })
+          .eq("id", userId);
+
+        if (updateError) {
+          console.error("Erreur mise à jour profil après trigger:", updateError);
+          // Ne pas échouer complètement, le profil existe déjà (créé par trigger)
+          // L'utilisateur peut toujours se connecter, même si le rôle n'est pas mis à jour immédiatement
+        }
+      } else {
+        // Autre erreur (contrainte, RLS, etc.)
+        console.error("Erreur upsert profil (non-duplicate):", profileError);
+        // Essayer quand même un UPDATE au cas où le profil existe
+        const { error: updateError } = await serviceClient
+          .from("profiles")
+          .update({
+            email: email.trim().toLowerCase(),
+            full_name: fullName.trim(),
+            role: role,
+          })
+          .eq("id", userId);
+
+        if (updateError) {
+          // Si l'UPDATE échoue aussi, le profil n'existe probablement pas
+          // Le trigger a peut-être échoué, mais on ne bloque pas la création de l'utilisateur auth
+          console.warn("⚠️ Le profil n'a pas pu être créé/mis à jour, mais l'utilisateur auth a été créé avec succès.");
+          console.warn("   → L'utilisateur pourra se connecter, mais devra peut-être compléter son profil.");
+        }
       }
     }
 

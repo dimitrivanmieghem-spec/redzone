@@ -1,4 +1,4 @@
-// RedZone - Système de Logging pour Monitoring
+// Octane98 - Système de Logging pour Monitoring
 
 import { createClient } from "./client";
 

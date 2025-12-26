@@ -7,6 +7,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Vehicule } from "@/lib/supabase/types";
 import CarCard from "@/components/features/vehicles/car-card";
+import type { UserRole } from "@/lib/permissions";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Building2,
   Globe,
@@ -20,13 +22,14 @@ import {
   Award,
   Crown,
   ArrowRight,
+  Lock,
 } from "lucide-react";
 
 interface PremiumGarageProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "particulier" | "pro" | "admin";
+  role: UserRole;
   avatar_url: string | null;
   garage_name: string | null;
   garage_description: string | null;
@@ -46,11 +49,15 @@ interface PremiumGarageProfile {
 export default function GaragePage() {
   const params = useParams();
   const userId = Array.isArray(params.userId) ? params.userId[0] : (params.userId as string);
+  const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<PremiumGarageProfile | null>(null);
   const [vehicles, setVehicles] = useState<Vehicule[]>([]);
   const [soldVehicles, setSoldVehicles] = useState<Vehicule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Vérifier si le visiteur est connecté (RGPD - protection des données sensibles)
+  const isVisitorConnected = Boolean(user && !authLoading);
 
   useEffect(() => {
     const loadGarageData = async () => {
@@ -151,9 +158,23 @@ export default function GaragePage() {
     );
   }
 
-  const fullAddress = [profile.address, profile.postal_code, profile.city]
-    .filter(Boolean)
-    .join(", ");
+  // RGPD : Construire l'adresse selon l'état de connexion du visiteur
+  // Si non connecté : seulement ville + code postal (pas la rue)
+  // Si connecté : adresse complète
+  const getDisplayAddress = () => {
+    if (isVisitorConnected) {
+      // Visiteur connecté : adresse complète
+      return [profile.address, profile.postal_code, profile.city]
+        .filter(Boolean)
+        .join(", ");
+    } else {
+      // Visiteur non connecté : seulement ville + code postal (RGPD)
+      return [profile.postal_code, profile.city]
+        .filter(Boolean)
+        .join(", ");
+    }
+  };
+  const displayAddress = getDisplayAddress();
 
   // Calculer l'année de création (depuis created_at ou founded_year)
   const memberSince = profile.founded_year || new Date(profile.created_at).getFullYear();
@@ -254,14 +275,28 @@ export default function GaragePage() {
 
                 {/* CTA Premium */}
                 <div className="flex flex-wrap items-center gap-4">
-                  <a
-                    href={`mailto:${profile.email}?subject=Demande de rendez-vous privé&body=Bonjour,%0D%0A%0D%0AJe souhaiterais solliciter un rendez-vous privé pour découvrir votre collection.`}
-                    className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-neutral-950 font-black px-8 py-4 rounded-full transition-all shadow-2xl shadow-amber-500/30 hover:scale-105"
-                  >
-                    <Sparkles size={20} />
-                    <span>Solliciter un rendez-vous privé</span>
-                    <ArrowRight size={18} />
-                  </a>
+                  {/* RGPD : Email - Affichage conditionnel selon connexion */}
+                  {isVisitorConnected ? (
+                    // Visiteur connecté : afficher le lien email normal
+                    <a
+                      href={`mailto:${profile.email}?subject=Demande de rendez-vous privé&body=Bonjour,%0D%0A%0D%0AJe souhaiterais solliciter un rendez-vous privé pour découvrir votre collection.`}
+                      className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-neutral-950 font-black px-8 py-4 rounded-full transition-all shadow-2xl shadow-amber-500/30 hover:scale-105"
+                    >
+                      <Sparkles size={20} />
+                      <span>Solliciter un rendez-vous privé</span>
+                      <ArrowRight size={18} />
+                    </a>
+                  ) : (
+                    // Visiteur non connecté : bouton de connexion (RGPD - email non exposé)
+                    <Link
+                      href={`/login?redirect=/garage/${userId}`}
+                      className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-neutral-950 font-black px-8 py-4 rounded-full transition-all shadow-2xl shadow-amber-500/30 hover:scale-105"
+                    >
+                      <Lock size={20} />
+                      <span>Connectez-vous pour voir les coordonnées</span>
+                      <ArrowRight size={18} />
+                    </Link>
+                  )}
 
                   {/* Infos pratiques */}
                   <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
@@ -276,13 +311,16 @@ export default function GaragePage() {
                         <span>Site web</span>
                       </a>
                     )}
-                    {fullAddress && (
+                    {/* RGPD : Adresse - Affichage conditionnel selon connexion */}
+                    {displayAddress && (
                       <div className="flex items-center gap-2">
                         <MapPin size={16} />
-                        <span>{fullAddress}</span>
+                        <span>{displayAddress}</span>
                       </div>
                     )}
-                    {profile.phone && (
+                    {/* RGPD : Téléphone - Affichage conditionnel selon connexion */}
+                    {isVisitorConnected && profile.phone ? (
+                      // Visiteur connecté : afficher le téléphone
                       <a
                         href={`tel:${profile.phone}`}
                         className="flex items-center gap-2 hover:text-amber-400 transition-colors"
@@ -290,7 +328,16 @@ export default function GaragePage() {
                         <Phone size={16} />
                         <span>{profile.phone}</span>
                       </a>
-                    )}
+                    ) : profile.phone ? (
+                      // Visiteur non connecté : bouton de connexion (RGPD - téléphone non exposé)
+                      <Link
+                        href={`/login?redirect=/garage/${userId}`}
+                        className="flex items-center gap-2 hover:text-amber-400 transition-colors"
+                      >
+                        <Lock size={16} />
+                        <span>Connectez-vous pour voir les coordonnées</span>
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </div>

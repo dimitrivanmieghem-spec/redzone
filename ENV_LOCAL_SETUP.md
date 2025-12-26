@@ -45,7 +45,7 @@ Ces variables ne sont **pas nécessaires** en développement local. Supprimez-le
    - **Quand l'ajouter** : Uniquement en production (Netlify) si vous voulez un CAPTCHA réel
 
 3. **`ADMIN_EMAIL`**
-   - **Raison** : Un fallback existe dans le code (`dimitri@gmail.com`)
+   - **Raison** : Un fallback existe dans le code (`admin@octane98.be`)
    - **Quand l'ajouter** : Uniquement si vous voulez personnaliser l'email admin
 
 ---

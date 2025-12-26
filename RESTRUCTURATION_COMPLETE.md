@@ -27,7 +27,7 @@
 **✅ `src/lib/supabase/server-actions/admin.ts` (NOUVEAU)**
 - Server Action `checkAdminStatus()`
 - Vérifie le rôle dans la table `profiles`
-- Fallback sur l'email admin (`dimitri.vanmieghem@gmail.com`) si la DB est inaccessible
+- Fallback sur l'email admin (`admin@octane98.be`) si la DB est inaccessible
 - Retourne `{ isAdmin, email, role }`
 
 ### 2. **GESTION DES UTILISATEURS**

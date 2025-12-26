@@ -1,15 +1,22 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import type { UserRole } from "@/lib/permissions";
+
+// Valeur par défaut pour le rôle utilisateur
+const DEFAULT_USER_ROLE: UserRole = "particulier";
+
+// Rôle admin pour les vérifications spécifiques
+const ADMIN_ROLE: UserRole = "admin";
 
 interface User {
   id: string;
   email: string;
   name: string;
   avatar: string;
-  role: "particulier" | "pro" | "admin" | "moderator" | "support" | "editor" | "viewer";
+  role: UserRole;
   is_banned?: boolean;
   ban_reason?: string | null;
   is_founder?: boolean;
@@ -90,10 +97,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
-      if (session?.user) {
-        await updateUserFromSession(session.user);
-      } else {
-        setUser(null);
+      try {
+        if (session?.user) {
+          await updateUserFromSession(session.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        // Protéger la boucle d'événements Auth : ne pas laisser une erreur silencieuse la briser
+        console.error("Erreur dans onAuthStateChange:", error);
+        // En cas d'erreur, définir user à null pour éviter un état incohérent
+        // (sauf si c'est une erreur de ban qui doit être propagée)
+        if (!(error instanceof Error && error.message.includes("banni"))) {
+          setUser(null);
+        }
       }
     });
 
@@ -120,31 +137,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       */
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase.auth]);
 
   // Transformer SupabaseUser en User
-  async function updateUserFromSession(supabaseUser: SupabaseUser) {
+  // MODE FAIL-SAFE : Garantit que setUser est TOUJOURS appelé, même si la DB échoue
+  const updateUserFromSession = useCallback(async (supabaseUser: SupabaseUser) => {
     try {
-      // Récupérer le profil depuis la table profiles
-      const { data: profile } = await supabase
+      // Récupérer le profil depuis la table profiles (avec gestion d'erreur)
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", supabaseUser.id)
         .single();
 
-      // Logger l'accès au profil (RGPD - accès aux données personnelles)
-      if (profile) {
-        try {
-          const { logDataAccess } = await import("@/lib/supabase/audit-logs-client");
-          await logDataAccess("profile", supabaseUser.id, "Accès au profil utilisateur");
-        } catch (logError) {
-          // Ne pas bloquer le chargement en cas d'erreur de logging
-          console.error("Erreur lors du logging d'audit:", logError);
+      // MODE DÉGRADÉ : Si erreur ou profil manquant, créer un utilisateur par défaut
+      if (profileError || !profile) {
+        // Log l'erreur pour debugging, mais ne bloque pas
+        if (profileError) {
+          console.warn("Profil non trouvé ou erreur de récupération:", profileError.message);
+        } else {
+          console.warn("Profil manquant pour l'utilisateur:", supabaseUser.id);
         }
+
+        // Créer un utilisateur minimal en mode dégradé avec les infos de base
+        const defaultName = supabaseUser.email?.split("@")[0] || "Utilisateur";
+        const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(defaultName)}&background=DC2626&color=fff&bold=true`;
+        
+        // Lire is_founder depuis user_metadata en fallback
+        const isFounder = Boolean(
+          supabaseUser.user_metadata?.is_founder === true ||
+          supabaseUser.user_metadata?.isFounder === true
+        );
+
+        setUser({
+          id: supabaseUser.id,
+          email: supabaseUser.email || "",
+          name: supabaseUser.user_metadata?.full_name || defaultName,
+          avatar: supabaseUser.user_metadata?.avatar_url || defaultAvatar,
+          role: DEFAULT_USER_ROLE, // Rôle par défaut en mode dégradé
+          is_banned: false,
+          ban_reason: null,
+          ban_until: null,
+          is_founder: isFounder,
+        });
+        return; // Sortir de la fonction après avoir défini l'utilisateur par défaut
+      }
+
+      // PROFIL TROUVÉ : Traitement normal avec toutes les données
+      // Logger l'accès au profil (RGPD - accès aux données personnelles)
+      try {
+        const { logDataAccess } = await import("@/lib/supabase/audit-logs-client");
+        await logDataAccess("profile", supabaseUser.id, "Accès au profil utilisateur");
+      } catch (logError) {
+        // Ne pas bloquer le chargement en cas d'erreur de logging
+        console.error("Erreur lors du logging d'audit:", logError);
       }
 
       // Vérifier si le ban a expiré
-      if (profile?.is_banned && profile?.ban_until) {
+      if (profile.is_banned && profile.ban_until) {
         const banUntilDate = new Date(profile.ban_until);
         if (banUntilDate < new Date()) {
           // Ban expiré, débannir automatiquement
@@ -162,35 +213,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Vérifier si l'utilisateur est fondateur (depuis user_metadata ou simulation)
+      // Lire la vraie valeur is_founder depuis le profil dans la base de données
+      // Priorité : 1) profile.is_founder (source de vérité), 2) user_metadata (fallback), 3) false (fail-safe)
+      const isFounder = Boolean(
+        profile.is_founder === true ||
+        supabaseUser.user_metadata?.is_founder === true ||
+        supabaseUser.user_metadata?.isFounder === true
+      );
+
+      // Définir l'utilisateur avec le profil complet
+      setUser({
+        id: supabaseUser.id,
+        email: supabaseUser.email || "",
+        name: profile.full_name || supabaseUser.email?.split("@")[0] || "Utilisateur",
+        avatar: profile.avatar_url || 
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            profile.full_name || supabaseUser.email?.split("@")[0] || "U"
+          )}&background=DC2626&color=fff&bold=true`,
+        role: (profile.role as UserRole) || DEFAULT_USER_ROLE,
+        is_banned: profile.is_banned || false,
+        ban_reason: profile.ban_reason || null,
+        ban_until: profile.ban_until || null,
+        is_founder: isFounder,
+      });
+    } catch (error) {
+      // Gestion d'erreur critique : même en cas d'exception, créer un utilisateur minimal
+      console.error("Erreur critique chargement profil:", error);
+      
+      // Si l'erreur concerne un ban, la propager pour traitement spécial
+      if (error instanceof Error && error.message.includes("banni")) {
+        throw error;
+      }
+
+      // MODE DÉGRADÉ D'URGENCE : Créer un utilisateur minimal pour éviter le blocage
+      const defaultName = supabaseUser.email?.split("@")[0] || "Utilisateur";
+      const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(defaultName)}&background=DC2626&color=fff&bold=true`;
+      
       const isFounder = Boolean(
         supabaseUser.user_metadata?.is_founder === true ||
-        supabaseUser.user_metadata?.isFounder === true ||
-        // Simulation : les 500 premiers utilisateurs (basé sur l'ID ou la date de création)
-        (supabaseUser.created_at && new Date(supabaseUser.created_at) < new Date("2025-02-01"))
+        supabaseUser.user_metadata?.isFounder === true
       );
 
       setUser({
         id: supabaseUser.id,
         email: supabaseUser.email || "",
-        name: profile?.full_name || supabaseUser.email?.split("@")[0] || "Utilisateur",
-        avatar: profile?.avatar_url || 
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            profile?.full_name || supabaseUser.email?.split("@")[0] || "U"
-          )}&background=DC2626&color=fff&bold=true`,
-        role: (profile?.role as "particulier" | "pro" | "admin") || "particulier",
-        is_banned: profile?.is_banned || false,
-        ban_reason: profile?.ban_reason || null,
-        ban_until: profile?.ban_until || null,
+        name: supabaseUser.user_metadata?.full_name || defaultName,
+        avatar: supabaseUser.user_metadata?.avatar_url || defaultAvatar,
+        role: DEFAULT_USER_ROLE,
+        is_banned: false,
+        ban_reason: null,
+        ban_until: null,
         is_founder: isFounder,
       });
-    } catch (error) {
-      console.error("Erreur chargement profil:", error);
-      if (error instanceof Error && error.message.includes("banni")) {
-        throw error;
-      }
     }
-  }
+  }, [supabase]);
 
   // Connexion
   async function login(email: string, password: string) {
@@ -239,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: data.user.id,
           email: email,
           full_name: name,
-          role: "particulier", // Par défaut, mais peut être modifié via metadata
+          role: DEFAULT_USER_ROLE, // Par défaut, mais peut être modifié via metadata
         });
 
         if (profileError) {
@@ -280,8 +356,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Utilisez directement login() avec votre email admin
     
     // Option 2 : Pour le dev, on peut utiliser un email admin par défaut
-    // Remplacez "admin@redzone.be" par votre email admin réel
-    const adminEmail = "admin@redzone.be"; // ⚠️ CHANGEZ CET EMAIL
+    // Remplacez "admin@octane98.be" par votre email admin réel
+    const adminEmail = "admin@octane98.be"; // ⚠️ CHANGEZ CET EMAIL
     
     try {
       await login(adminEmail, password);
@@ -312,7 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error("Erreur de vérification du profil administrateur");
         }
         
-        if (!profile || profile.role !== "admin") {
+        if (!profile || (profile.role as UserRole) !== ADMIN_ROLE) {
           await logout();
           throw new Error("Ce compte n'est pas administrateur. Contactez un admin pour obtenir les droits.");
         }

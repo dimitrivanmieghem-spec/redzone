@@ -22,6 +22,7 @@ export function useVehicules(filters?: {
   modele?: string;
   prixMin?: number;
   prixMax?: number;
+  limit?: number; // Pagination optionnelle
 }) {
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,10 +46,37 @@ export function useVehicules(filters?: {
 
       try {
         const supabase = createClient();
+        
+        // SELECT OPTIMISÉ : Ne charger que les champs nécessaires pour les cartes de liste
+        // Évite de charger les descriptions longues, toutes les images, l'historique, etc.
+        const selectFields = [
+          "id",
+          "brand",
+          "model",
+          "year",
+          "price",
+          "mileage",
+          "fuel_type",
+          "city",
+          "image", // Première image uniquement (pas le tableau images complet)
+          "owner_id",
+          "created_at",
+          "car_pass",
+          "euro_standard",
+          "poids_kg",
+          "power_hp",
+          "status",
+          "type",
+        ].join(", ");
+
         let query = supabase
           .from("vehicles")
-          .select("*")
+          .select(selectFields)
           .order("created_at", { ascending: false });
+
+        // Pagination par défaut : limiter à 50 véhicules pour éviter les timeouts
+        const limit = filters?.limit || 50;
+        query = query.limit(limit);
 
         // Filtrer par défaut sur les véhicules actifs si aucun filtre de status n'est spécifié
         if (filters?.status) {
@@ -75,7 +103,7 @@ export function useVehicules(filters?: {
           query = query.lte("price", filters.prixMax);
         }
 
-        // Utiliser retry pour les requêtes réseau
+        // Utiliser retry pour les requêtes réseau avec timeout plus court
         const { supabaseQueryWithRetry } = await import("@/lib/supabase/retry-utils");
         const result = await supabaseQueryWithRetry(
           () => query,
@@ -153,8 +181,8 @@ export function useVehicules(filters?: {
       }
     }
 
-    // Timeout de sécurité : forcer isLoading à false après 20 secondes
-    // Augmenté pour permettre aux connexions lentes de se terminer
+    // Timeout de sécurité : forcer isLoading à false après 15 secondes
+    // Réduit grâce à l'optimisation du select (moins de données = chargement plus rapide)
     const timeoutId = setTimeout(() => {
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         // Ne pas afficher de warning si on a déjà des données précédentes
@@ -167,7 +195,7 @@ export function useVehicules(filters?: {
           setError("Le chargement prend trop de temps. Veuillez réessayer.");
         }
       }
-    }, 20000); // 20 secondes (augmenté pour connexions lentes)
+    }, 15000); // 15 secondes (optimisé grâce au select chirurgical)
 
     fetchVehicules();
 
@@ -185,6 +213,7 @@ export function useVehicules(filters?: {
     filters?.modele,
     filters?.prixMin,
     filters?.prixMax,
+    filters?.limit,
   ]);
 
   return { vehicules, isLoading, error };

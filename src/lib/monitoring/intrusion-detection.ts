@@ -1,5 +1,5 @@
 /**
- * RedZone - Détection d'Intrusion
+ * Octane98 - Détection d'Intrusion
  * Système de monitoring pour détecter les tentatives d'intrusion et activités suspectes
  * 
  * IMPORTANT : Ce fichier est utilisé côté serveur uniquement (middleware, API routes)
