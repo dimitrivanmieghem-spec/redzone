@@ -1,26 +1,33 @@
 "use client";
 
-import { ArrowLeft, Car, Bike, Check, AlertTriangle, ChevronRight, ChevronLeft, Upload, Music, Shield, Loader2, Building2, MapPin, Mail } from "lucide-react";
+import { ArrowLeft, Check, AlertTriangle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useMemo, useRef, useEffect, useTransition, Suspense } from "react";
+import { useState, useMemo, useEffect, useTransition, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBanSimulation } from "@/contexts/BanSimulationContext";
-import { useCookieConsent } from "@/contexts/CookieConsentContext";
+// useCookieConsent n'est plus utilisé dans ce fichier
 import { VehicleType } from "@/lib/supabase/modelSpecs";
 import { getBrands, getModels, getModelSpecs } from "@/lib/supabase/modelSpecs";
-import { checkVehicleModeration, getModerationMessage } from "@/lib/moderationUtils";
-import { uploadImages, uploadAudio } from "@/lib/supabase/uploads";
-import MediaManager from "@/components/MediaManager";
-import SearchableSelect from "@/components/SearchableSelect";
+import { checkVehicleModeration } from "@/lib/moderationUtils";
+// MediaManager gère maintenant les uploads directement
 import { verifyEmailCode, storeVerificationCode } from "@/lib/supabase/vehicules";
-import { createVehicule, saveVehicle } from "@/lib/supabase/server-actions/vehicules";
+import { saveVehicle } from "@/lib/supabase/server-actions/vehicules";
 import { getVehiculeById } from "@/lib/supabase/vehicules";
 import { logInfo, logError } from "@/lib/supabase/logs";
-import { EXTERIOR_COLORS, INTERIOR_COLORS, CARROSSERIE_TYPES, EXTERIOR_COLOR_HEX, INTERIOR_COLOR_HEX } from "@/lib/vehicleData";
-import { Turnstile } from "@marsidev/react-turnstile";
+// Ces imports sont utilisés dans les composants enfants, pas dans ce fichier
 import { generateVerificationCode, sendVerificationEmail, getVerificationCodeExpiry } from "@/lib/emailVerification";
+import Step1Identity from "@/components/features/sell-form/Step1Identity";
+import Step2Mechanic from "@/components/features/sell-form/Step2Mechanic";
+import Step3Aesthetic from "@/components/features/sell-form/Step3Aesthetic";
+// Step4Gallery est logiquement Step3Media (renommé pour clarté dans le code)
+import Step3Media from "@/components/features/sell-form/Step3Media";
+const Step4Gallery = Step3Media;
+import Step4Finalize from "@/components/features/sell-form/Step4Finalize";
+import SellFormNavigation from "@/components/features/sell-form/SellFormNavigation";
+import StepperProgress from "@/components/features/sell-form/StepperProgress";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -30,7 +37,7 @@ function SellPageContent() {
   const { showToast } = useToast();
   const { user } = useAuth();
   const { isSimulatingBan } = useBanSimulation();
-  const { hasResponded } = useCookieConsent();
+  // useCookieConsent n'est plus utilisé dans ce fichier
 
   // Détecter l'ID du véhicule dans l'URL (mode édition)
   const vehiculeId = searchParams.get("id");
@@ -50,11 +57,99 @@ function SellPageContent() {
       router.push("/dashboard");
     }
   }, [isEffectivelyBanned, isSimulatingBan, user?.role, router, showToast]);
+
+  // Vérification du quota au chargement (uniquement pour les utilisateurs connectés et en mode création)
+  useEffect(() => {
+    let isMounted = true; // Flag pour éviter les mises à jour après démontage
+
+    const checkQuota = async () => {
+      // Ne vérifier que si :
+      // - L'utilisateur est connecté
+      // - Ce n'est PAS le mode édition (on peut toujours éditer)
+      // - L'utilisateur n'est pas banni
+      if (!user || isEditMode || isEffectivelyBanned) {
+        if (isMounted) {
+          setIsCheckingQuota(false);
+          setCanCreateAdvert(true); // Autoriser l'édition ou les invités
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setIsCheckingQuota(true);
+      }
+
+      try {
+        // Import dynamique avec gestion d'erreur explicite
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+
+        // Appeler la fonction RPC can_create_advert
+        const { data: canCreate, error: quotaError } = await supabase.rpc("can_create_advert", {
+          user_id: user.id,
+        });
+
+        if (!isMounted) return; // Ne pas mettre à jour si le composant est démonté
+
+        if (quotaError) {
+          console.error("Erreur vérification quota:", quotaError);
+          // En cas d'erreur, on autorise quand même (fail-open pour ne pas bloquer)
+          setCanCreateAdvert(true);
+          setIsCheckingQuota(false);
+          return;
+        }
+
+        // Récupérer les infos de quota pour l'affichage
+        const { data: quotaData, error: infoError } = await supabase.rpc("get_user_quota_info", {
+          user_id: user.id,
+        });
+
+        if (!infoError && quotaData && quotaData.length > 0 && isMounted) {
+          setQuotaInfo(quotaData[0]);
+        }
+
+        // ✅ FIX : Gérer explicitement undefined/null
+        const canCreateValue = canCreate === true;
+        if (isMounted) {
+          setCanCreateAdvert(canCreateValue);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification du quota:", error);
+        // En cas d'erreur, on autorise quand même (fail-open)
+        if (isMounted) {
+          setCanCreateAdvert(true);
+          setIsCheckingQuota(false); // ✅ GARANTIR l'arrêt du spinner même en cas d'erreur
+        }
+      } finally {
+        // ✅ GARANTIR l'arrêt du spinner dans tous les cas
+        if (isMounted) {
+          setIsCheckingQuota(false);
+        }
+      }
+    };
+
+    checkQuota();
+
+    // Cleanup : marquer le composant comme démonté
+    return () => {
+      isMounted = false;
+    };
+  }, [user, isEditMode, isEffectivelyBanned]);
+
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
-  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [isLoadingVehicle, setIsLoadingVehicle] = useState(false);
+  
+  // État pour la vérification de quota
+  const [isCheckingQuota, setIsCheckingQuota] = useState(true);
+  const [canCreateAdvert, setCanCreateAdvert] = useState<boolean | null>(null);
+  const [quotaInfo, setQuotaInfo] = useState<{
+    current_count: number;
+    max_limit: number;
+    role: string;
+    is_founder: boolean;
+    remaining_slots: number;
+  } | null>(null);
   
   // États pour la sécurité (CAPTCHA et vérification email)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -62,9 +157,7 @@ function SellPageContent() {
   const [verificationCode, setVerificationCode] = useState("");
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   
-  // Refs pour les inputs file
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const audioInputRef = useRef<HTMLInputElement>(null);
+  // MediaManager gère maintenant les uploads directement, plus besoin de refs
 
   // Données du formulaire
   const [formData, setFormData] = useState({
@@ -119,6 +212,7 @@ function SellPageContent() {
     co2Wltp: "", // CO2 WLTP (pour Flandre) - Pré-rempli depuis la base si disponible
     drivetrain: "", // RWD/FWD/AWD/4WD - Pré-rempli depuis la base si disponible
     topSpeed: "", // Vitesse maximale en km/h - Pré-rempli depuis la base si disponible
+    normeEuro: "", // Norme Euro - Modifiable (par défaut euro6d)
   });
 
   // Auto-modération "Le Videur"
@@ -243,6 +337,7 @@ function SellPageContent() {
           co2Wltp: vehicule.co2_wltp?.toString() || "",
           drivetrain: vehicule.drivetrain || "",
           topSpeed: vehicule.top_speed?.toString() || "",
+          normeEuro: vehicule.euro_standard || "euro6d",
         });
 
         // Définir hasCo2Data si CO2 existe
@@ -502,6 +597,7 @@ function SellPageContent() {
     );
   }, [formData.type, formData.marque, formData.modele, formData.carburant, moderationCheck.isAllowed, isManualModel]);
 
+  // Validation Étape 2 : Mécanique
   const isStep2Valid = useMemo(() => {
     const prixNum = parseFloat(formData.prix);
     const anneeNum = parseInt(formData.annee);
@@ -533,14 +629,20 @@ function SellPageContent() {
       (!hasCo2Data || (formData.co2 && !isNaN(co2Num) && co2Num >= 0)) &&
       // Pour les modèles manuels, cylindrée et moteur sont obligatoires
       (!isManualModel || (formData.cylindree && !isNaN(cylindreeNum) && cylindreeNum > 0)) &&
-      (!isManualModel || formData.moteur.trim()) &&
+      (!isManualModel || formData.moteur.trim())
+    );
+  }, [formData.prix, formData.annee, formData.km, formData.transmission, formData.puissance, formData.cvFiscaux, formData.co2, formData.cylindree, formData.moteur, isManualModel, hasCo2Data]);
+
+  // Validation Étape 3 : Esthétique
+  const isStep3Valid = useMemo(() => {
+    return !!(
       formData.description.trim().length >= 20 && // Description min 20 caractères
       !descriptionCheck.hasError // Pas de mots interdits dans description
     );
-  }, [formData.prix, formData.annee, formData.km, formData.transmission, formData.puissance, formData.cvFiscaux, formData.co2, formData.cylindree, formData.moteur, formData.description, descriptionCheck.hasError, isManualModel, hasCo2Data]);
+  }, [formData.description, descriptionCheck.hasError]);
 
-  // Validation étape 3 : Au moins une photo obligatoire + coordonnées
-  const isStep3Valid = useMemo(() => {
+  // Validation étape 4 : Au moins une photo obligatoire + coordonnées
+  const isStep4Valid = useMemo(() => {
     const hasPhotos = formData.photos.length > 0;
     // Email obligatoire si invité, sinon optionnel (utilisera user.email)
     const hasContactEmail = !!formData.contactEmail && formData.contactEmail.includes('@');
@@ -560,10 +662,14 @@ function SellPageContent() {
       return;
     }
     if (currentStep === 2 && !isStep2Valid) {
-      showToast("Veuillez remplir tous les champs correctement", "error");
+      showToast("Veuillez remplir tous les champs mécaniques correctement", "error");
       return;
     }
-    if (currentStep < 3) {
+    if (currentStep === 3 && !isStep3Valid) {
+      showToast("La description doit contenir au moins 20 caractères", "error");
+      return;
+    }
+    if (currentStep < 4) {
       setCurrentStep((prev) => (prev + 1) as Step);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -574,6 +680,26 @@ function SellPageContent() {
       setCurrentStep((prev) => (prev - 1) as Step);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+  };
+
+  const handleStepClick = (step: number) => {
+    // Permettre de revenir en arrière uniquement
+    if (step < currentStep) {
+      setCurrentStep(step as Step);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  // Animation variants pour framer-motion
+  const stepVariants = {
+    hidden: { opacity: 0, x: 20 },
+    visible: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -20 },
+  };
+
+  const stepTransition = {
+    duration: 0.3,
+    ease: [0.42, 0, 0.58, 1] as [number, number, number, number], // Courbe de Bézier équivalente à easeInOut
   };
 
   // Vérification du code email
@@ -612,7 +738,7 @@ function SellPageContent() {
   // Soumission
   const handleSubmit = async () => {
     if (!moderationCheck.isAllowed) {
-      showToast("⛔ Ce véhicule ne peut pas être publié sur RedZone", "error");
+      showToast("⛔ Ce véhicule ne peut pas être publié sur Octane98", "error");
       return;
     }
 
@@ -631,7 +757,7 @@ function SellPageContent() {
     // Validation stricte : Rejeter tout carburant non-thermique
     const carburant = formData.carburant?.toLowerCase() || "";
     if (!carburant || FORBIDDEN_CARBURANTS.includes(carburant) || !VALID_CARBURANTS.includes(carburant as typeof VALID_CARBURANTS[number])) {
-      showToast("⛔ RedZone est dédié aux sportives thermiques uniquement. Les véhicules électriques, hybrides et diesel ne sont pas acceptés.", "error");
+      showToast("⛔ Octane98 est dédié aux sportives thermiques uniquement. Les véhicules électriques, hybrides et diesel ne sont pas acceptés.", "error");
       return;
     }
 
@@ -672,7 +798,7 @@ function SellPageContent() {
         body_type: formData.carrosserie || (formData.type === "car" ? "Coupé" : "Sportive"),
         power_hp: parseInt(formData.puissance),
         condition: "Occasion" as "Neuf" | "Occasion",
-        euro_standard: "euro6d",
+        euro_standard: formData.normeEuro || "euro6d",
         car_pass: !!formData.carPassUrl, // true si URL fournie
         image: formData.photos[0] || "",
         images: formData.photos.length > 0 ? formData.photos : null,
@@ -709,20 +835,77 @@ function SellPageContent() {
         user ? null : contactEmail // userId si connecté, sinon guestEmail
       );
 
-      // Log de succès (seulement si connecté)
-      if (user) {
-        await logInfo(
-          `Ad [${savedVehiculeId}] ${isEditMode ? "updated" : "submitted"} successfully by User [${user.id}]`,
-          user.id,
-          {
-            vehicule_id: savedVehiculeId,
-            marque: formData.marque,
-            modele: isManualModel ? formData.modeleManuel : formData.modele,
-            prix: parseFloat(formData.prix),
-            is_manual_model: isManualModel,
-            is_edit: isEditMode,
+      // Mettre à jour le profil utilisateur avec les données business (si Pro et champs remplis)
+      if (user && user.role === "pro" && (formData.tvaNumber || formData.garageName || formData.garageAddress)) {
+        try {
+          const { createClient } = await import("@/lib/supabase/client");
+          const supabase = createClient();
+
+          const profileUpdate: {
+            vat_number?: string;
+            garage_name?: string;
+            address?: string;
+          } = {};
+
+          // Ajouter uniquement les champs remplis
+          if (formData.tvaNumber && formData.tvaNumber.trim()) {
+            profileUpdate.vat_number = formData.tvaNumber.trim();
           }
-        );
+          if (formData.garageName && formData.garageName.trim()) {
+            profileUpdate.garage_name = formData.garageName.trim();
+          }
+          if (formData.garageAddress && formData.garageAddress.trim()) {
+            profileUpdate.address = formData.garageAddress.trim();
+          }
+
+          // Mettre à jour le profil uniquement si au moins un champ est rempli
+          if (Object.keys(profileUpdate).length > 0) {
+            const { error: profileUpdateError } = await supabase
+              .from("profiles")
+              .update(profileUpdate)
+              .eq("id", user.id);
+
+            if (profileUpdateError) {
+              console.error("Erreur mise à jour profil business:", profileUpdateError);
+              // ✅ FIX : Afficher un toast d'avertissement (non-bloquant)
+              showToast(
+                "Votre annonce a été publiée, mais les informations professionnelles n'ont pas pu être sauvegardées. Veuillez les mettre à jour dans vos paramètres.",
+                "info"
+              );
+            } else {
+              // ✅ FIX : Confirmer la sauvegarde
+              showToast("Informations professionnelles sauvegardées.", "success");
+            }
+          }
+        } catch (profileError) {
+          console.error("Erreur lors de la mise à jour du profil business:", profileError);
+          // ✅ FIX : Afficher un toast d'avertissement
+          showToast(
+            "Votre annonce a été publiée, mais les informations professionnelles n'ont pas pu être sauvegardées.",
+            "info"
+          );
+        }
+      }
+
+      // Log de succès (seulement si connecté) - Non bloquant
+      if (user) {
+        try {
+          await logInfo(
+            `Ad [${savedVehiculeId}] ${isEditMode ? "updated" : "submitted"} successfully by User [${user.id}]`,
+            user.id,
+            {
+              vehicule_id: savedVehiculeId,
+              marque: formData.marque,
+              modele: isManualModel ? formData.modeleManuel : formData.modele,
+              prix: parseFloat(formData.prix),
+              is_manual_model: isManualModel,
+              is_edit: isEditMode,
+            }
+          );
+        } catch (logError) {
+          // Ne pas bloquer la soumission si le log échoue
+          console.warn("Erreur logging (non-bloquant):", logError);
+        }
         
         // Utilisateur connecté : redirection selon le mode
         if (isEditMode) {
@@ -756,19 +939,24 @@ function SellPageContent() {
           // Envoyer l'email (simulation pour l'instant)
           await sendVerificationEmail(contactEmail, code, savedVehiculeId);
           
-          // Log pour invité
-          await logInfo(
-            `Ad [${savedVehiculeId}] submitted by Guest [${contactEmail}], waiting email verification`,
-            undefined,
-            {
-              vehicule_id: savedVehiculeId,
-              marque: formData.marque,
-              modele: isManualModel ? formData.modeleManuel : formData.modele,
-              prix: parseFloat(formData.prix),
-              is_manual_model: isManualModel,
-              guest_email: contactEmail,
-            }
-          );
+          // Log pour invité - Non bloquant
+          try {
+            await logInfo(
+              `Ad [${savedVehiculeId}] submitted by Guest [${contactEmail}], waiting email verification`,
+              undefined,
+              {
+                vehicule_id: savedVehiculeId,
+                marque: formData.marque,
+                modele: isManualModel ? formData.modeleManuel : formData.modele,
+                prix: parseFloat(formData.prix),
+                is_manual_model: isManualModel,
+                guest_email: contactEmail,
+              }
+            );
+          } catch (logError) {
+            // Ne pas bloquer la soumission si le log échoue
+            console.warn("Erreur logging (non-bloquant):", logError);
+          }
           
           // Passer à l'étape 4 : vérification email
           setVehiculeIdForVerification(savedVehiculeId);
@@ -830,18 +1018,23 @@ function SellPageContent() {
         showToast(errorMessage, "error");
       }
       
-      // Log de l'erreur (seulement si connecté)
+      // Log de l'erreur (seulement si connecté) - Non bloquant
       if (user) {
-        await logError(
-          `Submission failed for User [${user.id}]: ${errorMessage}`,
-          user.id,
-          {
-            error_message: errorMessage,
-            error_code: error?.code || null,
-            marque: formData.marque,
-            modele: isManualModel ? formData.modeleManuel : formData.modele,
-          }
-        );
+        try {
+          await logError(
+            `Submission failed for User [${user.id}]: ${errorMessage}`,
+            user.id,
+            {
+              error_message: errorMessage,
+              error_code: error?.code || null,
+              marque: formData.marque,
+              modele: isManualModel ? formData.modeleManuel : formData.modele,
+            }
+          );
+        } catch (logError) {
+          // Ne pas bloquer l'affichage de l'erreur si le log échoue
+          console.warn("Erreur logging (non-bloquant):", logError);
+        }
       }
 
       showToast(
@@ -854,117 +1047,7 @@ function SellPageContent() {
     }
   };
 
-  // Upload Photos Réel
-  const handlePhotoInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploadingPhotos(true);
-    try {
-      const fileArray = Array.from(files);
-      
-      // Valider les fichiers avant upload
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
-      
-      for (const file of fileArray) {
-        if (file.size === 0) {
-          throw new Error(`Le fichier "${file.name}" est vide.`);
-        }
-        if (file.size > maxSize) {
-          throw new Error(`Le fichier "${file.name}" est trop volumineux (max 10MB). Taille actuelle: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-        }
-        if (!allowedTypes.includes(file.type)) {
-          throw new Error(`Le fichier "${file.name}" n'est pas un format d'image valide. Formats acceptés: JPEG, PNG, WebP, GIF`);
-        }
-      }
-
-      // Ajouter un timeout pour éviter les blocages
-      const uploadPromise = uploadImages(fileArray, user?.id || null);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("L'upload prend trop de temps. Vérifiez votre connexion et réessayez.")), 30000);
-      });
-
-      const uploadedUrls = await Promise.race([uploadPromise, timeoutPromise]);
-      
-      setFormData(prev => ({
-        ...prev,
-        photos: [...prev.photos, ...uploadedUrls],
-        photoFiles: [...prev.photoFiles, ...fileArray],
-      }));
-      
-      showToast(`${uploadedUrls.length} photo(s) uploadée(s) avec succès !`, "success");
-    } catch (error: any) {
-      console.error("Erreur upload photos:", error);
-      const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload des photos. Vérifiez votre connexion et réessayez.";
-      showToast(errorMessage, "error");
-    } finally {
-      setIsUploadingPhotos(false);
-      // Reset input
-      if (photoInputRef.current) {
-        photoInputRef.current.value = "";
-      }
-    }
-  };
-
-  // Upload Audio Réel
-  const handleAudioInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingAudio(true);
-    try {
-      // Valider le fichier avant upload
-      const maxSize = 5 * 1024 * 1024; // 5MB
-      const allowedTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/webm"];
-      
-      if (file.size === 0) {
-        throw new Error(`Le fichier "${file.name}" est vide.`);
-      }
-      if (file.size > maxSize) {
-        throw new Error(`Le fichier "${file.name}" est trop volumineux (max 5MB). Taille actuelle: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-      }
-      if (!allowedTypes.includes(file.type)) {
-        throw new Error(`Le fichier "${file.name}" n'est pas un format audio valide. Formats acceptés: MP3, WAV, OGG, WebM`);
-      }
-
-      // Ajouter un timeout pour éviter les blocages
-      const uploadPromise = uploadAudio(file, user?.id || null);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("L'upload prend trop de temps. Vérifiez votre connexion et réessayez.")), 30000);
-      });
-
-      const audioUrl = await Promise.race([uploadPromise, timeoutPromise]);
-      
-      setFormData(prev => ({
-        ...prev,
-        audioFile: file,
-        audioUrl: audioUrl,
-      }));
-      
-      showToast("Son uploadé avec succès !", "success");
-    } catch (error: any) {
-      console.error("Erreur upload audio:", error);
-      const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload du son. Vérifiez votre connexion et réessayez.";
-      showToast(errorMessage, "error");
-    } finally {
-      setIsUploadingAudio(false);
-      // Reset input
-      if (audioInputRef.current) {
-        audioInputRef.current.value = "";
-      }
-    }
-  };
-
-  // Supprimer une photo (gérée par MediaManager maintenant)
-  // Cette fonction est conservée pour compatibilité mais n'est plus utilisée
-  const removePhoto = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== index),
-      photoFiles: prev.photoFiles.filter((_, i) => i !== index),
-    }));
-  };
+  // Les uploads sont maintenant gérés directement par MediaManager dans Step3Media
 
   // Toggle Historique
   const toggleHistory = (item: string) => {
@@ -985,6 +1068,63 @@ function SellPageContent() {
     setFormData({ ...formData, marque, modele: "" });
   };
 
+  // Afficher la page de blocage si le quota est atteint (uniquement en mode création)
+  if (!isEditMode && user && !isCheckingQuota && canCreateAdvert === false) {
+    const limitText = quotaInfo?.max_limit === 999999 
+      ? "illimitées" 
+      : `${quotaInfo?.max_limit || 3} annonces`;
+    
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center px-4">
+        <div className="max-w-2xl w-full bg-neutral-900 rounded-3xl border border-red-600/30 p-8 md:p-12 text-center">
+          <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle size={40} className="text-red-600" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-white mb-4">
+            Limite d&apos;annonces atteinte
+          </h1>
+          <p className="text-lg text-neutral-300 mb-6">
+            En tant que membre <strong className="text-white">{quotaInfo?.role === "pro" ? "Professionnel" : "Particulier"}</strong>, 
+            vous êtes limité à <strong className="text-red-500">{limitText}</strong>.
+          </p>
+          <div className="bg-neutral-800/50 rounded-2xl p-6 mb-8">
+            <p className="text-neutral-400 mb-4">
+              Vous avez actuellement <strong className="text-white">{quotaInfo?.current_count || 0}</strong> annonce{quotaInfo?.current_count !== 1 ? "s" : ""} active{quotaInfo?.current_count !== 1 ? "s" : ""}.
+            </p>
+            {quotaInfo?.is_founder && (
+              <p className="text-yellow-400 text-sm font-semibold mb-2">
+                ✨ Vous êtes Membre Fondateur - Accès illimité activé
+              </p>
+            )}
+          </div>
+          <div className="space-y-4">
+            <Link
+              href="/dashboard"
+              className="block w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-xl transition-all"
+            >
+              Retour au Dashboard
+            </Link>
+            <p className="text-sm text-neutral-500">
+              Devenez <strong className="text-red-500">Pionnier</strong> ou <strong className="text-blue-500">Pro</strong> pour plus de liberté.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Afficher un loader pendant la vérification du quota
+  if (!isEditMode && user && isCheckingQuota) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin text-red-600 mx-auto mb-4" size={48} />
+          <p className="text-neutral-300">Vérification de votre quota...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-0 sm:min-h-screen bg-neutral-950 pb-24 md:pb-0">
       {/* Header */}
@@ -1003,1510 +1143,174 @@ function SellPageContent() {
           <p className="text-neutral-300 text-lg font-light tracking-wide">
             {isEditMode 
               ? "Mettez à jour les informations de votre véhicule" 
-              : "Ajoutez votre véhicule au Showroom RedZone • Visibilité premium • Commission 0%"}
+              : "Ajoutez votre véhicule au Showroom Octane98 • Visibilité premium • Commission 0%"}
           </p>
         </div>
       </div>
 
-      {/* Barre de Progression */}
-      <div className="bg-neutral-900/50 border-b border-white/10 shadow-sm">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Étape 1 */}
-            <button
-              type="button"
-              onClick={() => {
-                if (currentStep > 1) {
-                  setCurrentStep(1);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }
-              }}
-              disabled={currentStep === 1}
-              className={`flex items-center gap-3 flex-1 transition-opacity ${
-                currentStep > 1 ? "cursor-pointer hover:opacity-80" : "cursor-default"
-              }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all ${
-                  currentStep >= 1
-                    ? "bg-red-600 text-white"
-                    : "bg-neutral-200 text-neutral-500"
-                } ${
-                  currentStep > 1 ? "hover:scale-110" : ""
-                }`}
-              >
-                {currentStep > 1 ? <Check size={20} /> : "1"}
-              </div>
-              <span
-                className={`font-bold text-sm tracking-wide ${
-                  currentStep >= 1 ? "text-white" : "text-neutral-400"
-                }`}
-              >
-                L&apos;Identité
-              </span>
-            </button>
+      {/* Barre de Progression Améliorée */}
+      <StepperProgress
+        currentStep={currentStep}
+        onStepClick={handleStepClick}
+        steps={[
+          { number: 1, label: "Identité", shortLabel: "Identité" },
+          { number: 2, label: "Mécanique", shortLabel: "Mécanique" },
+          { number: 3, label: "Esthétique", shortLabel: "Esthétique" },
+          { number: 4, label: "Galerie & Prix", shortLabel: "Galerie" },
+        ]}
+      />
 
-            <div className={`h-1 flex-1 ${currentStep >= 2 ? "bg-red-600" : "bg-neutral-700"}`} />
-
-            {/* Étape 2 */}
-            <button
-              type="button"
-              onClick={() => {
-                if (currentStep > 2) {
-                  setCurrentStep(2);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }
-              }}
-              disabled={currentStep === 2 || currentStep < 2}
-              className={`flex items-center gap-3 flex-1 justify-center transition-opacity ${
-                currentStep > 2 ? "cursor-pointer hover:opacity-80" : "cursor-default"
-              }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all ${
-                  currentStep >= 2
-                    ? "bg-red-600 text-white"
-                    : "bg-neutral-700 text-neutral-400"
-                } ${
-                  currentStep > 2 ? "hover:scale-110" : ""
-                }`}
-              >
-                {currentStep > 2 ? <Check size={20} /> : "2"}
-              </div>
-              <span
-                className={`font-bold text-sm tracking-wide ${
-                  currentStep >= 2 ? "text-white" : "text-neutral-400"
-                }`}
-              >
-                Caractéristiques & Configuration
-              </span>
-            </button>
-
-            <div className={`h-1 flex-1 ${currentStep >= 3 ? "bg-red-600" : "bg-neutral-700"}`} />
-
-            {/* Étape 3 */}
-            <div className="flex items-center gap-3 flex-1 justify-end">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${
-                  currentStep >= 3
-                    ? "bg-red-600 text-white"
-                    : "bg-neutral-700 text-neutral-400"
-                }`}
-              >
-                3
-              </div>
-              <span
-                className={`font-bold text-sm tracking-wide ${
-                  currentStep >= 3 ? "text-white" : "text-neutral-400"
-                }`}
-              >
-                La Galerie
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Contenu du Wizard */}
+      {/* Contenu du Wizard avec Animations */}
       <div className="max-w-4xl mx-auto px-6 py-6 sm:py-12">
-        <div className="bg-neutral-900/50 backdrop-blur-sm rounded-3xl shadow-2xl shadow-black/50 border border-white/10 p-8 md:p-12">
-          {/* ÉTAPE 1 : L'Identité */}
-          {currentStep === 1 && (
-            <div className="space-y-8">
-              {/* Section 1 : L'Identité (Card) */}
-              <div className="bg-neutral-800/50 rounded-2xl border border-white/10 p-6 md:p-8">
-                <h2 className="text-2xl font-black text-white mb-2 tracking-wide">
-                  L&apos;Identité
-                </h2>
-                <p className="text-neutral-300 mb-6 font-light">Marque, modèle et essence</p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => handleTypeChange("car")}
-                    className={`p-6 rounded-2xl border-4 transition-all hover:scale-105 ${
-                      formData.type === "car"
-                        ? "border-red-600 bg-red-900/20 shadow-xl shadow-red-600/20"
-                        : "border-neutral-700 hover:border-neutral-600 bg-neutral-800/50"
-                    }`}
-                  >
-                    <Car
-                      size={48}
-                      className={formData.type === "car" ? "text-red-500 mx-auto mb-3" : "text-neutral-400 mx-auto mb-3"}
-                    />
-                    <p className="font-black text-lg text-white">Voiture</p>
-                    {formData.type === "car" && (
-                      <div className="mt-2">
-                        <span className="inline-flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          <Check size={14} />
-                          Sélectionné
-                        </span>
-                      </div>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleTypeChange("moto")}
-                    className={`p-6 rounded-2xl border-4 transition-all hover:scale-105 ${
-                      formData.type === "moto"
-                        ? "border-red-600 bg-red-900/20 shadow-xl shadow-red-600/20"
-                        : "border-neutral-700 hover:border-neutral-600 bg-neutral-800/50"
-                    }`}
-                  >
-                    <Bike
-                      size={48}
-                      className={formData.type === "moto" ? "text-red-500 mx-auto mb-3" : "text-neutral-400 mx-auto mb-3"}
-                    />
-                    <p className="font-black text-lg text-white">Moto</p>
-                    {formData.type === "moto" && (
-                      <div className="mt-2">
-                        <span className="inline-flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          <Check size={14} />
-                          Sélectionné
-                        </span>
-                      </div>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {formData.type && (
-                <>
-                  {/* Marque - SearchableSelect */}
-                  <div>
-                    <SearchableSelect
-                      value={formData.marque}
-                      onChange={(value) => handleMarqueChange(value)}
-                      options={marques}
-                      placeholder="Rechercher une marque..."
-                      label="Marque"
-                      loading={loadingBrands}
-                      error={errorBrands}
-                      disabled={isEffectivelyBanned || !formData.type}
-                      required
-                    />
-                  </div>
-
-                  {/* Modèle - SearchableSelect */}
-                  {formData.marque && (
-                    <div>
-                      <SearchableSelect
-                        value={formData.modele}
-                        onChange={(value) => {
-                          setFormData({ ...formData, modele: value });
-                        }}
-                        options={[...modeles, "__AUTRE__"]}
-                        placeholder="Rechercher un modèle..."
-                        label="Modèle"
-                        loading={loadingModels}
-                        error={errorModels}
-                        disabled={!formData.marque}
-                        required
-                      />
-                      {isManualModel && (
-                        <div className="mt-3 space-y-3">
-                          <div className="p-4 bg-amber-900/20 border-2 border-amber-600/40 rounded-xl">
-                            <p className="text-sm font-bold text-amber-300 mb-2">
-                              ⚠️ Modèle non listé : Tous les champs techniques deviennent obligatoires.
-                            </p>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-bold text-white mb-2">
-                              Nom du modèle *
-                            </label>
-                            <input
-                              type="text"
-                              value={formData.modeleManuel}
-                              onChange={(e) =>
-                                setFormData({ ...formData, modeleManuel: e.target.value })
-                              }
-                              placeholder="Ex: 911 GT3 RS (992)"
-                              className="w-full p-4 bg-neutral-800 border-2 border-amber-400 rounded-2xl focus:ring-4 focus:ring-amber-600/20 focus:border-amber-600 text-white font-medium"
-                              required
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Carburant */}
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Carburant *
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {[
-                        { value: "essence", label: "Essence", emoji: "⛽" },
-                        { value: "e85", label: "E85", emoji: "🌽" },
-                        { value: "lpg", label: "LPG", emoji: "🔥" },
-                      ].map((carb) => (
-                        <button
-                          key={carb.value}
-                          type="button"
-                          onClick={() =>
-                            setFormData({ ...formData, carburant: carb.value })
-                          }
-                          className={`p-4 rounded-2xl border-4 transition-all hover:scale-105 ${
-                            formData.carburant === carb.value
-                              ? "border-red-600 bg-red-900/20 shadow-lg"
-                              : "border-white/10 hover:border-white/20 bg-neutral-800/50"
-                          }`}
-                        >
-                          <span className="text-3xl mb-2 block">{carb.emoji}</span>
-                          <p className="font-bold text-sm text-white">
-                            {carb.label}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-red-400 mt-3 font-bold bg-red-900/20 p-3 rounded-xl border-2 border-red-600/40">
-                      🏁 RedZone est dédié aux sportives thermiques uniquement. Pas de Diesel, Hybride ou Électrique.
-                    </p>
-                  </div>
-
-                  {/* Alerte Modération */}
-                  {!moderationCheck.isAllowed && (
-                    <div className="bg-red-900/10 border-4 border-red-600 rounded-2xl p-6 animate-pulse">
-                      <div className="flex items-start gap-4">
-                        <AlertTriangle className="text-red-600 flex-shrink-0" size={32} />
-                        <div>
-                          <h3 className="text-xl font-black text-red-600 mb-2">
-                            Le Videur a parlé 🛑
-                          </h3>
-                          <p className="text-red-800 mb-3">
-                            {getModerationMessage(moderationCheck.detectedWords)}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {moderationCheck.detectedWords.map((word, i) => (
-                              <span
-                                key={i}
-                                className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase"
-                              >
-                                {word}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ÉTAPE 2 : Caractéristiques & Configuration */}
-          {currentStep === 2 && (
-            <div className="space-y-8">
-              {/* Section 2 : Caractéristiques & Configuration (Card) */}
-              <div className="bg-slate-800/50 rounded-2xl border border-white/10 p-6 md:p-8">
-                <h2 className="text-2xl font-black text-white mb-2 tracking-wide">
-                  Caractéristiques & Configuration
-                </h2>
-                <p className="text-slate-300 mb-6 font-light">Moteur, transmission et configuration esthétique</p>
-
-                {/* Sous-Section A : Mécanique & Performance */}
-                <div className="mb-10">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
-                    <h3 className="text-lg font-bold text-red-500/90 tracking-wide">
-                      Mécanique & Performance
-                    </h3>
-                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
-                  </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {/* Prix */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Prix (€) *
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={formData.prix}
-                    onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
-                    placeholder="Ex: 145000"
-                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-bold text-xl placeholder:text-slate-500"
-                  />
-                </div>
-
-                {/* Année */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Année *
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.annee}
-                    onChange={(e) => setFormData({ ...formData, annee: e.target.value })}
-                    placeholder="Ex: 2021"
-                    min="1950"
-                    max={new Date().getFullYear() + 1}
-                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                </div>
-
-                {/* Kilométrage */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Kilométrage *
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.km}
-                    onChange={(e) => setFormData({ ...formData, km: e.target.value })}
-                    placeholder="Ex: 18000"
-                    min="0"
-                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                </div>
-
-                {/* Puissance */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Puissance (ch) *
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.puissance}
-                    onChange={(e) =>
-                      setFormData({ ...formData, puissance: e.target.value })
-                    }
-                    placeholder="Ex: 450"
-                    min="1"
-                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                </div>
-
-                {/* CV Fiscaux */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Puissance Fiscale (CV) *
-                    <span className="text-xs font-normal text-slate-400 ml-2">(Pour taxe annuelle)</span>
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.cvFiscaux}
-                    onChange={(e) =>
-                      setFormData({ ...formData, cvFiscaux: e.target.value })
-                    }
-                    placeholder="Ex: 17"
-                    min="1"
-                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                </div>
-
-                {/* CO2 - Affiché uniquement si les specs contiennent des données CO2 */}
-                {hasCo2Data && (
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Émissions CO2 (g/km) *
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={formData.co2}
-                      onChange={(e) =>
-                        setFormData({ ...formData, co2: e.target.value })
-                      }
-                      placeholder="Ex: 233"
-                      min="0"
-                      className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                    />
-                  </div>
-                )}
-
-                {/* Cylindrée */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Cylindrée (cc) {isManualModel ? "*" : ""}
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.cylindree}
-                    onChange={(e) =>
-                      setFormData({ ...formData, cylindree: e.target.value })
-                    }
-                    placeholder="Ex: 3996"
-                    min="0"
-                    required={isManualModel}
-                    className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                </div>
-
-                {/* Architecture Moteur */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Architecture Moteur {isManualModel ? "*" : "(Optionnel)"}
-                  </label>
-                  <div className="flex flex-wrap gap-3">
-                    {[
-                      { value: "L4", label: "L4", subtitle: "4 cyl. ligne" },
-                      { value: "L5", label: "L5", subtitle: "5 cyl. ligne" },
-                      { value: "L6", label: "L6", subtitle: "6 cyl. ligne" },
-                      { value: "V6", label: "V6", subtitle: "" },
-                      { value: "V8", label: "V8", subtitle: "" },
-                      { value: "V10", label: "V10", subtitle: "" },
-                      { value: "V12", label: "V12", subtitle: "" },
-                      { value: "Flat-6", label: "Flat-6", subtitle: "Boxer 6" },
-                      { value: "Moteur Rotatif", label: "Rotatif", subtitle: "" },
-                    ].map((arch) => (
-                      <button
-                        key={arch.value}
-                        type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, architectureMoteur: arch.value, moteur: arch.value })
-                        }
-                      className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                        formData.architectureMoteur === arch.value
-                          ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                          : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
-                      }`}
-                      >
-                        <div className="text-center">
-                          <div className="font-bold text-base">{arch.label}</div>
-                          {arch.subtitle && (
-                            <div className={`text-xs mt-0.5 ${
-                              formData.architectureMoteur === arch.value ? "text-red-100" : "text-slate-500"
-                            }`}>
-                              {arch.subtitle}
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {isManualModel && !formData.architectureMoteur && (
-                    <p className="text-xs text-red-600 mt-2 font-medium">
-                      ⚠️ Architecture moteur requise pour les modèles non listés
-                    </p>
-                  )}
-                </div>
-              </div>
-
-                  {/* Note de pré-remplissage */}
-                  {!isManualModel && formData.modele && formData.puissance && (
-                    <div className="mt-4 p-4 bg-green-900/20 border-2 border-green-600/40 rounded-xl">
-                      <p className="text-sm text-green-300 font-medium flex items-center gap-2">
-                        <Check size={16} className="text-green-500" />
-                        <span className="font-bold">Données constructeur pré-remplies automatiquement.</span> Vous pouvez les modifier si votre véhicule est différent (ex: Stage 1, préparation).
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Transmission */}
-                  <div>
-                <label className="block text-sm font-bold text-white mb-3">
-                  Transmission *
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[
-                    { value: "manuelle", label: "Manuelle", emoji: "🎯" },
-                    { value: "automatique", label: "Automatique", emoji: "⚡" },
-                    { value: "sequentielle", label: "Séquentielle", emoji: "🏁" },
-                  ].map((trans) => (
-                    <button
-                      key={trans.value}
-                      type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, transmission: trans.value })
-                      }
-                      className={`p-4 rounded-2xl border-4 transition-all hover:scale-105 ${
-                        formData.transmission === trans.value
-                          ? "border-red-600 bg-red-900/20 shadow-lg"
-                          : "border-white/10 hover:border-white/20 bg-slate-800/50"
-                      }`}
-                    >
-                      <span className="text-2xl mb-2 block">{trans.emoji}</span>
-                      <p className="font-bold text-sm text-white">{trans.label}</p>
-                    </button>
-                  ))}
-                  </div>
-                </div>
-                </div>
-
-                {/* Champs optionnels supplémentaires (affichés si pré-remplis depuis la base) */}
-                {(formData.co2Wltp || formData.topSpeed || formData.drivetrain) && (
-                  <div className="mt-6 grid grid-cols-2 gap-6">
-                    {/* CO2 WLTP */}
-                    <div>
-                      <label className="block text-sm font-bold text-white mb-3">
-                        CO2 WLTP (g/km) <span className="text-xs font-normal text-slate-400">(Pour Flandre)</span>
-                      </label>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={formData.co2Wltp}
-                        onChange={(e) => setFormData({ ...formData, co2Wltp: e.target.value })}
-                        placeholder="Ex: 245"
-                        min="0"
-                        className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                      />
-                    </div>
-
-                    {/* Vitesse max */}
-                    <div>
-                      <label className="block text-sm font-bold text-white mb-3">
-                        Vitesse max (km/h)
-                      </label>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={formData.topSpeed}
-                        onChange={(e) => setFormData({ ...formData, topSpeed: e.target.value })}
-                        placeholder="Ex: 320"
-                        min="0"
-                        className="w-full p-4 min-h-[48px] bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                      />
-                    </div>
-
-                    {/* Transmission (RWD/FWD/AWD) */}
-                    <div>
-                      <label className="block text-sm font-bold text-white mb-3">
-                        Type de transmission
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { value: "RWD", label: "RWD", subtitle: "Propulsion" },
-                          { value: "FWD", label: "FWD", subtitle: "Traction" },
-                          { value: "AWD", label: "AWD", subtitle: "4x4" },
-                          { value: "4WD", label: "4WD", subtitle: "4x4" },
-                        ].map((drivetrain) => (
-                          <button
-                            key={drivetrain.value}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, drivetrain: drivetrain.value })}
-                            className={`px-4 py-3 rounded-xl border-2 transition-all text-center ${
-                              formData.drivetrain === drivetrain.value
-                                ? "bg-red-600 border-red-600 text-white font-bold"
-                                : "bg-slate-800/50 border-white/10 text-white hover:border-white/20"
-                            }`}
-                          >
-                            <div className="font-bold text-sm">{drivetrain.label}</div>
-                            <div className="text-xs text-slate-400">{drivetrain.subtitle}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sous-Section B : Configuration Esthétique */}
-                <div>
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
-                    <h3 className="text-lg font-bold text-red-500/90 tracking-wide">
-                      Configuration Esthétique
-                    </h3>
-                    <div className="h-px bg-gradient-to-r from-transparent via-red-600/40 to-transparent flex-1" />
-                  </div>
-
-                  {/* Type de Carrosserie */}
-                  <div>
-                <label className="block text-sm font-bold text-white mb-3">
-                  Type de Carrosserie (Optionnel)
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {CARROSSERIE_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, carrosserie: type })
-                      }
-                      className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                        formData.carrosserie === type
-                          ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                          : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, carrosserie: "" })}
-                  className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                    formData.carrosserie
-                      ? "text-red-600 hover:text-red-700 font-medium"
-                      : "text-slate-400 cursor-not-allowed"
-                  }`}
-                >
-                  {formData.carrosserie ? "✕ Réinitialiser" : ""}
-                </button>
-              </div>
-
-                  {/* Couleur Extérieure */}
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Couleur Extérieure (Optionnel)
-                    </label>
-                    <div className="overflow-x-auto -mx-2 px-2 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                      <div className="flex gap-3 md:grid md:grid-cols-6 lg:grid-cols-8 md:gap-4 min-w-max md:min-w-0">
-                        {EXTERIOR_COLORS.map((color) => {
-                          const isSelected = formData.couleurExterieure === color;
-                          return (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() =>
-                                setFormData({ ...formData, couleurExterieure: color })
-                              }
-                              className="group relative flex flex-col items-center gap-2 flex-shrink-0"
-                              title={color}
-                            >
-                              <div
-                                className={`w-12 h-12 rounded-full border-4 transition-all duration-200 hover:scale-110 active:scale-95 ${
-                                  isSelected
-                                    ? "border-red-600 shadow-lg shadow-red-600/50 ring-4 ring-red-600/30 ring-offset-2 ring-offset-slate-800"
-                                    : "border-slate-300 hover:border-slate-400"
-                                }`}
-                                style={{
-                                  backgroundColor: EXTERIOR_COLOR_HEX[color],
-                                }}
-                              />
-                              <span
-                                className={`text-xs font-medium transition-colors text-center ${
-                                  isSelected ? "text-red-500 font-bold" : "text-slate-400"
-                                }`}
-                              >
-                                {color}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, couleurExterieure: "" })}
-                      className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                        formData.couleurExterieure
-                          ? "text-red-600 hover:text-red-700 font-medium"
-                          : "text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      {formData.couleurExterieure ? "✕ Réinitialiser" : ""}
-                    </button>
-                  </div>
-
-                  {/* Couleur Intérieure */}
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Couleur Intérieure (Optionnel)
-                    </label>
-                    <div className="flex flex-wrap gap-3">
-                      {INTERIOR_COLORS.map((couleur) => (
-                        <button
-                          key={couleur}
-                          type="button"
-                          onClick={() =>
-                            setFormData({ ...formData, couleurInterieure: couleur })
-                          }
-                          className={`px-6 py-3 min-h-[48px] rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                            formData.couleurInterieure === couleur
-                              ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30 ring-2 ring-red-600/50 ring-offset-2 ring-offset-slate-800"
-                              : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
-                          }`}
-                        >
-                          {couleur}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, couleurInterieure: "" })}
-                      className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                        formData.couleurInterieure
-                          ? "text-red-600 hover:text-red-700 font-medium"
-                          : "text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      {formData.couleurInterieure ? "✕ Réinitialiser" : ""}
-                    </button>
-                  </div>
-
-                  {/* Nombre de Places */}
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Nombre de Places (Optionnel)
-                    </label>
-                    <div className="flex flex-wrap gap-3">
-                      {[
-                        { value: "2", label: "2 places" },
-                        { value: "4", label: "4 places" },
-                        { value: "5", label: "5 places" },
-                        { value: "2+2", label: "2+2" },
-                      ].map((places) => (
-                        <button
-                          key={places.value}
-                          type="button"
-                          onClick={() =>
-                            setFormData({ ...formData, nombrePlaces: places.value })
-                          }
-                          className={`px-6 py-3 rounded-xl border-2 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                            formData.nombrePlaces === places.value
-                              ? "bg-red-600 border-red-600 text-white font-bold shadow-lg shadow-red-600/30"
-                              : "bg-slate-800/50 border-white/10 text-white hover:border-white/20 hover:shadow-md"
-                          }`}
-                        >
-                          {places.label}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, nombrePlaces: "" })}
-                      className={`mt-3 text-xs px-4 py-2 rounded-lg transition-all ${
-                        formData.nombrePlaces
-                          ? "text-red-600 hover:text-red-700 font-medium"
-                          : "text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      {formData.nombrePlaces ? "✕ Réinitialiser" : ""}
-                    </button>
-                  </div>
-                </div>
-
-              {/* L'Histoire du véhicule */}
-              <div>
-                <label className="block text-sm font-bold text-white mb-3 tracking-wide">
-                  L&apos;Histoire du véhicule *
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  rows={8}
-                  placeholder="Racontez l'histoire de ce véhicule : entretien, options, modifications (Stage 1, préparation...), édition limitée, garantie, historique... (Minimum 20 caractères)"
-                  className={`w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 text-white font-light resize-none placeholder:text-slate-500 ${
-                    descriptionCheck.hasError
-                      ? "border-red-600 focus:border-red-600"
-                      : "focus:border-red-600"
-                  }`}
-                />
-
-                {/* Compteur de caractères */}
-                <div className="flex items-center justify-between mt-2">
-                  <p
-                    className={`text-xs font-bold ${
-                      formData.description.length < 20
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {formData.description.length >= 20 ? (
-                      <>✓ {formData.description.length} caractères</>
-                    ) : (
-                      <>⚠️ {formData.description.length}/20 caractères minimum</>
-                    )}
-                  </p>
-                </div>
-
-                {/* Le Videur V2 - Alerte Inline */}
-                {descriptionCheck.hasError && (
-                  <div className="mt-4 bg-red-900/10 border-2 border-red-600 rounded-2xl p-4 animate-pulse">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="text-red-600 flex-shrink-0" size={24} />
-                      <div className="flex-1">
-                        <p className="text-red-300 font-bold mb-2">
-                          ⛔ Termes interdits détectés dans votre description
-                        </p>
-                        <p className="text-red-400 text-sm mb-3 font-light">
-                          RedZone est réservé à la vente pure de sportives essence. Merci de retirer ces termes :
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {descriptionCheck.detectedWords.map((word, i) => (
-                            <span
-                              key={i}
-                              className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase"
-                            >
-                              {word}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              </div>
-            </div>
-          )}
-
-          {/* ÉTAPE 3 : La Galerie */}
-          {currentStep === 3 && (
-            <div className="space-y-8">
-              {/* Section 3 : La Galerie (Card) */}
-              <div className="bg-slate-800/50 rounded-2xl border border-white/10 p-6 md:p-8">
-                <h2 className="text-2xl font-black text-white mb-2 tracking-wide">
-                  La Galerie
-                </h2>
-                <p className="text-slate-300 mb-6 font-light">
-                  Photos, son et histoire du véhicule
-                </p>
-
-                {/* RÉCAPITULATIF DE L'ANNONCE */}
-                <div className="bg-gradient-to-br from-red-900/20 to-red-800/20 border-2 border-red-600 rounded-3xl p-8 shadow-2xl">
-                  <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
-                    <Check className="text-red-500" size={28} />
-                    Récapitulatif de votre annonce
-                  </h3>
-
-                  <div className="bg-slate-800/50 rounded-2xl p-6 space-y-4 border border-white/10">
-                    {/* Titre */}
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 mb-1">TITRE</p>
-                      <p className="text-2xl font-black text-white">
-                        {formData.marque} {formData.modele}
-                      </p>
-                    </div>
-
-                    {/* Prix */}
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 mb-1">PRIX</p>
-                      <p className="text-3xl font-black text-red-500">
-                        {parseFloat(formData.prix).toLocaleString("fr-BE")} €
-                      </p>
-                    </div>
-
-                    {/* Détails */}
-                    <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10">
-                      <div>
-                        <p className="text-xs font-bold text-slate-400">ANNÉE</p>
-                        <p className="text-lg font-bold text-white">{formData.annee}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400">KM</p>
-                        <p className="text-lg font-bold text-white">
-                          {parseInt(formData.km).toLocaleString("fr-BE")} km
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400">PUISSANCE</p>
-                        <p className="text-lg font-bold text-white">{formData.puissance} ch</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* L'Histoire */}
-                  <div className="pt-4 border-t border-white/10">
-                    <p className="text-xs font-bold text-slate-400 mb-2 tracking-wide">L&apos;HISTOIRE</p>
-                    <p className="text-sm text-slate-300 leading-relaxed line-clamp-4 font-light">
-                      {formData.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Localisation - Où voir le véhicule ? */}
-              <div>
-                <label className="block text-sm font-bold text-white mb-4 flex items-center gap-2">
-                  <MapPin size={20} className="text-red-500" />
-                  Où voir le véhicule ? <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Code Postal */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-2">
-                      Code Postal <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.codePostal}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, codePostal: e.target.value }))}
-                      placeholder="Ex: 5000, 7181"
-                      required
-                      maxLength={4}
-                      pattern="[0-9]{4}"
-                      className="w-full px-4 py-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white placeholder:text-slate-500"
-                    />
-                    <p className="text-xs text-slate-500 mt-2">Format: 4 chiffres (ex: 5000)</p>
-                  </div>
-
-                  {/* Ville */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-2">
-                      Ville <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.ville}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, ville: e.target.value }))}
-                      placeholder="Ex: Namur, Liège, Bruxelles"
-                      required
-                      className="w-full px-4 py-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white placeholder:text-slate-500"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-slate-400 mt-3 flex items-center gap-2">
-                  <MapPin size={14} className="text-slate-400" />
-                  Cette information permettra aux acheteurs de localiser votre véhicule sur une carte.
-                </p>
-              </div>
-
-              {/* Module Média Pro (Photos & Audio) */}
-              <MediaManager
-                photos={formData.photos}
-                audioUrl={formData.audioUrl}
-                onPhotosChange={(newPhotos) => {
-                  setFormData(prev => ({ ...prev, photos: newPhotos }));
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={stepVariants}
+            transition={stepTransition}
+            className="bg-neutral-900/50 backdrop-blur-sm rounded-3xl shadow-2xl shadow-black/50 border border-white/10 p-8 md:p-12"
+          >
+            {/* ÉTAPE 1 : L'Identité */}
+            {currentStep === 1 && (
+              <Step1Identity
+                formData={{
+                  type: formData.type,
+                  marque: formData.marque,
+                  modele: formData.modele,
+                  modeleManuel: formData.modeleManuel,
+                  carburant: formData.carburant,
                 }}
-                onAudioChange={(newAudioUrl) => {
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    audioUrl: newAudioUrl,
-                    audioFile: newAudioUrl ? prev.audioFile : null
-                  }));
-                }}
-                userId={user?.id || null}
-                disabled={isEffectivelyBanned || isSubmitting}
+                onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                onTypeChange={handleTypeChange}
+                onMarqueChange={handleMarqueChange}
+                marques={marques}
+                modeles={modeles}
+                loadingBrands={loadingBrands}
+                loadingModels={loadingModels}
+                errorBrands={errorBrands}
+                errorModels={errorModels}
+                isManualModel={isManualModel}
+                moderationCheck={moderationCheck}
+                isEffectivelyBanned={isEffectivelyBanned}
               />
-
-              {/* Car-Pass URL */}
-              <div data-field="carPassUrl">
-                <label className="block text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <Shield size={20} className="text-green-600" />
-                  Lien Car-Pass (URL) <span className="text-xs font-normal text-slate-400">(Optionnel)</span>
-                </label>
-                <input
-                  type="url"
-                  value={formData.carPassUrl}
-                  onChange={(e) => {
-                    setFormData({ ...formData, carPassUrl: e.target.value });
-                    // Effacer l'erreur quand l'utilisateur modifie le champ
-                    if (fieldErrors.carPassUrl) {
-                      setFieldErrors((prev) => {
-                        const newErrors = { ...prev };
-                        delete newErrors.carPassUrl;
-                        return newErrors;
-                      });
-                    }
-                  }}
-                  placeholder="https://www.car-pass.be/..."
-                  className={`w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium transition-all placeholder:text-slate-500 ${
-                    fieldErrors.carPassUrl
-                      ? "border-red-600 bg-red-900/20"
-                      : ""
-                  }`}
-                />
-                {fieldErrors.carPassUrl ? (
-                  <div className="mt-2 p-3 bg-red-900/20 border-2 border-red-600/40 rounded-xl">
-                    <p className="text-sm font-bold text-red-300 flex items-center gap-2">
-                      <AlertTriangle size={16} className="text-red-400" />
-                      {fieldErrors.carPassUrl}
-                    </p>
-                    <p className="text-xs text-red-400 mt-2 ml-6">
-                      Format attendu : <code className="bg-red-900/30 px-2 py-1 rounded text-red-200">https://www.car-pass.be/...</code> ou <code className="bg-red-900/30 px-2 py-1 rounded text-red-200">http://www.car-pass.be/...</code>
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 mt-2 font-light">
-                    🔒 Plus sécurisé qu'un upload de fichier. Partagez le lien vers votre Car-Pass en ligne.
-                  </p>
-                )}
-              </div>
-
-              {/* Vos Coordonnées */}
-              <div className="mt-8 pt-8 border-t-2 border-white/10">
-                <h3 className="text-xl font-black text-white mb-6 tracking-wide">
-                  Vos coordonnées
-                </h3>
-
-                {/* Email de contact */}
-                <div className="mb-6">
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Email de contact {!user && <span className="text-red-600">*</span>}
-                    {user && <span className="text-xs font-normal text-slate-400">(Optionnel - utilisera {user.email} par défaut)</span>}
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.contactEmail}
-                    onChange={(e) =>
-                      setFormData({ ...formData, contactEmail: e.target.value })
-                    }
-                    placeholder={user ? user.email : "votre@email.be"}
-                    required={!user}
-                    className="w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                  <p className="text-xs text-slate-400 mt-2">
-                    {user 
-                      ? "Cet email sera visible par les acheteurs intéressés. Si vide, votre email de compte sera utilisé."
-                      : "⚠️ Email obligatoire pour les invités. Cet email sera visible par les acheteurs intéressés."
-                    }
-                  </p>
-                </div>
-
-                {/* Téléphone */}
-                <div className="mb-6">
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Téléphone {formData.contactMethods.includes('whatsapp') || formData.contactMethods.includes('tel') ? <span className="text-red-500">*</span> : <span className="text-xs font-normal text-slate-400">(Optionnel)</span>}
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.telephone}
-                    onChange={(e) => {
-                      // Format automatique belge +32
-                      let value = e.target.value.replace(/\D/g, '');
-                      if (value.startsWith('32')) {
-                        value = '+' + value;
-                      } else if (value && !value.startsWith('+')) {
-                        value = '+32' + value;
-                      }
-                      setFormData({ ...formData, telephone: value });
-                    }}
-                    placeholder="+32 471 23 45 67"
-                    required={formData.contactMethods.includes('whatsapp') || formData.contactMethods.includes('tel')}
-                    className="w-full p-4 bg-slate-800/50 border-2 border-white/10 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white font-medium placeholder:text-slate-500"
-                  />
-                  <p className="text-xs text-slate-400 mt-2">
-                    Format belge : +32 XXX XX XX XX
-                  </p>
-                </div>
-
-                {/* Préférences de contact */}
-                <div>
-                  <label className="block text-sm font-bold text-white mb-3">
-                    Préférences de contact *
-                  </label>
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-300 hover:border-red-400 transition-all cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.contactMethods.includes('email')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              contactMethods: [...prev.contactMethods, 'email']
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              contactMethods: prev.contactMethods.filter(m => m !== 'email')
-                            }));
-                          }
-                        }}
-                        className="w-5 h-5 text-red-600 rounded border-2 border-slate-400 focus:ring-red-600"
-                      />
-                      <div className="flex-1">
-                        <span className="font-bold text-white">Accepter les contacts par Email</span>
-                        <p className="text-xs text-slate-400">Les acheteurs pourront vous envoyer un email</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-300 hover:border-green-400 transition-all cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.contactMethods.includes('whatsapp')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              contactMethods: [...prev.contactMethods, 'whatsapp']
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              contactMethods: prev.contactMethods.filter(m => m !== 'whatsapp')
-                            }));
-                          }
-                        }}
-                        className="w-5 h-5 text-green-600 rounded border-2 border-slate-400 focus:ring-green-600"
-                      />
-                      <div className="flex-1">
-                        <span className="font-bold text-white">Accepter les contacts par WhatsApp</span>
-                        <p className="text-xs text-slate-400">Nécessite un numéro de téléphone</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-300 hover:border-red-400 transition-all cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.contactMethods.includes('tel')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              contactMethods: [...prev.contactMethods, 'tel']
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              contactMethods: prev.contactMethods.filter(m => m !== 'tel')
-                            }));
-                          }
-                        }}
-                        className="w-5 h-5 text-red-600 rounded border-2 border-slate-400 focus:ring-red-600"
-                      />
-                      <div className="flex-1">
-                        <span className="font-bold text-white">Accepter les appels téléphoniques</span>
-                        <p className="text-xs text-slate-400">Nécessite un numéro de téléphone</p>
-                      </div>
-                    </label>
-                  </div>
-                  {formData.contactMethods.length === 0 && (
-                    <p className="text-sm text-red-600 font-medium mt-2">
-                      ⚠️ Veuillez sélectionner au moins une méthode de contact.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Champs Professionnels (si role === 'pro') */}
-              {user?.role === "pro" && (
-                <div className="bg-gradient-to-br from-red-950/30 to-red-900/20 border-2 border-red-600/30 rounded-3xl p-8 shadow-xl">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-2">
-                    <Building2 size={28} className="text-red-600" />
-                    Informations Professionnelles
-                  </h3>
-                  <div className="space-y-6">
-                    {/* Nom du Garage */}
-                    <div>
-                      <label className="block text-sm font-bold text-white mb-3">
-                        Nom du Garage *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.garageName}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, garageName: e.target.value }))}
-                        placeholder="Ex: Garage Auto Premium"
-                        required={user.role === "pro"}
-                        className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white"
-                      />
-                    </div>
-
-                    {/* Numéro de TVA */}
-                    <div>
-                      <label className="block text-sm font-bold text-white mb-3">
-                        Numéro de TVA (BE) *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.tvaNumber}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, tvaNumber: e.target.value }))}
-                        placeholder="Ex: BE0123456789"
-                        required={user.role === "pro"}
-                        pattern="BE[0-9]{10}"
-                        className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all text-white"
-                      />
-                      <p className="text-xs text-slate-400 mt-2">
-                        Format: BE suivi de 10 chiffres
-                      </p>
-                    </div>
-
-                    {/* Adresse du Garage */}
-                    <div>
-                      <label className="block text-sm font-bold text-white mb-3">
-                        Adresse du Garage
-                      </label>
-                      <textarea
-                        value={formData.garageAddress}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, garageAddress: e.target.value }))}
-                        placeholder="Rue, Numéro, Code postal, Ville"
-                        rows={3}
-                        className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-2xl focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/20 transition-all resize-y text-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Historique */}
-              <div>
-                <label className="block text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <Shield size={20} className="text-red-600" />
-                  Transparence & Historique (Optionnel)
-                </label>
-                <div className="space-y-3">
-                  {[
-                    "Carnet d'entretien complet",
-                    "Factures disponibles",
-                    "Véhicule non accidenté",
-                    "Origine Belgique",
-                    "2 clés disponibles",
-                  ].map((item) => {
-                    const isSelected = formData.history.includes(item);
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => toggleHistory(item)}
-                        className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-3 ${
-                          isSelected
-                            ? "border-green-600 bg-green-50"
-                            : "border-slate-300 hover:border-slate-400 bg-slate-800/50"
-                        }`}
-                      >
-                        <div
-                          className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${
-                            isSelected
-                              ? "bg-green-600 border-green-600"
-                              : "border-slate-400"
-                          }`}
-                        >
-                          {isSelected && (
-                            <Check size={16} className="text-white" />
-                          )}
-                        </div>
-                        <span className={`font-medium ${
-                          isSelected 
-                            ? "text-green-900" 
-                            : "text-white"
-                        }`}>
-                          {item}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* CAPTCHA Turnstile - Uniquement pour les invités */}
-              {!user && (
-                <div className="mt-8 pt-8 border-t-2 border-slate-200">
-                  <label className="block text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    <Shield size={20} className="text-red-600" />
-                    Vérification anti-robot <span className="text-red-600">*</span>
-                  </label>
-                  <div className="flex justify-center">
-                    <Turnstile
-                      siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"} // Clé de test par défaut
-                      onSuccess={(token) => {
-                        setTurnstileToken(token);
-                      }}
-                      onError={() => {
-                        setTurnstileToken(null);
-                        showToast("Erreur lors de la vérification anti-robot", "error");
-                      }}
-                      onExpire={() => {
-                        setTurnstileToken(null);
-                      }}
-                      options={{
-                        theme: "light",
-                        size: "normal",
-                      }}
-                    />
-                  </div>
-                  {!turnstileToken && (
-                    <p className="text-xs text-red-600 mt-3 text-center font-medium">
-                      ⚠️ Veuillez compléter la vérification anti-robot pour continuer
-                    </p>
-                  )}
-                  {turnstileToken && (
-                    <p className="text-xs text-green-600 mt-3 text-center font-medium flex items-center justify-center gap-2">
-                      <Check size={14} />
-                      Vérification réussie
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ÉTAPE 4 : Vérification Email (Uniquement pour les invités) */}
-          {currentStep === 4 && vehiculeIdForVerification && (
-            <div className="space-y-8">
-              <div>
-                <h2 className="text-2xl font-black text-white mb-2 tracking-tight flex items-center gap-2">
-                  <Mail size={28} className="text-red-600" />
-                  Vérification de votre email
-                </h2>
-                <p className="text-slate-400 mb-6">
-                  Un code de vérification à 6 chiffres vous a été envoyé à <strong>{formData.contactEmail}</strong>
-                </p>
-              </div>
-
-              <div className="bg-gradient-to-br from-red-950/30 to-red-900/20 border-2 border-red-600/30 rounded-3xl p-8 shadow-xl">
-                <div className="space-y-6">
-                  <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-red-600 rounded-full mb-4">
-                      <Mail size={40} className="text-white" />
-                    </div>
-                    <h3 className="text-xl font-black text-white mb-2">
-                      Vérifiez votre boîte email
-                    </h3>
-                    <p className="text-slate-300">
-                      Entrez le code à 6 chiffres reçu par email pour confirmer votre annonce.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Code de vérification <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={verificationCode}
-                      onChange={(e) => {
-                        // Limiter à 6 chiffres
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setVerificationCode(value);
-                      }}
-                      placeholder="123456"
-                      maxLength={6}
-                      className="w-full p-6 text-center text-3xl font-black tracking-widest bg-slate-800 border-4 border-slate-600 rounded-2xl focus:ring-4 focus:ring-red-600/20 focus:border-red-600 text-white"
-                      autoFocus
-                    />
-                    <p className="text-xs text-slate-400 mt-3 text-center font-light">
-                      {verificationCode.length}/6 chiffres
-                    </p>
-                  </div>
-
-                  <div className="bg-amber-900/20 border-2 border-amber-600/40 rounded-xl p-4">
-                    <p className="text-sm text-amber-300 font-light">
-                      ⚠️ <strong>Code expiré ?</strong> Le code est valide pendant 15 minutes. Si vous ne l'avez pas reçu, vérifiez vos spams ou contactez le support.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleVerifyCode}
-                    disabled={isVerifyingCode || verificationCode.length !== 6}
-                    className={`w-full py-4 rounded-full font-black text-lg transition-all shadow-2xl ${
-                      isVerifyingCode || verificationCode.length !== 6
-                        ? "bg-slate-400 cursor-not-allowed text-white opacity-60"
-                        : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105 shadow-red-600/50 active:scale-95"
-                    }`}
-                  >
-                    {isVerifyingCode ? (
-                      <>
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white inline-block mr-2" />
-                        Vérification...
-                      </>
-                    ) : (
-                      <>
-                        ✓ Vérifier le code
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation Buttons (Fixed Bottom) - TOUJOURS VISIBLE */}
-        <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-white/10 shadow-2xl z-[90] pointer-events-auto">
-          <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-            {/* Bouton Précédent - Visible uniquement si étape > 1 et <= 3 */}
-            {currentStep > 1 && currentStep <= 3 ? (
-              <button
-                type="button"
-                onClick={handlePrevious}
-                className="flex items-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white font-medium rounded-full transition-all duration-200"
-              >
-                <ChevronLeft size={18} />
-                Retour
-              </button>
-            ) : (
-              <div className="w-0" />
             )}
 
-            <div className="flex-1" />
+            {/* ÉTAPE 2 : Mécanique */}
+            {currentStep === 2 && (
+              <Step2Mechanic
+                formData={{
+                  prix: formData.prix,
+                  annee: formData.annee,
+                  km: formData.km,
+                  transmission: formData.transmission,
+                  puissance: formData.puissance,
+                  cvFiscaux: formData.cvFiscaux,
+                  co2: formData.co2,
+                  cylindree: formData.cylindree,
+                  moteur: formData.moteur,
+                  architectureMoteur: formData.architectureMoteur,
+                  co2Wltp: formData.co2Wltp,
+                  drivetrain: formData.drivetrain,
+                  topSpeed: formData.topSpeed,
+                  normeEuro: formData.normeEuro,
+                }}
+                onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                isManualModel={isManualModel}
+                hasCo2Data={hasCo2Data}
+              />
+            )}
 
-            {/* Bouton Suivant - Visible si étape 1 ou 2 */}
-            {currentStep < 3 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={
-                  (currentStep === 1 && !isStep1Valid) ||
-                  (currentStep === 2 && !isStep2Valid)
-                }
-                className={`flex items-center gap-2 px-8 py-4 rounded-full font-black text-lg transition-all shadow-2xl ${
-                  (currentStep === 1 && !isStep1Valid) ||
-                  (currentStep === 2 && !isStep2Valid)
-                    ? "bg-slate-400 cursor-not-allowed text-white opacity-60"
-                    : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105 shadow-red-600/50 active:scale-95"
-                }`}
-              >
-                Suivant
-                <ChevronRight size={24} />
-              </button>
-            ) : currentStep === 3 ? (
+            {/* ÉTAPE 3 : Esthétique */}
+            {currentStep === 3 && (
+              <Step3Aesthetic
+                formData={{
+                  carrosserie: formData.carrosserie,
+                  couleurExterieure: formData.couleurExterieure,
+                  couleurInterieure: formData.couleurInterieure,
+                  nombrePlaces: formData.nombrePlaces,
+                  description: formData.description,
+                }}
+                onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                descriptionCheck={descriptionCheck}
+              />
+            )}
+
+            {/* ÉTAPE 4 : Galerie & Prix */}
+            {currentStep === 4 && (
               <>
-                {/* Note BETA - Publication gratuite */}
-                <div className="w-full mb-4">
-                  <div className="bg-red-900/20 border-2 border-red-600/40 rounded-xl p-4">
-                    <p className="text-sm text-red-300 font-light text-center tracking-wide">
-                      ℹ️ Durant la phase Bêta, la publication d&apos;annonces est entièrement gratuite et illimitée.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Bouton Publier/Enregistrer - Visible uniquement étape 3 */}
-                {isEffectivelyBanned && (
-                  <div className="mb-4 p-4 bg-red-900/20 border-2 border-red-600/40 rounded-xl">
-                    <p className="text-sm font-bold text-red-300 flex items-center gap-2">
-                      <AlertTriangle size={16} />
-                      {isSimulatingBan && user?.role === "admin"
-                        ? "Mode test actif : Publication d'annonces désactivée (simulation)"
-                        : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces."}
-                    </p>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={
-                    isSubmitting || 
-                    !moderationCheck.isAllowed || 
-                    !isStep3Valid || 
-                    (!user && !turnstileToken) || // CAPTCHA requis pour les invités
-                    isEffectivelyBanned // Bloqué si banni ou en simulation
-                  }
-                  className={`flex items-center gap-2 px-8 py-4 rounded-full font-black text-lg transition-all shadow-2xl ${
-                    isSubmitting || 
-                    !moderationCheck.isAllowed || 
-                    !isStep3Valid || 
-                    (!user && !turnstileToken) ||
-                    isEffectivelyBanned
-                      ? "bg-slate-400 cursor-not-allowed text-white opacity-60"
-                      : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105 shadow-red-600/50 active:scale-95"
-                  }`}
-                  title={
-                    isEffectivelyBanned
-                      ? (isSimulatingBan && user?.role === "admin"
-                          ? "Mode test actif : Publication d'annonces désactivée (simulation)"
-                          : "Votre compte est suspendu. Vous ne pouvez pas publier d'annonces.")
-                      : !isStep3Valid 
-                      ? "Une annonce de sportive doit avoir au moins une photo pour être validée." 
-                      : (!user && !turnstileToken)
-                      ? "Veuillez compléter la vérification anti-robot"
-                      : ""
-                  }
-                >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
-                    <span className="tracking-wide">
-                      {isEditMode ? "Enregistrement en cours..." : "Envoi du dossier en cours..."}
-                    </span>
-                  </>
+                {vehiculeIdForVerification ? (
+                  <Step4Finalize
+                    contactEmail={formData.contactEmail}
+                    verificationCode={verificationCode}
+                    onVerificationCodeChange={setVerificationCode}
+                    onVerify={handleVerifyCode}
+                    isVerifying={isVerifyingCode}
+                  />
                 ) : (
-                  <>
-                    <span className="tracking-wide">
-                      {isEditMode ? "Enregistrer les modifications" : "Ajouter au Showroom"}
-                    </span>
-                  </>
+                  <Step4Gallery
+                    formData={{
+                      marque: formData.marque,
+                      modele: formData.modele,
+                      prix: formData.prix,
+                      annee: formData.annee,
+                      km: formData.km,
+                      puissance: formData.puissance,
+                      description: formData.description,
+                      photos: formData.photos,
+                      audioUrl: formData.audioUrl,
+                      carPassUrl: formData.carPassUrl,
+                      codePostal: formData.codePostal,
+                      ville: formData.ville,
+                      contactEmail: formData.contactEmail,
+                      telephone: formData.telephone,
+                      contactMethods: formData.contactMethods,
+                      history: formData.history,
+                      tvaNumber: formData.tvaNumber,
+                      garageName: formData.garageName,
+                      garageAddress: formData.garageAddress,
+                    }}
+                    onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                    onHistoryToggle={toggleHistory}
+                    user={user}
+                    isEffectivelyBanned={isEffectivelyBanned}
+                    isSubmitting={isSubmitting}
+                    turnstileToken={turnstileToken}
+                    onTurnstileTokenChange={setTurnstileToken}
+                    fieldErrors={fieldErrors}
+                    onFieldErrorClear={(field) => {
+                      setFieldErrors((prev) => {
+                        const newErrors = { ...prev };
+                        delete newErrors[field];
+                        return newErrors;
+                      });
+                    }}
+                  />
                 )}
-              </button>
               </>
-            ) : null}
-          </div>
-        </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation Buttons (Fixed Bottom) - TOUJOURS VISIBLE */}
+        <SellFormNavigation
+          currentStep={currentStep}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onSubmit={handleSubmit}
+          isStep1Valid={isStep1Valid}
+          isStep2Valid={isStep2Valid}
+          isStep3Valid={isStep3Valid}
+          isStep4Valid={isStep4Valid}
+          isSubmitting={isSubmitting}
+          moderationCheckAllowed={moderationCheck.isAllowed}
+          isEffectivelyBanned={isEffectivelyBanned}
+          isSimulatingBan={isSimulatingBan}
+          userRole={user?.role || null}
+          turnstileToken={turnstileToken}
+          user={user}
+        />
       </div>
 
       {/* Padding Bottom pour éviter que le contenu soit caché par les boutons fixes et le CookieBanner */}
