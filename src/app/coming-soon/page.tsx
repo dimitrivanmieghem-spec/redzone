@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { Gauge, Sparkles, Shield, TrendingUp, CheckCircle, Loader2, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -21,39 +22,113 @@ export default function ComingSoonPage() {
       return;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     setIsSubmitting(true);
+    
     try {
       const supabase = createClient();
-      const { error } = await supabase
+      
+      // Vérifier d'abord si l'email existe déjà (optionnel, mais utile pour UX)
+      const { data: existing } = await supabase
+        .from("waiting_list")
+        .select("email")
+        .eq("email", normalizedEmail)
+        .single();
+
+      if (existing) {
+        showToast("Vous êtes déjà inscrit à la liste !", "info");
+        setIsSubmitted(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Insérer dans la base de données
+      const { data: insertData, error: insertError } = await supabase
         .from("waiting_list")
         .insert({
-          email: email.trim().toLowerCase(),
+          email: normalizedEmail,
           source: "website",
-        });
+        })
+        .select()
+        .single();
 
-      if (error) {
-        // Si l'email existe déjà, c'est pas grave
-        if (error.code === "23505") {
+      if (insertError) {
+        // Gestion des erreurs spécifiques avec logs détaillés
+        if (insertError.code === "23505") {
+          // Doublon (peu probable car on a vérifié avant, mais sécurité)
+          console.log("[Coming Soon] Email déjà présent (doublon):", normalizedEmail);
           showToast("Vous êtes déjà inscrit à la liste !", "info");
           setIsSubmitted(true);
+        } else if (insertError.code === "42501") {
+          // Erreur de permissions RLS
+          console.error("[Coming Soon] ERREUR RLS - Politique d'insertion refusée:", {
+            email: normalizedEmail,
+            error: insertError.message,
+            code: insertError.code,
+            hint: insertError.hint,
+          });
+          showToast("Erreur de permissions. Contactez le support.", "error");
         } else {
-          throw error;
+          // Autre erreur
+          console.error("[Coming Soon] ERREUR insertion waiting_list:", {
+            email: normalizedEmail,
+            error: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint,
+          });
+          showToast("Erreur lors de l'inscription. Réessayez plus tard.", "error");
         }
-      } else {
-        // Nouvelle inscription : envoyer l'email de bienvenue
-        try {
-          await sendWelcomeEmail(email.trim().toLowerCase());
-        } catch (emailError) {
-          // On ne bloque pas le flux si l'email échoue
-          console.error("Erreur envoi email de bienvenue:", emailError);
-        }
-        
-        showToast("Inscription réussie ! Vérifiez votre email pour votre message de bienvenue.", "success");
-        setIsSubmitted(true);
-        setEmail("");
+        setIsSubmitting(false);
+        return;
       }
+
+      // Insertion réussie - Log pour Netlify
+      console.log("[Coming Soon] ✅ Inscription réussie:", {
+        email: normalizedEmail,
+        id: insertData?.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Envoyer l'email de bienvenue (ne bloque pas si échec)
+      let emailSent = false;
+      try {
+        const emailResult = await sendWelcomeEmail(normalizedEmail);
+        emailSent = emailResult.success;
+        
+        if (emailResult.success) {
+          console.log("[Coming Soon] ✅ Email de bienvenue envoyé:", normalizedEmail);
+        } else {
+          console.warn("[Coming Soon] ⚠️ Email de bienvenue non envoyé (non-bloquant):", {
+            email: normalizedEmail,
+            error: emailResult.error,
+          });
+        }
+      } catch (emailError: any) {
+        // L'erreur d'email ne bloque jamais l'inscription
+        console.warn("[Coming Soon] ⚠️ Exception lors de l'envoi d'email (non-bloquant):", {
+          email: normalizedEmail,
+          error: emailError?.message || "Erreur inconnue",
+        });
+      }
+
+      // Succès - Message adapté selon l'envoi d'email
+      showToast(
+        emailSent
+          ? "Inscription réussie ! Vérifiez votre email pour votre message de bienvenue."
+          : "Inscription réussie ! Vous serez informé en avant-première du lancement.",
+        "success"
+      );
+      setIsSubmitted(true);
+      setEmail("");
+      
     } catch (error: any) {
-      console.error("Erreur inscription:", error);
+      // Erreur inattendue (exception non gérée)
+      console.error("[Coming Soon] ❌ ERREUR CRITIQUE inscription:", {
+        email: normalizedEmail,
+        error: error?.message || "Erreur inconnue",
+        stack: error?.stack,
+      });
       showToast("Erreur lors de l'inscription. Réessayez plus tard.", "error");
     } finally {
       setIsSubmitting(false);
@@ -83,13 +158,39 @@ export default function ComingSoonPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 flex items-center justify-center px-4 py-12">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="max-w-4xl w-full text-center"
-      >
+    <main className="min-h-screen bg-neutral-950 text-white relative overflow-hidden">
+      {/* Hero Background - Même style que la page d'accueil */}
+      <section className="relative h-screen flex items-center justify-center overflow-hidden">
+        {/* Image de fond - Hero Octane98 */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/hero-bg.png"
+            alt="Octane98 - Le sanctuaire du moteur thermique"
+            fill
+            className="object-cover opacity-60"
+            priority
+            sizes="100vw"
+            unoptimized
+          />
+        </div>
+
+        {/* Fond avec dégradé noir/rouge profond - Par-dessus l'image */}
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-neutral-950 via-red-950/20 to-neutral-950">
+          {/* Pattern subtil */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(220,38,38,0.1),transparent_70%)]" />
+        </div>
+
+        {/* Overlay pour améliorer la lisibilité du texte */}
+        <div className="absolute inset-0 z-0 bg-black/40" />
+
+        {/* Contenu central */}
+        <div className="relative z-10 w-full px-4 py-12">
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="max-w-4xl mx-auto text-center"
+          >
         {/* Logo et Titre */}
         <motion.div variants={itemVariants} className="mb-12">
           <div className="flex items-center justify-center gap-4 mb-6">
@@ -198,11 +299,13 @@ export default function ComingSoonPage() {
           </motion.div>
         </motion.div>
 
-        {/* Footer */}
-        <motion.div variants={itemVariants} className="text-neutral-500 text-sm">
-          <p>Bientôt disponible en Belgique 🇧🇪</p>
-        </motion.div>
-      </motion.div>
+            {/* Footer */}
+            <motion.div variants={itemVariants} className="text-neutral-400 text-sm mt-8">
+              <p>Bientôt disponible en Belgique 🇧🇪</p>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
     </main>
   );
 }
