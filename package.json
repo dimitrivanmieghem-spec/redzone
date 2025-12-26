@@ -1,5 +1,5 @@
 {
-  "name": "redzone",
+  "name": "octane98",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -20,10 +20,14 @@
     "@marsidev/react-turnstile": "^1.4.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.87.0",
+    "browser-image-compression": "^2.0.2",
+    "framer-motion": "^12.23.26",
     "lucide-react": "^0.556.0",
     "next": "16.0.7",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-to-print": "^3.2.0",
     "resend": "^6.6.0",
     "zod": "^4.2.1"
   },

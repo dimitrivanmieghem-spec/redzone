@@ -25,25 +25,34 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RedZone | La mécanique des puristes",
+  title: "Octane98 | La mécanique des puristes",
   description: "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
+  keywords: "Octane98, marketplace automobile Belgique, voiture sportive Belgique, calculateur taxes Belgique, annonces véhicules Belgique",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "RedZone",
+    title: "Octane98",
   },
   openGraph: {
     type: "website",
     locale: "fr_BE",
-    url: process.env.NEXT_PUBLIC_SITE_URL || "https://redzone.be",
-    siteName: "RedZone",
-    title: "RedZone | La mécanique des puristes",
+    url: process.env.NEXT_PUBLIC_SITE_URL || "https://octane98.be",
+    siteName: "Octane98",
+    title: "Octane98 | La mécanique des puristes",
     description: "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
+    images: [
+      {
+        url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://octane98.be"}/og-image.jpg`,
+        width: 1200,
+        height: 630,
+        alt: "Octane98 - Le Sanctuaire du Moteur Thermique",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "RedZone | La mécanique des puristes",
+    title: "Octane98 | La mécanique des puristes",
     description: "Supercars, youngtimers, GTI. V8, atmosphérique, manuelle. La marketplace des passionnés automobiles en Belgique.",
   },
 };
@@ -70,7 +79,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#DC2626" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="RedZone" />
+        <meta name="apple-mobile-web-app-title" content="Octane98" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/favicon.ico" />
       </head>

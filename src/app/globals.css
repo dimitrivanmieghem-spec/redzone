@@ -3,10 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  /* RedZone Brand Colors */
-  --redzone-bg: #0a0a0b;
-  --redzone-action: #ff0000;
-  --redzone-action-hover: #cc0000;
+  /* Octane98 Brand Colors */
+  --octane-bg: #0a0a0b;
+  --octane-action: #ff0000;
+  --octane-action-hover: #cc0000;
 }
 
 @theme inline {
@@ -45,6 +45,28 @@ body {
   }
   to {
     transform: translateY(0);
+  }
+}
+
+/* Styles d'impression pour les fiches véhicules */
+@media print {
+  /* Cache tout le corps de la page par défaut */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Affiche uniquement le contenu marqué pour l'impression et ses enfants */
+  [data-print-content],
+  [data-print-content] * {
+    visibility: visible;
+  }
+  
+  /* Positionne le contenu imprimable en haut à gauche absolue pour ne pas imprimer de pages blanches */
+  [data-print-content] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
   }
 }
 
