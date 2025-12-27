@@ -27,7 +27,24 @@ export async function subscribeToWaitingList(
 
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Log de debug pour diagnostic
+  console.log("[Subscribe Action] 🚀 Début inscription:", {
+    email: normalizedEmail,
+    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    timestamp: new Date().toISOString(),
+  });
+
   try {
+    // Vérification explicite de la variable d'environnement avant d'appeler createAdminClient
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[Subscribe Action] ❌ SUPABASE_SERVICE_ROLE_KEY manquante dans les variables d'environnement");
+      return {
+        success: false,
+        error: "Configuration serveur invalide. Contactez le support.",
+        code: "ENV_MISSING",
+      };
+    }
+
     const supabase = createAdminClient();
 
     // Insérer dans la base de données avec client admin (contourne RLS)
