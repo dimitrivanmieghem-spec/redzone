@@ -14,11 +14,11 @@ export default function MobileNav() {
   const { user } = useAuth();
   const { isSimulatingBan } = useBanSimulation();
 
-  // Vérification du cookie bypass Alpha
-  const hasAlphaBypass = typeof window !== "undefined" && document.cookie.includes("octane_bypass_token=true");
-
   // Combiner le ban réel et la simulation pour bloquer l'accès
   const isEffectivelyBanned = user?.is_banned || (isSimulatingBan && user?.role === "admin");
+
+  // Déterminer si on est sur la page coming-soon
+  const isComingSoonPage = pathname === "/coming-soon";
 
   // État pour le mode cockpit (masquage au scroll)
   const [isVisible, setIsVisible] = useState(true);
@@ -46,16 +46,16 @@ export default function MobileNav() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
-  // Navigation limitée si pas de bypass Alpha
-  const navItems = hasAlphaBypass ? [
+  // Navigation limitée sur coming-soon, complète partout ailleurs
+  const navItems = isComingSoonPage ? [
+    { href: "/", label: "Accueil", icon: Home },
+    { href: "/login", label: "Connexion", icon: User },
+  ] : [
     { href: "/", label: "Accueil", icon: Home },
     { href: "/search", label: "Explorer", icon: Search },
     { href: "/sell", label: "Vendre", icon: Plus, isPrimary: true },
     { href: "/favorites", label: "Favoris", icon: Heart, badge: favorites.length },
     { href: user ? "/dashboard" : "/login", label: "Profil", icon: User },
-  ] : [
-    { href: "/", label: "Accueil", icon: Home },
-    { href: "/login", label: "Connexion", icon: User },
   ];
 
   const isActive = (href: string) => {

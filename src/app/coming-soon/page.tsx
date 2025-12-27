@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import { Gauge, Sparkles, Shield, TrendingUp, CheckCircle, Loader2, ArrowRight, Calculator } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import dynamic from "next/dynamic";
@@ -235,6 +236,16 @@ export default function ComingSoonPage() {
                   )}
                 </form>
               </div>
+            </motion.div>
+
+            {/* Bouton de connexion - Point d'entrée vers l'app */}
+            <motion.div variants={itemVariants} className="mb-8 md:mb-16 text-center">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold px-6 py-3 rounded-2xl transition-all hover:scale-105 shadow-lg shadow-red-900/50"
+              >
+                Se connecter à Octane98
+              </Link>
             </motion.div>
 
             {/* Section "Pourquoi Octane98 ?" - Cards optimisées mobile */}

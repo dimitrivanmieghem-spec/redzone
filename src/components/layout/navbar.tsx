@@ -3,7 +3,7 @@
 import { Menu, X, Heart, ChevronDown, User, LayoutDashboard, LogOut, Gauge, Shield, Settings, FileText, Users, TestTube, XCircle, Bell, BellRing, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBanSimulation } from "@/contexts/BanSimulationContext";
@@ -22,9 +22,10 @@ function Navbar() {
   const { user, logout } = useAuth();
   const { isSimulatingBan, toggleSimulation, stopSimulation } = useBanSimulation();
   const router = useRouter();
+  const pathname = usePathname();
 
-  // Vérification du cookie bypass Alpha
-  const hasAlphaBypass = typeof window !== "undefined" && document.cookie.includes("octane_bypass_token=true");
+  // Déterminer si on est sur la page coming-soon pour affichage minimal
+  const isComingSoonPage = pathname === "/coming-soon";
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -130,8 +131,8 @@ function Navbar() {
             </span>
           </Link>
 
-          {/* Navigation Desktop - MASQUÉE si pas de bypass Alpha */}
-          {hasAlphaBypass && (
+          {/* Navigation Desktop - MASQUÉE sur coming-soon uniquement */}
+          {!isComingSoonPage && (
             <nav className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (
                 <Link
@@ -504,8 +505,8 @@ function Navbar() {
           </nav>
           )}
 
-          {/* Bouton Menu Burger Mobile - Blanc - MASQUÉ si pas de bypass Alpha */}
-          {hasAlphaBypass && (
+          {/* Bouton Menu Burger Mobile - Blanc - MASQUÉ sur coming-soon uniquement */}
+          {!isComingSoonPage && (
             <button
               onClick={toggleMenu}
               className="md:hidden p-2 text-white hover:text-slate-300 transition-colors duration-300"
@@ -527,8 +528,8 @@ function Navbar() {
           />
         )}
 
-        {/* Drawer/Panneau latéral - Thème sombre - MASQUÉ si pas de bypass Alpha */}
-        {hasAlphaBypass && (
+        {/* Drawer/Panneau latéral - Thème sombre - MASQUÉ sur coming-soon uniquement */}
+        {!isComingSoonPage && (
           <div
             className={`fixed top-0 right-0 h-full w-80 bg-[#0a0a0b]/95 backdrop-blur-xl border-l border-white/10 z-[85] shadow-2xl shadow-black/50 md:hidden transform transition-transform duration-300 ease-out ${
               isMenuOpen ? "translate-x-0" : "translate-x-full"
