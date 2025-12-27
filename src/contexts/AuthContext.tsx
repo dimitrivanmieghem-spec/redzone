@@ -185,11 +185,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profileError) {
         // Erreur technique (réseau, permissions, etc.)
         console.warn("Erreur technique lors de la récupération du profil:", profileError.message);
-        throw profileError; // Bloque le processus car c'est une vraie erreur
-      } else if (!profile) {
-        // Pas de profil trouvé (mais pas d'erreur technique) ->
-        // Utilisateur nouvellement inscrit, profil pas encore créé
-        console.log("Profil manquant, utilisation des données de session pour initialisation");
+        // SELF-HEALING : Ne pas bloquer, créer un utilisateur par défaut même en cas d'erreur technique
+        console.log("Mode self-healing activé : création d'utilisateur par défaut malgré l'erreur");
+      }
+
+      if (!profile) {
+        // Pas de profil trouvé (erreur technique ou profil manquant) ->
+        // SELF-HEALING : Créer un utilisateur minimal en mode dégradé
+        console.log("Profil manquant ou erreur - Mode self-healing : création d'utilisateur par défaut");
 
         // Créer un utilisateur minimal en mode dégradé avec les infos de base
         const defaultName = supabaseUser.email?.split("@")[0] || "Utilisateur";

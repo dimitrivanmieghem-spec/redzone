@@ -198,50 +198,18 @@ function LoginContent() {
 
       showToast("Connexion réussie !", "success");
 
-      // ===== VÉRIFICATION ACTIVE DE LA SESSION =====
-      // Au lieu d'attendre bêtement, on vérifie que la session est réellement prête
-      const MAX_ATTEMPTS = 5;
-      const POLL_INTERVAL = 200; // 200ms entre chaque vérification
-      const startTime = Date.now();
-
-      console.log("[Login] Vérification de la session prête...");
-
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        try {
-          console.log(`[Login] Tentative ${attempt}/${MAX_ATTEMPTS} de vérification de session`);
-
-          // Vérifier si la session est disponible
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-          if (session && !sessionError) {
-            const elapsedTime = Date.now() - startTime;
-            console.log(`[Login] ✅ Session confirmée après ${attempt} tentatives (${elapsedTime}ms)`);
-            break;
-          } else {
-            console.log(`[Login] ⏳ Session pas encore prête (tentative ${attempt}/${MAX_ATTEMPTS})`);
-            if (attempt < MAX_ATTEMPTS) {
-              // Attendre avant la prochaine vérification
-              await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
-            }
-          }
-        } catch (pollError) {
-          console.warn(`[Login] Erreur lors de la vérification ${attempt}:`, pollError);
-          if (attempt < MAX_ATTEMPTS) {
-            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
-          }
-        }
-      }
+      // Petit délai pour l'UX (optionnel - évite le flash de redirection)
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Déterminer l'URL de redirection
       const redirectUrl = searchParams.get("redirect") || "/dashboard";
 
       // Valider que l'URL de redirection est sécurisée (commence par /)
       if (redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")) {
-        console.log(`[Login] 🔄 Redirection vers: ${redirectUrl}`);
-        // Hard navigation pour garantir que le middleware voit la session
+        // Hard navigation pour forcer le rechargement complet
+        // Cela garantit que le middleware voit immédiatement la session
         window.location.href = redirectUrl;
       } else {
-        console.log(`[Login] 🔄 Redirection vers dashboard (URL invalide: ${redirectUrl})`);
         // En cas d'URL invalide, rediriger vers le dashboard par défaut
         window.location.href = "/dashboard";
       }
