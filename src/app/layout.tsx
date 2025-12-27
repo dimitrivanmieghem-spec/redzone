@@ -64,7 +64,7 @@ export function generateViewport() {
     maximumScale: 2, // Réduit pour éviter zoom excessif sur mobile
     userScalable: true,
     themeColor: "#DC2626",
-    viewportFit: "auto", // Changé de "cover" à "auto" pour éviter bandes noires
+    viewportFit: "cover", // Utilise "cover" pour combler la notch iPhone
   };
 }
 

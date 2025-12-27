@@ -23,13 +23,18 @@
   }
 }
 
+html {
+  background: var(--octane-bg); /* Noir pour combler la notch iPhone */
+}
+
 body {
-  background: #0a0a0b;
+  background: var(--octane-bg); /* Noir pour combler la notch iPhone */
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100dvh; /* Utiliser dvh au lieu de vh pour éviter bandes noires */
+  padding-top: env(safe-area-inset-top); /* Combler la notch iPhone */
 }
 
 /* S'assurer que le layout principal utilise la bonne hauteur */

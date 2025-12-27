@@ -57,6 +57,8 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [userEmail, setUserEmail] = useState<string>("");
+  const [otpCode, setOtpCode] = useState<string>("");
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [formData, setFormData] = useState<RegisterFormData>({
     firstName: "",
     lastName: "",
@@ -105,6 +107,50 @@ export default function RegisterPage() {
     }
   };
 
+  const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (otpCode.length !== 6 && otpCode.length !== 8) {
+      showToast("Le code doit contenir 6 ou 8 chiffres", "error");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: userEmail,
+        token: otpCode,
+        type: 'email'
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.user) {
+        showToast("Email vérifié avec succès ! 🎉", "success");
+        router.refresh();
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 500);
+      }
+    } catch (err: any) {
+      console.error("Erreur vérification OTP:", err);
+      let errorMessage = "Code invalide ou expiré";
+
+      if (err?.message) {
+        if (err.message.includes("invalid")) {
+          errorMessage = "Code invalide";
+        } else if (err.message.includes("expired")) {
+          errorMessage = "Code expiré, veuillez en demander un nouveau";
+        }
+      }
+
+      showToast(errorMessage, "error");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -115,28 +161,13 @@ export default function RegisterPage() {
       // Validation avec Zod
       const validatedData = registerSchema.parse(formData);
 
-      // 1. Appel Supabase avec emailRedirectTo
+      // 1. Appel Supabase avec OTP (code à 6/8 chiffres)
       const fullName = `${validatedData.firstName} ${validatedData.lastName}`.trim();
-      
-      // Déterminer l'URL de redirection : priorité à NEXT_PUBLIC_SITE_URL (production)
-      // Ne jamais utiliser localhost pour les emails de confirmation
-      let siteUrl: string;
-      if (process.env.NEXT_PUBLIC_SITE_URL) {
-        // Utiliser la variable d'environnement de production (Netlify)
-        siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-      } else if (typeof window !== "undefined" && window.location.origin && !window.location.origin.includes("localhost")) {
-        // Utiliser window.location.origin seulement si ce n'est PAS localhost
-        siteUrl = window.location.origin;
-      } else {
-        // Fallback vers l'URL de production par défaut
-        siteUrl = "https://octane98.netlify.app";
-      }
-      
+
       const { data, error: supabaseError } = await supabase.auth.signUp({
         email: validatedData.email,
         password: validatedData.password,
         options: {
-          emailRedirectTo: `${siteUrl}/auth/callback`,
           data: {
             first_name: validatedData.firstName,
             last_name: validatedData.lastName,
@@ -211,12 +242,12 @@ export default function RegisterPage() {
         }
       }
 
-      // 4. Gestion du succès : Si pas de session, c'est que l'email doit être confirmé
+      // 4. Gestion du succès : Si pas de session, c'est que l'OTP doit être saisi
       if (!data.session) {
-        // Email de confirmation envoyé
+        // Code OTP envoyé par email
         setUserEmail(validatedData.email);
         setPendingVerification(true);
-        showToast("Email de confirmation envoyé ! Vérifiez votre boîte mail.", "success");
+        showToast("Code de vérification envoyé ! Vérifiez votre boîte mail.", "success");
       } else {
         // Session créée (peu probable si Confirm Email est activé, mais on gère le cas)
         showToast("Compte créé avec succès ! 🎉", "success");
@@ -277,20 +308,53 @@ export default function RegisterPage() {
               Vérifiez votre boîte mail
             </h2>
             <p className="text-neutral-400 text-lg">
-              Un lien de confirmation a été envoyé à
+              Un code de vérification a été envoyé à
             </p>
             <p className="text-yellow-400 font-bold text-xl mt-2 break-all">
               {userEmail}
             </p>
           </div>
 
-          {/* Message principal */}
-          <div className="bg-gradient-to-r from-yellow-500/10 via-yellow-600/10 to-yellow-500/10 border-2 border-yellow-500/30 rounded-xl p-6 mb-6">
-            <p className="text-white text-center leading-relaxed">
-              Cliquez sur le lien dans l&apos;email pour activer votre compte{" "}
-              <span className="font-bold text-yellow-400">Membre Fondateur</span>.
-            </p>
-          </div>
+          {/* Formulaire OTP */}
+          <form onSubmit={handleVerifyOtp} className="bg-neutral-800/50 backdrop-blur-sm rounded-xl p-6 mb-6 border border-white/10">
+            <div className="text-center mb-4">
+              <p className="text-white text-sm mb-4">
+                Saisissez le code à 6 ou 8 chiffres reçu par email
+              </p>
+              <input
+                type="text"
+                value={otpCode}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, ''); // Uniquement chiffres
+                  if (value.length <= 8) {
+                    setOtpCode(value);
+                  }
+                }}
+                placeholder="123456"
+                maxLength={8}
+                className="w-full max-w-xs mx-auto text-center text-2xl font-mono tracking-widest bg-neutral-900/50 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-600/50 focus:border-red-600"
+                required
+                disabled={isVerifyingOtp}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isVerifyingOtp || otpCode.length < 6}
+              className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-green-400 disabled:to-green-500 disabled:cursor-not-allowed text-white font-black py-3 px-6 rounded-xl transition-all shadow-lg shadow-green-900/20 hover:shadow-green-900/40 hover:scale-[1.02] flex items-center justify-center gap-2"
+            >
+              {isVerifyingOtp ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Vérification...
+                </>
+              ) : (
+                <>
+                  Vérifier le code
+                </>
+              )}
+            </button>
+          </form>
 
           {/* Instructions */}
           <div className="space-y-3 mb-6">
@@ -304,7 +368,7 @@ export default function RegisterPage() {
               <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
                 <span className="text-red-400 text-xs font-bold">2</span>
               </div>
-              <p className="text-sm">Cliquez sur le lien de confirmation dans l&apos;email</p>
+              <p className="text-sm">Saisissez le code de 6 ou 8 chiffres dans le champ ci-dessus</p>
             </div>
             <div className="flex items-start gap-3 text-neutral-300">
               <div className="flex-shrink-0 w-6 h-6 bg-red-600/20 border border-red-500/40 rounded-full flex items-center justify-center mt-0.5">
@@ -326,12 +390,12 @@ export default function RegisterPage() {
           {/* Message d'aide */}
           <div className="mt-6 text-center">
             <p className="text-xs text-neutral-500">
-              Vous n&apos;avez pas reçu l&apos;email ? Vérifiez vos spams ou{" "}
+              Vous n&apos;avez pas reçu le code ? Vérifiez vos spams ou{" "}
               <button
                 onClick={() => setPendingVerification(false)}
                 className="text-yellow-400 hover:text-yellow-300 underline font-medium"
               >
-                réessayez
+                réessayez l&apos;inscription
               </button>
             </p>
           </div>

@@ -23,6 +23,9 @@ function Navbar() {
   const { isSimulatingBan, toggleSimulation, stopSimulation } = useBanSimulation();
   const router = useRouter();
 
+  // Vérification du cookie bypass Alpha
+  const hasAlphaBypass = typeof window !== "undefined" && document.cookie.includes("octane_bypass_token=true");
+
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
@@ -127,200 +130,201 @@ function Navbar() {
             </span>
           </Link>
 
-          {/* Navigation Desktop */}
-          <nav className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
+          {/* Navigation Desktop - MASQUÉE si pas de bypass Alpha */}
+          {hasAlphaBypass && (
+            <nav className="hidden md:flex items-center gap-8">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-slate-300 hover:text-white font-medium text-sm transition-colors duration-300"
+                >
+                  {link.label}
+                </Link>
+              ))}
+
+              {/* Lien Favoris avec badge */}
               <Link
-                key={link.href}
-                href={link.href}
-                className="text-slate-300 hover:text-white font-medium text-sm transition-colors duration-300"
+                href="/favorites"
+                className="relative text-slate-300 hover:text-white font-medium text-sm transition-colors duration-300 flex items-center gap-1.5"
               >
-                {link.label}
+                <Heart
+                  size={18}
+                  className={favorites.length > 0 ? "fill-red-500 text-red-500" : ""}
+                />
+                <span>Favoris</span>
+                {favorites.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {favorites.length}
+                  </span>
+                )}
               </Link>
-            ))}
-            
-            {/* Lien Favoris avec badge */}
-            <Link
-              href="/favorites"
-              className="relative text-slate-300 hover:text-white font-medium text-sm transition-colors duration-300 flex items-center gap-1.5"
-            >
-              <Heart
-                size={18}
-                className={favorites.length > 0 ? "fill-red-500 text-red-500" : ""}
-              />
-              <span>Favoris</span>
-              {favorites.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {favorites.length}
-                </span>
-              )}
-            </Link>
 
-            {/* Utilisateur connecté ou non */}
-            {user ? (
-              <div className="flex items-center gap-3">
-                {/* Cloche de notifications */}
-                <div className="relative">
-                  <button
-                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                    className="relative p-2 rounded-full hover:bg-white/10 transition-colors duration-300"
-                    aria-label="Notifications"
-                  >
-                    {unreadCount > 0 ? (
-                      <BellRing size={20} className="text-red-500" />
-                    ) : (
-                      <Bell size={20} className="text-slate-300" />
-                    )}
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
-                  </button>
+              {/* Utilisateur connecté ou non */}
+              {user ? (
+                <div className="flex items-center gap-3">
+                  {/* Cloche de notifications */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                      className="relative p-2 rounded-full hover:bg-white/10 transition-colors duration-300"
+                      aria-label="Notifications"
+                    >
+                      {unreadCount > 0 ? (
+                        <BellRing size={20} className="text-red-500" />
+                      ) : (
+                        <Bell size={20} className="text-slate-300" />
+                      )}
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
 
-                  {/* Dropdown Notifications */}
-                  {isNotificationsOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setIsNotificationsOpen(false)}
-                      />
-                      <div className="absolute right-0 mt-3 bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 w-80 max-w-[calc(100vw-2rem)] z-20 max-h-[400px] flex flex-col">
-                        {/* Header */}
-                        <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                          <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                            <BellRing size={18} className="text-red-500" />
-                            Notifications
-                            {unreadCount > 0 && (
-                              <span className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
-                                {unreadCount}
-                              </span>
-                            )}
-                          </h3>
-                          <button
-                            onClick={() => setIsNotificationsOpen(false)}
-                            className="w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center"
-                          >
-                            <X size={16} className="text-slate-300" />
-                          </button>
-                        </div>
+                    {/* Dropdown Notifications */}
+                    {isNotificationsOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setIsNotificationsOpen(false)}
+                        />
+                        <div className="absolute right-0 mt-3 bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 w-80 max-w-[calc(100vw-2rem)] z-20 max-h-[400px] flex flex-col">
+                          {/* Header */}
+                          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                              <BellRing size={18} className="text-red-500" />
+                              Notifications
+                              {unreadCount > 0 && (
+                                <span className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                                  {unreadCount}
+                                </span>
+                              )}
+                            </h3>
+                            <button
+                              onClick={() => setIsNotificationsOpen(false)}
+                              className="w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center"
+                            >
+                              <X size={16} className="text-slate-300" />
+                            </button>
+                          </div>
 
-                        {/* Liste */}
-                        <div className="flex-1 overflow-y-auto">
-                          {notifications.length === 0 ? (
-                            <div className="text-center py-8 px-4">
-                              <Bell size={32} className="text-slate-600 mx-auto mb-2" />
-                              <p className="text-slate-400 text-sm">Aucune notification</p>
-                            </div>
-                          ) : (
-                            <div className="divide-y divide-white/10">
-                              {notifications.map((notification) => (
-                                <Link
-                                  key={notification.id}
-                                  href={notification.link || "#"}
-                                  onClick={async () => {
-                                    if (!notification.is_read) {
-                                      await markNotificationAsRead(notification.id);
-                                      // Mettre à jour l'état local
-                                      setNotifications((prev) =>
-                                        prev.map((n) =>
-                                          n.id === notification.id
-                                            ? { ...n, is_read: true, read_at: new Date().toISOString() }
-                                            : n
-                                        )
-                                      );
-                                      // Décrémenter le compteur
-                                      setUnreadCount((prev) => Math.max(0, prev - 1));
-                                    }
-                                    setIsNotificationsOpen(false);
-                                  }}
-                                  className={`block p-4 hover:bg-white/5 transition-colors ${
-                                    !notification.is_read ? "bg-red-600/10" : ""
-                                  }`}
-                                >
-                                  <div className="flex items-start gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <h4 className="text-white font-medium text-sm truncate">
-                                          {notification.title}
-                                        </h4>
-                                        {!notification.is_read && (
-                                          <span className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0" />
-                                        )}
+                          {/* Liste */}
+                          <div className="flex-1 overflow-y-auto">
+                            {notifications.length === 0 ? (
+                              <div className="text-center py-8 px-4">
+                                <Bell size={32} className="text-slate-600 mx-auto mb-2" />
+                                <p className="text-slate-400 text-sm">Aucune notification</p>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-white/10">
+                                {notifications.map((notification) => (
+                                  <Link
+                                    key={notification.id}
+                                    href={notification.link || "#"}
+                                    onClick={async () => {
+                                      if (!notification.is_read) {
+                                        await markNotificationAsRead(notification.id);
+                                        // Mettre à jour l'état local
+                                        setNotifications((prev) =>
+                                          prev.map((n) =>
+                                            n.id === notification.id
+                                              ? { ...n, is_read: true, read_at: new Date().toISOString() }
+                                              : n
+                                          )
+                                        );
+                                        // Décrémenter le compteur
+                                        setUnreadCount((prev) => Math.max(0, prev - 1));
+                                      }
+                                      setIsNotificationsOpen(false);
+                                    }}
+                                    className={`block p-4 hover:bg-white/5 transition-colors ${
+                                      !notification.is_read ? "bg-red-600/10" : ""
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <h4 className="text-white font-medium text-sm truncate">
+                                            {notification.title}
+                                          </h4>
+                                          {!notification.is_read && (
+                                            <span className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0" />
+                                          )}
+                                        </div>
+                                        <p className="text-slate-400 text-xs line-clamp-2">
+                                          {notification.message}
+                                        </p>
+                                        <span className="text-slate-500 text-[10px] mt-1 block">
+                                          {new Date(notification.created_at).toLocaleDateString("fr-BE", {
+                                            day: "numeric",
+                                            month: "short",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}
+                                        </span>
                                       </div>
-                                      <p className="text-slate-400 text-xs line-clamp-2">
-                                        {notification.message}
-                                      </p>
-                                      <span className="text-slate-500 text-[10px] mt-1 block">
-                                        {new Date(notification.created_at).toLocaleDateString("fr-BE", {
-                                          day: "numeric",
-                                          month: "short",
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                      </span>
                                     </div>
-                                  </div>
-                                </Link>
-                              ))}
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer */}
+                          {notifications.length > 0 && (
+                            <div className="p-3 border-t border-white/10">
+                              <Link
+                                href="/dashboard"
+                                onClick={() => setIsNotificationsOpen(false)}
+                                className="block text-center text-slate-300 hover:text-white text-xs font-medium"
+                              >
+                                Voir toutes les notifications →
+                              </Link>
                             </div>
                           )}
                         </div>
-
-                        {/* Footer */}
-                        {notifications.length > 0 && (
-                          <div className="p-3 border-t border-white/10">
-                            <Link
-                              href="/dashboard"
-                              onClick={() => setIsNotificationsOpen(false)}
-                              className="block text-center text-slate-300 hover:text-white text-xs font-medium"
-                            >
-                              Voir toutes les notifications →
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Menu utilisateur */}
-                <div className="relative">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                      className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300"
-                    >
-                      <div className="w-9 h-9 rounded-full border-2 border-white/20 overflow-hidden ring-2 ring-white/10 relative">
-                        <Image
-                          src={user.avatar}
-                          alt={user.name}
-                          width={36}
-                          height={36}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </button>
-                    {/* Badge Admin cliquable (visible uniquement pour les admins) */}
-                    {user.role === "admin" && (
-                      <Link
-                        href="/admin"
-                        className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors flex items-center gap-1"
-                        title="Accéder au panneau d'administration"
-                      >
-                        ADMIN
-                      </Link>
+                      </>
                     )}
                   </div>
 
-                {/* Menu déroulant utilisateur */}
-                {isUserMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    />
-                    <div className={`absolute right-0 mt-3 bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 py-2 z-20 ${
+                  {/* Menu utilisateur */}
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                        className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300"
+                      >
+                        <div className="w-9 h-9 rounded-full border-2 border-white/20 overflow-hidden ring-2 ring-white/10 relative">
+                          <Image
+                            src={user.avatar}
+                            alt={user.name}
+                            width={36}
+                            height={36}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </button>
+                      {/* Badge Admin cliquable (visible uniquement pour les admins) */}
+                      {user.role === "admin" && (
+                        <Link
+                          href="/admin"
+                          className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors flex items-center gap-1"
+                          title="Accéder au panneau d'administration"
+                        >
+                          ADMIN
+                        </Link>
+                      )}
+                    </div>
+
+                  {/* Menu déroulant utilisateur */}
+                  {isUserMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      />
+                      <div className={`absolute right-0 mt-3 bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 py-2 z-20 ${
                       user.role === "admin" ? "w-72" : "w-56"
                     }`}>
                       {/* Header avec badge ADMIN */}
@@ -498,15 +502,18 @@ function Navbar() {
               );
             })()}
           </nav>
+          )}
 
-          {/* Bouton Menu Burger Mobile - Blanc */}
-          <button
-            onClick={toggleMenu}
-            className="md:hidden p-2 text-white hover:text-slate-300 transition-colors duration-300"
-            aria-label="Ouvrir le menu"
-          >
-            <Menu size={24} />
-          </button>
+          {/* Bouton Menu Burger Mobile - Blanc - MASQUÉ si pas de bypass Alpha */}
+          {hasAlphaBypass && (
+            <button
+              onClick={toggleMenu}
+              className="md:hidden p-2 text-white hover:text-slate-300 transition-colors duration-300"
+              aria-label="Ouvrir le menu"
+            >
+              <Menu size={24} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -520,30 +527,31 @@ function Navbar() {
           />
         )}
 
-        {/* Drawer/Panneau latéral - Thème sombre */}
-        <div
-          className={`fixed top-0 right-0 h-full w-80 bg-[#0a0a0b]/95 backdrop-blur-xl border-l border-white/10 z-[85] shadow-2xl shadow-black/50 md:hidden transform transition-transform duration-300 ease-out ${
-            isMenuOpen ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          {/* Header du drawer */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
-                <Gauge className="text-white" size={18} />
+        {/* Drawer/Panneau latéral - Thème sombre - MASQUÉ si pas de bypass Alpha */}
+        {hasAlphaBypass && (
+          <div
+            className={`fixed top-0 right-0 h-full w-80 bg-[#0a0a0b]/95 backdrop-blur-xl border-l border-white/10 z-[85] shadow-2xl shadow-black/50 md:hidden transform transition-transform duration-300 ease-out ${
+              isMenuOpen ? "translate-x-0" : "translate-x-full"
+            }`}
+          >
+            {/* Header du drawer */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
+                  <Gauge className="text-white" size={18} />
+                </div>
+                <h2 className="text-white font-semibold text-lg tracking-tight">
+                  Octane<span className="text-red-500">98</span>
+                </h2>
               </div>
-              <h2 className="text-white font-semibold text-lg tracking-tight">
-                Octane<span className="text-red-500">98</span>
-              </h2>
+              <button
+                onClick={closeMenu}
+                className="p-2 text-white hover:text-slate-300 hover:bg-white/10 rounded-full transition-all duration-300"
+                aria-label="Fermer le menu"
+              >
+                <X size={24} />
+              </button>
             </div>
-            <button
-              onClick={closeMenu}
-              className="p-2 text-white hover:text-slate-300 hover:bg-white/10 rounded-full transition-all duration-300"
-              aria-label="Fermer le menu"
-            >
-              <X size={24} />
-            </button>
-          </div>
 
           {/* Profil utilisateur (mobile) */}
           {user && (
@@ -779,7 +787,7 @@ function Navbar() {
             })()}
           </nav>
         </div>
-      </>
+        )}
 
       {/* Spacer pour compenser la navbar fixe (ajusté si bannière simulation visible) */}
       <div className={`h-16 ${isSimulatingBan && user?.role === "admin" ? "mt-14" : ""}`} />

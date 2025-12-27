@@ -29,7 +29,6 @@ export default function ComingSoonPage() {
   // État pour le calculateur fiscal
   const [showCalculator, setShowCalculator] = useState(false);
   const [calculatorInputs, setCalculatorInputs] = useState({
-    region: "wallonie" as "wallonie" | "flandre",
     annee: new Date().getFullYear(),
     puissanceKw: 150, // Valeur d'exemple pour montrer le calculateur
     co2: 150,
@@ -309,113 +308,6 @@ export default function ComingSoonPage() {
                 </p>
               </div>
 
-              {/* Formulaire d'entrée du calculateur */}
-              <div className="bg-slate-900/70 backdrop-blur-md rounded-3xl border border-neutral-800/50 p-6 md:p-8 shadow-xl mb-6 max-w-4xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Région */}
-                  <div>
-                    <label className="block text-sm font-bold text-white mb-3">
-                      Région
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setCalculatorInputs(prev => ({ ...prev, region: "wallonie" }))}
-                        className={`p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                          calculatorInputs.region === "wallonie"
-                            ? "border-blue-500 bg-blue-900/30 text-blue-300"
-                            : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
-                        }`}
-                      >
-                        🇧🇪 Wallonie / Bruxelles
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCalculatorInputs(prev => ({ ...prev, region: "flandre" }))}
-                        className={`p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                          calculatorInputs.region === "flandre"
-                            ? "border-blue-500 bg-blue-900/30 text-blue-300"
-                            : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
-                        }`}
-                      >
-                        🇧🇪 Flandre
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Année */}
-                  <div>
-                    <label htmlFor="calc-annee" className="block text-sm font-bold text-white mb-3">
-                      Année du véhicule
-                    </label>
-                    <input
-                      type="number"
-                      id="calc-annee"
-                      min="1900"
-                      max={new Date().getFullYear() + 1}
-                      value={calculatorInputs.annee}
-                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, annee: parseInt(e.target.value) || new Date().getFullYear() }))}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
-                      placeholder="2020"
-                    />
-                  </div>
-
-                  {/* Puissance (kW) */}
-                  <div>
-                    <label htmlFor="calc-puissance" className="block text-sm font-bold text-white mb-3">
-                      Puissance (kW)
-                    </label>
-                    <input
-                      type="number"
-                      id="calc-puissance"
-                      min="0"
-                      step="0.1"
-                      value={calculatorInputs.puissanceKw || ""}
-                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, puissanceKw: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
-                      placeholder="150"
-                    />
-                  </div>
-
-                  {/* CO2 */}
-                  <div>
-                    <label htmlFor="calc-co2" className="block text-sm font-bold text-white mb-3">
-                      Émissions CO₂ (g/km)
-                    </label>
-                    <input
-                      type="number"
-                      id="calc-co2"
-                      min="0"
-                      step="1"
-                      value={calculatorInputs.co2 || ""}
-                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, co2: parseInt(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
-                      placeholder="150"
-                    />
-                  </div>
-
-                  {/* CV Fiscaux */}
-                  <div className="md:col-span-2">
-                    <label htmlFor="calc-cv" className="block text-sm font-bold text-white mb-3">
-                      Chevaux Fiscaux (CV) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      id="calc-cv"
-                      min="0"
-                      step="1"
-                      value={calculatorInputs.cvFiscaux || ""}
-                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, cvFiscaux: parseInt(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
-                      placeholder="11"
-                    />
-                    <p className="text-xs text-slate-400 mt-2">
-                      ⚠️ <strong>Important :</strong> Les CV fiscaux sont basés sur la <strong>cylindrée</strong> (cm³),
-                      et <strong>NON</strong> sur la puissance DIN (kW ou CH).
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               {/* Affichage du résultat du calculateur */}
               {showCalculator && (
@@ -435,6 +327,7 @@ export default function ComingSoonPage() {
                       co2={calculatorInputs.co2}
                       carburant={calculatorInputs.carburant}
                       annee={calculatorInputs.annee}
+                      defaultRegion="wallonie"
                     />
                   </Suspense>
 
@@ -447,11 +340,11 @@ export default function ComingSoonPage() {
                   >
                     <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-3xl p-6 border border-red-500/30 max-w-2xl mx-auto">
                       <h3 className="text-xl font-black text-white mb-3">
-                        📧 Recevez votre rapport complet par email
+                        🚀 Devenez Membre Fondateur
                       </h3>
                       <p className="text-slate-300 mb-4">
-                        Inscrivez-vous maintenant et recevez un rapport détaillé de votre calcul fiscal,
-                        plus des conseils personnalisés pour votre achat automobile en Belgique.
+                        Inscrivez-vous maintenant pour valider votre statut de Membre Fondateur
+                        et obtenir votre accès prioritaire au lancement d&apos;Octane98.
                       </p>
                       <button
                         onClick={() => {

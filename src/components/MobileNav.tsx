@@ -14,6 +14,9 @@ export default function MobileNav() {
   const { user } = useAuth();
   const { isSimulatingBan } = useBanSimulation();
 
+  // Vérification du cookie bypass Alpha
+  const hasAlphaBypass = typeof window !== "undefined" && document.cookie.includes("octane_bypass_token=true");
+
   // Combiner le ban réel et la simulation pour bloquer l'accès
   const isEffectivelyBanned = user?.is_banned || (isSimulatingBan && user?.role === "admin");
 
@@ -57,6 +60,11 @@ export default function MobileNav() {
     }
     return pathname?.startsWith(href);
   };
+
+  // Masquer complètement la navigation si pas de bypass Alpha
+  if (!hasAlphaBypass) {
+    return null;
+  }
 
   return (
     <nav className={`fixed bottom-0 left-0 right-0 z-40 block md:hidden safe-area-inset-bottom shadow-2xl transition-transform duration-300 ${
