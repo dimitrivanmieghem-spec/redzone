@@ -322,26 +322,6 @@ function LoginContent() {
               "Se connecter"
             )}
           </button>
-
-          {/* Séparateur */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-neutral-900/50 text-neutral-400 font-medium">
-                Pas encore de compte ?
-              </span>
-            </div>
-          </div>
-
-          {/* Bouton Créer un compte */}
-          <Link
-            href="/register"
-            className="w-full border-2 border-white/20 text-white font-bold py-4 px-6 rounded-xl transition-all hover:bg-white/10 hover:border-white/30 flex items-center justify-center gap-2 hover:scale-[1.02]"
-          >
-            Créer un compte
-          </Link>
         </form>
 
         {/* Message sécurité */}

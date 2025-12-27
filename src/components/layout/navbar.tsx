@@ -751,13 +751,6 @@ function Navbar() {
                   <User size={20} />
                   Espace Membre
                 </Link>
-                <Link
-                  href="/register"
-                  onClick={closeMenu}
-                  className="mt-2 py-3 px-4 text-white hover:bg-white/10 font-medium text-sm rounded-xl transition-all duration-300 flex items-center gap-3 tracking-wide"
-                >
-                  Rejoindre
-                </Link>
               </>
             )}
 

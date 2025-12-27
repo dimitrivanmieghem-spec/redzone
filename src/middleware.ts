@@ -7,15 +7,17 @@ import type { UserRole } from "@/lib/permissions";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Routes toujours accessibles (statiques, API, etc.)
+  // ===== PHASE 1: ROUTES TOUJOURS AUTORISÉES =====
   const alwaysAllowedRoutes = [
-    "/api",
-    "/_next",
-    "/favicon.ico",
-    "/manifest.json",
+    "/api",             // APIs
+    "/_next",           // Framework Next.js
+    "/favicon.ico",     // Favicon
+    "/manifest.json",   // PWA
+    "/robots.txt",      // SEO
+    "/sitemap.xml",     // SEO
+    "/legal",           // Pages légales
   ];
 
-  // Vérifier si la route est toujours accessible
   const isAlwaysAllowed = alwaysAllowedRoutes.some((route) =>
     pathname === route || pathname.startsWith(`${route}/`)
   );
@@ -24,28 +26,64 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Routes publiques - accessibles sans authentification
+  // ===== PHASE 2: GESTION SPÉCIALE /register =====
+  if (pathname === "/register") {
+    // Inscription INTERDITE en Closed Alpha
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // ===== PHASE 3: GESTION SPÉCIALE RACINE / =====
+  if (pathname === "/") {
+    try {
+      // Créer client Supabase pour vérifier la session
+      const cookieStore = await cookies();
+      const { env } = await import("@/lib/env");
+      const supabase = createServerClient(
+        env.NEXT_PUBLIC_SUPABASE_URL,
+        env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        {
+          cookies: {
+            getAll() { return cookieStore.getAll(); },
+            setAll() {}, // Lecture seule pour le middleware
+          },
+        }
+      );
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        // Utilisateur connecté → accès à l'accueil
+        return NextResponse.next();
+      } else {
+        // Visiteur → redirection vers coming-soon
+        return NextResponse.redirect(new URL("/coming-soon", request.url));
+      }
+    } catch {
+      // En cas d'erreur → redirection sécurisée
+      return NextResponse.redirect(new URL("/coming-soon", request.url));
+    }
+  }
+
+  // ===== PHASE 4: ROUTES PUBLIQUES =====
   const publicRoutes = [
-    "/",                // Page d'accueil (redirige selon logique)
-    "/coming-soon",     // Landing page
-    "/login",           // Connexion
-    "/register",        // Inscription
-    "/forgot-password", // Réinitialisation mot de passe
-    "/reset-password",  // Reset mot de passe
-    "/auth",            // Callbacks OAuth
+    "/coming-soon",     // Landing page (accessible à tous)
+    "/login",           // Connexion (accessible à tous)
+    "/auth",            // Callbacks OAuth (nécessaires)
+    "/forgot-password", // Reset MDP (accessible à tous)
+    "/reset-password",  // Reset MDP (accessible à tous)
   ];
 
-  // Vérifier si la route est publique
   const isPublicRoute = publicRoutes.some((route) =>
     pathname === route || pathname.startsWith(`${route}/`)
   );
 
   if (isPublicRoute) {
-    // Routes publiques passent directement
     return NextResponse.next();
   }
 
-  // Toutes les routes restantes nécessitent une authentification Supabase
+  // ===== PHASE 5: TOUTES LES AUTRES ROUTES = AUTHENTIFICATION REQUISE =====
+
+  // ===== PHASE 5: AUTHENTIFICATION REQUISE =====
   try {
     // Créer le client Supabase pour vérifier l'authentification
     const cookieStore = await cookies();
@@ -58,18 +96,7 @@ export async function middleware(request: NextRequest) {
           getAll() {
             return cookieStore.getAll();
           },
-          setAll(cookiesToSet) {
-            // Permettre la mise à jour des cookies pour rafraîchir la session
-            // Mais seulement en lecture pour éviter les problèmes de timing
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                // Ne pas modifier les cookies dans le middleware pour éviter les blocages
-                // Les cookies seront mis à jour côté client après le login
-              });
-            } catch {
-              // Ignorer les erreurs de cookies dans le middleware
-            }
-          },
+          setAll() {}, // Lecture seule pour le middleware
         },
       }
     );
