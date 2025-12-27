@@ -787,7 +787,8 @@ function Navbar() {
             })()}
           </nav>
         </div>
-        )}
+      )}
+      </>
 
       {/* Spacer pour compenser la navbar fixe (ajusté si bannière simulation visible) */}
       <div className={`h-16 ${isSimulatingBan && user?.role === "admin" ? "mt-14" : ""}`} />

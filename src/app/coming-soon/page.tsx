@@ -327,7 +327,6 @@ export default function ComingSoonPage() {
                       co2={calculatorInputs.co2}
                       carburant={calculatorInputs.carburant}
                       annee={calculatorInputs.annee}
-                      defaultRegion="wallonie"
                     />
                   </Suspense>
 
