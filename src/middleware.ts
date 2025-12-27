@@ -270,8 +270,11 @@ export async function middleware(request: NextRequest) {
 
 // ===== FONCTION SÉCURITÉ =====
 function addSecurityHeaders(response: NextResponse) {
-  // Récupérer l'URL Supabase depuis les variables d'environnement
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  // TEMPORAIRE : Retour aux URLs hardcodées pour diagnostiquer
+  // Le problème pourrait venir de la variable d'environnement côté serveur
+  const supabaseUrl = 'https://ehjkapbqofperdtycykb.supabase.co https://*.supabase.co https://*.supabase.in';
+
+  console.log('[CSP] Using hardcoded Supabase URLs:', supabaseUrl);
 
   // Content Security Policy - Autorise les ressources nécessaires
   const csp = [
@@ -280,7 +283,7 @@ function addSecurityHeaders(response: NextResponse) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     `img-src 'self' data: blob: https: ${supabaseUrl}`,
-    // ✅ AJOUT wss: + VARIABLE ENV pour Supabase
+    // ✅ AJOUT wss: + VARIABLE ENV pour Supabase (avec fallback)
     `connect-src 'self' https: wss: ${supabaseUrl} https://www.google-analytics.com https://www.googletagmanager.com`,
     "worker-src 'self' blob:",  // CRITIQUE : Permet les Web Workers pour browser-image-compression
     "frame-src 'none'",
