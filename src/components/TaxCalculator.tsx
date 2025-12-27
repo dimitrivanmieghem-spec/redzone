@@ -10,7 +10,7 @@ interface TaxCalculatorProps {
   co2?: number; // CO2 NEDC (pour Wallonie)
   co2Wltp?: number; // CO2 WLTP (pour Flandre) - PRIORITAIRE si disponible
   carburant?: string; // Optionnel (non utilisé dans les calculs mais utile pour l'affichage)
-  annee: number;
+  annee?: number; // Optionnel car le composant peut gérer sa propre valeur par défaut
   firstRegistrationDate?: string; // Date de première immatriculation (plus précis que year)
   isHybrid?: boolean; // Véhicule hybride (réduction Flandre)
   isElectric?: boolean; // Véhicule électrique (exemption Flandre)
@@ -28,19 +28,36 @@ export default function TaxCalculator({
   isHybrid = false,
   isElectric = false,
 }: TaxCalculatorProps) {
+  // État interne auto-géré pour les inputs utilisateur
+  const [formData, setFormData] = useState({
+    puissanceKw: 0,
+    co2: 0,
+    cvFiscaux: 0,
+    annee: new Date().getFullYear(),
+    carburant: "essence" as string
+  });
+
+  // Gestionnaire de changement pour les inputs
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   type Region = "wallonie" | "flandre";
   const [region, setRegion] = useState<Region>("wallonie");
 
-  // Calcul de l'âge du véhicule (utiliser firstRegistrationDate si disponible, sinon year)
+  // Calcul de l'âge du véhicule (utiliser firstRegistrationDate si disponible, sinon annee prop ou formData)
   const currentYear = new Date().getFullYear();
-  const registrationYear = firstRegistrationDate 
+  const registrationYear = firstRegistrationDate
     ? new Date(firstRegistrationDate).getFullYear()
-    : annee;
+    : (annee || formData.annee);
   const age = Math.max(0, currentYear - registrationYear);
   const isAncetre = age >= 30; // Véhicule de collection (30+ ans)
-  
-  // Utiliser CO2 WLTP pour Flandre si disponible, sinon CO2 NEDC
-  const co2ForFlandre = co2Wltp || co2;
+
+  // Utiliser CO2 WLTP pour Flandre si disponible, sinon CO2 NEDC (prop ou formData)
+  const co2ForFlandre = co2Wltp || (co2 || formData.co2);
 
   // ============================================
   // WALLONIE / BRUXELLES - Calcul Officiel 2025
@@ -58,17 +75,17 @@ export default function TaxCalculator({
   // 1. CALCUL TMC DE BASE (selon puissance en kW uniquement)
   let tmcBase = 0;
 
-  if (puissanceKw <= 70) {
+  if ((puissanceKw || formData.puissanceKw) <= 70) {
     tmcBase = 61.5;
-  } else if (puissanceKw <= 85) {
+  } else if ((puissanceKw || formData.puissanceKw) <= 85) {
     tmcBase = 123.0;
-  } else if (puissanceKw <= 100) {
+  } else if ((puissanceKw || formData.puissanceKw) <= 100) {
     tmcBase = 495.0;
-  } else if (puissanceKw <= 110) {
+  } else if ((puissanceKw || formData.puissanceKw) <= 110) {
     tmcBase = 867.0;
-  } else if (puissanceKw <= 120) {
+  } else if ((puissanceKw || formData.puissanceKw) <= 120) {
     tmcBase = 1239.0;
-  } else if (puissanceKw <= 155) {
+  } else if ((puissanceKw || formData.puissanceKw) <= 155) {
     tmcBase = 2478.0;
   } else {
     tmcBase = 4957.0;
@@ -134,7 +151,7 @@ export default function TaxCalculator({
   // 3. ÉCO-MALUS (Wallonie uniquement, sauf véhicules > 30 ans)
   // Utiliser CO2 NEDC pour Wallonie (co2), CO2 WLTP pour Flandre (co2Wltp)
   let ecoMalus = 0;
-  const co2ForWallonie = co2; // Wallonie utilise NEDC
+  const co2ForWallonie = co2 || formData.co2; // Wallonie utilise NEDC
 
   if (!isAncetre && region === "wallonie") {
     if (co2ForWallonie >= 146 && co2ForWallonie <= 155) {
@@ -177,7 +194,7 @@ export default function TaxCalculator({
   
   // Barème approximatif Wallonie/Bruxelles 2025
   let taxeCirculation = 0;
-  const cvFiscauxNum = cvFiscaux || 0; // Utilisation EXCLUSIVE de cvFiscaux (basé sur cylindrée)
+  const cvFiscauxNum = cvFiscaux || formData.cvFiscaux || 0; // Utilisation EXCLUSIVE de cvFiscaux (basé sur cylindrée)
   
   if (cvFiscauxNum <= 4) {
     taxeCirculation = 100;
@@ -298,6 +315,92 @@ export default function TaxCalculator({
         </div>
       </div>
 
+      {/* Formulaire d'entrée - Design Pro */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-white/10">
+        <h4 className="text-lg font-bold text-white mb-4">Paramètres du véhicule</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Puissance (kW) */}
+          <div>
+            <label htmlFor="calc-puissance" className="block text-sm font-bold text-white mb-3">
+              Puissance (kW)
+            </label>
+            <input
+              type="number"
+              id="calc-puissance"
+              min="0"
+              step="0.1"
+              value={formData.puissanceKw || ""}
+              onChange={(e) => handleInputChange("puissanceKw", parseFloat(e.target.value) || 0)}
+              className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium placeholder:text-slate-400"
+              placeholder="Ex: 150"
+            />
+            <p className="text-xs text-slate-400 mt-2">
+              Puissance électrique ou thermique en kilowatts
+            </p>
+          </div>
+
+          {/* CO2 */}
+          <div>
+            <label htmlFor="calc-co2" className="block text-sm font-bold text-white mb-3">
+              Émissions CO₂ (g/km)
+            </label>
+            <input
+              type="number"
+              id="calc-co2"
+              min="0"
+              step="1"
+              value={formData.co2 || ""}
+              onChange={(e) => handleInputChange("co2", parseInt(e.target.value) || 0)}
+              className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium placeholder:text-slate-400"
+              placeholder="Ex: 150"
+            />
+            <p className="text-xs text-slate-400 mt-2">
+              Valeur NEDC (cycle normalisé européen)
+            </p>
+          </div>
+
+          {/* CV Fiscaux */}
+          <div>
+            <label htmlFor="calc-cv" className="block text-sm font-bold text-white mb-3">
+              Chevaux Fiscaux (CV)
+            </label>
+            <input
+              type="number"
+              id="calc-cv"
+              min="0"
+              step="1"
+              value={formData.cvFiscaux || ""}
+              onChange={(e) => handleInputChange("cvFiscaux", parseInt(e.target.value) || 0)}
+              className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium placeholder:text-slate-400"
+              placeholder="Ex: 11"
+            />
+            <p className="text-xs text-slate-400 mt-2">
+              ⚠️ <strong>Important :</strong> Basé sur la cylindrée (cm³), pas sur la puissance
+            </p>
+          </div>
+
+          {/* Année */}
+          <div>
+            <label htmlFor="calc-annee" className="block text-sm font-bold text-white mb-3">
+              Année du véhicule
+            </label>
+            <input
+              type="number"
+              id="calc-annee"
+              min="1900"
+              max={new Date().getFullYear() + 1}
+              value={formData.annee}
+              onChange={(e) => handleInputChange("annee", parseInt(e.target.value) || new Date().getFullYear())}
+              className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
+              placeholder="2020"
+            />
+            <p className="text-xs text-slate-400 mt-2">
+              Année de première immatriculation
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Contenu conditionnel selon la région */}
       {region === "wallonie" ? (
         <>
@@ -306,7 +409,7 @@ export default function TaxCalculator({
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400 font-medium">Puissance</span>
               <span className="text-sm font-black text-white">
-                {puissanceKw.toFixed(1)} kW ({puissanceCv} CH)
+                {(puissanceKw || formData.puissanceKw).toFixed(1)} kW ({Math.round((puissanceKw || formData.puissanceKw) * 1.3596)} CH)
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -317,7 +420,7 @@ export default function TaxCalculator({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400 font-medium">Émissions CO2</span>
-              <span className="text-sm font-black text-white">{co2} g/km</span>
+              <span className="text-sm font-black text-white">{(co2 || formData.co2)} g/km</span>
             </div>
             <div className="flex justify-between items-center border-t border-slate-700 pt-3">
               <span className="text-sm text-slate-400 font-medium">Âge du véhicule</span>
@@ -469,7 +572,7 @@ export default function TaxCalculator({
                 </p>
               ) : (
                 <p className="text-sm text-orange-400">
-                  ⚠️ CO2 WLTP non disponible (utilise NEDC : {co2} g/km)
+                  ⚠️ CO2 WLTP non disponible (utilise NEDC : {(co2 || formData.co2)} g/km)
                 </p>
               )}
               {isHybrid && (

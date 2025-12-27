@@ -28,13 +28,6 @@ export default function ComingSoonPage() {
 
   // État pour le calculateur fiscal
   const [showCalculator, setShowCalculator] = useState(false);
-  const [calculatorInputs, setCalculatorInputs] = useState({
-    annee: new Date().getFullYear(),
-    puissanceKw: 150, // Valeur d'exemple pour montrer le calculateur
-    co2: 150,
-    cvFiscaux: 11, // Valeur d'exemple pour montrer le calculateur
-    carburant: "essence" as string
-  });
 
   // Ref pour détecter quand l'utilisateur scrolle vers le calculateur
   const calculatorRef = useRef<HTMLDivElement>(null);
@@ -320,14 +313,7 @@ export default function ComingSoonPage() {
                       </div>
                     </div>
                   }>
-                    <TaxCalculator
-                      puissanceKw={calculatorInputs.puissanceKw}
-                      puissanceCv={Math.round(calculatorInputs.puissanceKw * 1.3596)}
-                      cvFiscaux={calculatorInputs.cvFiscaux}
-                      co2={calculatorInputs.co2}
-                      carburant={calculatorInputs.carburant}
-                      annee={calculatorInputs.annee}
-                    />
+                    <TaxCalculator />
                   </Suspense>
 
                   {/* CTA après calcul */}
