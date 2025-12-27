@@ -206,14 +206,18 @@ export async function middleware(request: NextRequest) {
 
 // ===== FONCTION SÉCURITÉ =====
 function addSecurityHeaders(response: NextResponse) {
+  // Récupérer l'URL Supabase depuis les variables d'environnement
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
   // Content Security Policy - Autorise les ressources nécessaires
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https: https://*.supabase.co https://*.supabase.in",
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in https://www.google-analytics.com https://www.googletagmanager.com",
+    `img-src 'self' data: blob: https: ${supabaseUrl}`,
+    // ✅ AJOUT wss: + VARIABLE ENV pour Supabase
+    `connect-src 'self' https: wss: ${supabaseUrl} https://www.google-analytics.com https://www.googletagmanager.com`,
     "worker-src 'self' blob:",  // CRITIQUE : Permet les Web Workers pour browser-image-compression
     "frame-src 'none'",
     "object-src 'none'",
