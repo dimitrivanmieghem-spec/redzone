@@ -198,8 +198,8 @@ function LoginContent() {
 
       showToast("Connexion réussie !", "success");
 
-      // Attendre un peu pour que les cookies soient bien mis à jour et que les contextes soient initialisés
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Attendre suffisamment pour que les cookies soient bien mis à jour et que les contextes soient initialisés
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       // Utiliser router.push au lieu de window.location.assign pour éviter les problèmes avec les extensions
       // et permettre une navigation plus fluide avec Next.js
@@ -210,10 +210,6 @@ function LoginContent() {
         try {
           // Utiliser router.push pour une navigation Next.js native
           await router.push(redirectUrl);
-          // Forcer un refresh après un court délai pour s'assurer que la session est bien chargée
-          setTimeout(() => {
-            router.refresh();
-          }, 100);
         } catch (navError) {
           console.error("Erreur navigation:", navError);
           // En cas d'erreur, rediriger vers le dashboard

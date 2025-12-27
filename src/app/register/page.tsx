@@ -128,9 +128,10 @@ export default function RegisterPage() {
 
       if (data?.user) {
         showToast("Email vérifié avec succès ! 🎉", "success");
-        router.refresh();
+        // Utiliser window.location.href pour forcer un rechargement complet
+        // Cela garantit que le middleware voit bien le nouveau cookie de session
         setTimeout(() => {
-          router.push("/dashboard");
+          window.location.href = "/dashboard";
         }, 500);
       }
     } catch (err: any) {
