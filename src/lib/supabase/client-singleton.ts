@@ -65,11 +65,11 @@ export function createClient() {
       } : undefined,
     },
     global: {
-      // Timeout augmenté à 12 secondes pour gérer les connexions lentes
+      // Timeout augmenté à 30 secondes pour gérer les connexions mobiles lentes (3G/Edge)
       // Utiliser AbortController pour un meilleur contrôle
       fetch: (url, options = {}) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 secondes max (augmenté pour connexions lentes)
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondes max (optimisé pour mobile)
         
         return fetch(url, {
           ...options,

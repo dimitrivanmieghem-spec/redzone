@@ -1,16 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { Gauge, Sparkles, Shield, TrendingUp, CheckCircle, Loader2, ArrowRight } from "lucide-react";
+import { Gauge, Sparkles, Shield, TrendingUp, CheckCircle, Loader2, ArrowRight, Calculator } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import dynamic from "next/dynamic";
+
+// Lazy load du calculateur fiscal pour la performance
+const TaxCalculator = dynamic(() => import("@/components/TaxCalculator"), {
+  loading: () => (
+    <div className="bg-slate-900/50 backdrop-blur-sm rounded-3xl p-8 border border-white/10 flex items-center justify-center min-h-[400px]">
+      <div className="text-center">
+        <Loader2 className="animate-spin text-red-600 mx-auto mb-4" size={48} />
+        <p className="text-slate-400">Chargement du calculateur...</p>
+      </div>
+    </div>
+  ),
+  ssr: false // Pas de SSR pour éviter les problèmes d'hydratation
+});
 
 export default function ComingSoonPage() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { showToast } = useToast();
+
+  // État pour le calculateur fiscal
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calculatorInputs, setCalculatorInputs] = useState({
+    region: "wallonie" as "wallonie" | "flandre",
+    annee: new Date().getFullYear(),
+    puissanceKw: 0,
+    co2: 0,
+    cvFiscaux: 0,
+    carburant: "essence" as string
+  });
+
+  // Ref pour détecter quand l'utilisateur scrolle vers le calculateur
+  const calculatorRef = useRef<HTMLDivElement>(null);
+
+  // Détection du scroll pour charger le calculateur uniquement quand visible
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !showCalculator) {
+          setShowCalculator(true);
+        }
+      },
+      { threshold: 0.1, rootMargin: '50px' }
+    );
+
+    if (calculatorRef.current) {
+      observer.observe(calculatorRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [showCalculator]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +144,7 @@ export default function ComingSoonPage() {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white relative overflow-hidden">
+    <main className="min-h-[100dvh] bg-neutral-950 text-white relative overflow-hidden">
       {/* Hero Background - Optimisé Mobile-First */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Image de fond - Hero Octane98 - Optimisée pour mobile vertical */}
@@ -239,6 +285,188 @@ export default function ComingSoonPage() {
                   Rejoignez une communauté qui respire la mécanique. Partagez les sonorités de votre moteur, l'histoire de votre véhicule, et connectez-vous avec d'autres puristes.
                 </p>
               </motion.div>
+            </motion.div>
+
+            {/* Section Calculateur Fiscal - Lazy loaded au scroll */}
+            <motion.div
+              ref={calculatorRef}
+              variants={itemVariants}
+              className="mb-8 md:mb-16"
+            >
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-3xl mb-4 shadow-2xl shadow-red-600/40">
+                  <Calculator size={32} className="text-white" />
+                </div>
+                <h2 className="text-2xl md:text-4xl font-black text-white mb-4 tracking-tight">
+                  Calculateur Fiscal Belge 2025
+                </h2>
+                <p className="text-lg text-slate-300 max-w-2xl mx-auto">
+                  Découvrez le coût réel d&apos;immatriculation de votre véhicule en Belgique.
+                  <strong className="text-red-500"> Précis et gratuit.</strong>
+                </p>
+              </div>
+
+              {/* Formulaire d'entrée du calculateur */}
+              <div className="bg-slate-900/70 backdrop-blur-md rounded-3xl border border-neutral-800/50 p-6 md:p-8 shadow-xl mb-6 max-w-4xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Région */}
+                  <div>
+                    <label className="block text-sm font-bold text-white mb-3">
+                      Région
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setCalculatorInputs(prev => ({ ...prev, region: "wallonie" }))}
+                        className={`p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                          calculatorInputs.region === "wallonie"
+                            ? "border-blue-500 bg-blue-900/30 text-blue-300"
+                            : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
+                        }`}
+                      >
+                        🇧🇪 Wallonie / Bruxelles
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCalculatorInputs(prev => ({ ...prev, region: "flandre" }))}
+                        className={`p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                          calculatorInputs.region === "flandre"
+                            ? "border-blue-500 bg-blue-900/30 text-blue-300"
+                            : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
+                        }`}
+                      >
+                        🇧🇪 Flandre
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Année */}
+                  <div>
+                    <label htmlFor="calc-annee" className="block text-sm font-bold text-white mb-3">
+                      Année du véhicule
+                    </label>
+                    <input
+                      type="number"
+                      id="calc-annee"
+                      min="1900"
+                      max={new Date().getFullYear() + 1}
+                      value={calculatorInputs.annee}
+                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, annee: parseInt(e.target.value) || new Date().getFullYear() }))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
+                      placeholder="2020"
+                    />
+                  </div>
+
+                  {/* Puissance (kW) */}
+                  <div>
+                    <label htmlFor="calc-puissance" className="block text-sm font-bold text-white mb-3">
+                      Puissance (kW)
+                    </label>
+                    <input
+                      type="number"
+                      id="calc-puissance"
+                      min="0"
+                      step="0.1"
+                      value={calculatorInputs.puissanceKw || ""}
+                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, puissanceKw: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
+                      placeholder="150"
+                    />
+                  </div>
+
+                  {/* CO2 */}
+                  <div>
+                    <label htmlFor="calc-co2" className="block text-sm font-bold text-white mb-3">
+                      Émissions CO₂ (g/km)
+                    </label>
+                    <input
+                      type="number"
+                      id="calc-co2"
+                      min="0"
+                      step="1"
+                      value={calculatorInputs.co2 || ""}
+                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, co2: parseInt(e.target.value) || 0 }))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
+                      placeholder="150"
+                    />
+                  </div>
+
+                  {/* CV Fiscaux */}
+                  <div className="md:col-span-2">
+                    <label htmlFor="calc-cv" className="block text-sm font-bold text-white mb-3">
+                      Chevaux Fiscaux (CV) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="calc-cv"
+                      min="0"
+                      step="1"
+                      value={calculatorInputs.cvFiscaux || ""}
+                      onChange={(e) => setCalculatorInputs(prev => ({ ...prev, cvFiscaux: parseInt(e.target.value) || 0 }))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-600 bg-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-white font-medium"
+                      placeholder="11"
+                    />
+                    <p className="text-xs text-slate-400 mt-2">
+                      ⚠️ <strong>Important :</strong> Les CV fiscaux sont basés sur la <strong>cylindrée</strong> (cm³),
+                      et <strong>NON</strong> sur la puissance DIN (kW ou CH).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Affichage du résultat du calculateur */}
+              {showCalculator && calculatorInputs.puissanceKw > 0 && calculatorInputs.cvFiscaux > 0 && (
+                <div className="max-w-4xl mx-auto">
+                  <Suspense fallback={
+                    <div className="bg-slate-900/50 backdrop-blur-sm rounded-3xl p-8 border border-white/10 flex items-center justify-center min-h-[400px]">
+                      <div className="text-center">
+                        <Loader2 className="animate-spin text-red-600 mx-auto mb-4" size={48} />
+                        <p className="text-slate-400">Calcul en cours...</p>
+                      </div>
+                    </div>
+                  }>
+                    <TaxCalculator
+                      puissanceKw={calculatorInputs.puissanceKw}
+                      puissanceCv={Math.round(calculatorInputs.puissanceKw * 1.3596)}
+                      cvFiscaux={calculatorInputs.cvFiscaux}
+                      co2={calculatorInputs.co2}
+                      carburant={calculatorInputs.carburant}
+                      annee={calculatorInputs.annee}
+                    />
+                  </Suspense>
+
+                  {/* CTA après calcul */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-8 text-center"
+                  >
+                    <div className="bg-gradient-to-r from-red-900/20 to-red-800/20 rounded-3xl p-6 border border-red-500/30 max-w-2xl mx-auto">
+                      <h3 className="text-xl font-black text-white mb-3">
+                        📧 Recevez votre rapport complet par email
+                      </h3>
+                      <p className="text-slate-300 mb-4">
+                        Inscrivez-vous maintenant et recevez un rapport détaillé de votre calcul fiscal,
+                        plus des conseils personnalisés pour votre achat automobile en Belgique.
+                      </p>
+                      <button
+                        onClick={() => {
+                          // Scroll vers le formulaire d'inscription
+                          document.querySelector('input[type="email"]')?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                          });
+                        }}
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold px-6 py-3 rounded-2xl transition-all hover:scale-105 shadow-lg shadow-red-900/50"
+                      >
+                        <ArrowRight size={20} />
+                        M&apos;inscrire maintenant
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
             </motion.div>
 
             {/* Footer */}

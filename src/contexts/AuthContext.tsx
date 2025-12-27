@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import type { UserRole } from "@/lib/permissions";
@@ -39,12 +40,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   // Utiliser le singleton pour éviter les problèmes de connexion
   const supabase = createClient();
+  const pathname = usePathname();
+
+  // Détecter si on est sur une page publique (pas besoin de profil complet)
+  const isPublicPage = () => {
+    const publicRoutes = [
+      "/",
+      "/login",
+      "/register",
+      "/forgot-password",
+      "/reset-password",
+      "/search",
+      "/cars",
+      "/legal",
+      "/auth",
+      "/coming-soon",
+    ];
+    return publicRoutes.some((route) =>
+      pathname === route || pathname?.startsWith(`${route}/`)
+    );
+  };
 
   // Charger l'utilisateur au démarrage
   useEffect(() => {
     const loadUser = async () => {
       try {
-        // Utiliser getUser() au lieu de getSession() pour plus de sécurité
+        // ⚡ OPTIMISATION : Sur pages publiques, juste vérifier si session existe
+        if (isPublicPage()) {
+          const {
+            data: { user },
+            error,
+          } = await supabase.auth.getUser();
+
+          // Sur pages publiques, on ne charge pas le profil complet
+          // Juste vérifier si une session existe pour éviter les redirections inutiles
+          if (error || !user) {
+            setUser(null);
+          } else {
+            // Session existe, créer un user minimal sans requête DB
+            setUser({
+              id: user.id,
+              email: user.email || "",
+              name: user.email?.split("@")[0] || "Utilisateur",
+              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email?.split("@")[0] || "U")}&background=DC2626&color=fff&bold=true`,
+              role: "particulier", // Rôle par défaut temporaire
+              is_banned: false,
+              ban_reason: null,
+              ban_until: null,
+              is_founder: Boolean(user.user_metadata?.is_founder),
+            });
+          }
+          setIsLoading(false);
+          return;
+        }
+
+        // Sur pages protégées : chargement complet avec profil DB
         const {
           data: { user },
           error,

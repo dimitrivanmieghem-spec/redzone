@@ -29,6 +29,12 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh; /* Utiliser dvh au lieu de vh pour éviter bandes noires */
+}
+
+/* S'assurer que le layout principal utilise la bonne hauteur */
+#__next {
+  min-height: 100dvh;
 }
 
 /* Safe area pour mobile (notch, etc.) */

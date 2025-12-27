@@ -61,10 +61,10 @@ export function generateViewport() {
   return {
     width: "device-width",
     initialScale: 1,
-    maximumScale: 5,
+    maximumScale: 2, // Réduit pour éviter zoom excessif sur mobile
     userScalable: true,
     themeColor: "#DC2626",
-    viewportFit: "cover",
+    viewportFit: "auto", // Changé de "cover" à "auto" pour éviter bandes noires
   };
 }
 
@@ -84,7 +84,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon.ico" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-neutral-950 text-white`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-[100dvh] bg-neutral-950 text-white`}
       >
         <CookieConsentProvider>
           <AuthProvider>

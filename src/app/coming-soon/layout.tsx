@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Octane98 - Le Sanctuaire du Moteur Thermique | Coming Soon",
-  description: "La première marketplace belge dédiée aux puristes de la performance. Calculateur de taxes précis, annonces certifiées, et mélodies mécaniques. Bientôt disponible.",
-  keywords: "Octane98, Belgique, moteur thermique, marketplace, voitures, calculateur taxes, annonces véhicules, passion automobile",
+  title: "Calculateur Taxe Auto Belgique 2025 | TMC & Taxe Circulation | Octane98",
+  description: "Calculez gratuitement la Taxe de Mise en Circulation (TMC) et Taxe de Circulation en Belgique 2025. Calculateur officiel pour Wallonie, Bruxelles et Flandre. Précis et gratuit.",
+  keywords: "calculateur taxe auto belgique, TMC belgique 2025, taxe circulation belgique, calculateur fiscal voiture, coût immatriculation belgique, taxe voiture belgique, TMC wallonie, TMC flandre, CV fiscaux belgique",
   openGraph: {
-    title: "Octane98 - Le Sanctuaire du Moteur Thermique arrive",
-    description: "La première marketplace belge dédiée aux puristes de la performance. Inscrivez-vous pour être informé du lancement.",
+    title: "Calculateur Taxe Auto Belgique 2025 | TMC & Taxe Circulation",
+    description: "Calculez gratuitement la Taxe de Mise en Circulation (TMC) et Taxe de Circulation en Belgique. Calculateur officiel 2025 pour Wallonie, Bruxelles et Flandre.",
     type: "website",
     locale: "fr_BE",
     siteName: "Octane98",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Octane98 - Le Sanctuaire du Moteur Thermique",
-    description: "La première marketplace belge dédiée aux puristes de la performance.",
+    title: "Calculateur Taxe Auto Belgique 2025 | TMC & Taxe Circulation",
+    description: "Calculez gratuitement la Taxe de Mise en Circulation (TMC) et Taxe de Circulation en Belgique. Calculateur officiel 2025.",
   },
   alternates: {
     canonical: "https://octane98.be/coming-soon",
+  },
+  other: {
+    "robots": "index, follow",
+    "googlebot": "index, follow",
   },
 };
 

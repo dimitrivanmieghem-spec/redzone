@@ -43,7 +43,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Routes publiques (après vérification du bypass)
+  // Routes publiques (après vérification du bypass) - AUCUNE vérification DB
   const publicRoutes = [
     "/",
     "/login",
@@ -54,14 +54,16 @@ export async function middleware(request: NextRequest) {
     "/cars",
     "/legal",
     "/auth",
+    "/coming-soon", // Ajouté car c'est une route publique en mode maintenance
   ];
 
-  // Vérifier si la route est publique
+  // Vérifier si la route est publique - si oui, PAS de vérification DB du tout
   const isPublicRoute = publicRoutes.some((route) =>
     pathname === route || pathname.startsWith(`${route}/`)
   );
 
   if (isPublicRoute) {
+    // ⚡ OPTIMISATION : Routes publiques passent DIRECTEMENT sans DB queries
     return NextResponse.next();
   }
 

@@ -72,10 +72,10 @@ export default function SupportButton() {
 
   return (
     <>
-      {/* Bouton flottant */}
+      {/* Bouton flottant - Masqué sur mobile pour éviter chevauchement avec MobileNav */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-28 right-4 md:bottom-6 md:right-6 z-30 w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 group"
+        className="fixed bottom-28 right-4 md:bottom-6 md:right-6 z-30 w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 group hidden md:flex"
         aria-label="Contacter le support"
       >
         <HelpCircle size={24} className="group-hover:rotate-12 transition-transform" />

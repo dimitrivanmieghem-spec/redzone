@@ -33,6 +33,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.9,
     },
+    {
+      url: `${baseUrl}/coming-soon`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9, // Haute priorité pour le calculateur fiscal
+    },
   ];
 
   // Pages dynamiques : véhicules actifs

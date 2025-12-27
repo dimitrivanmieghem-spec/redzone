@@ -160,7 +160,13 @@ function SellPageContent() {
   // MediaManager gère maintenant les uploads directement, plus besoin de refs
 
   // Données du formulaire
-  const [formData, setFormData] = useState({
+  // Sauvegarde automatique du formulaire en localStorage
+  const [formData, setFormData] = useState(() => {
+    // Restauration depuis localStorage au chargement
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sell-form-draft');
+        return saved ? JSON.parse(saved) : {
     // Étape 1
     type: "" as VehicleType | "",
     marque: "",
@@ -213,9 +219,86 @@ function SellPageContent() {
     drivetrain: "", // RWD/FWD/AWD/4WD - Pré-rempli depuis la base si disponible
     topSpeed: "", // Vitesse maximale en km/h - Pré-rempli depuis la base si disponible
     normeEuro: "", // Norme Euro - Modifiable (par défaut euro6d)
+        };
+      } catch {
+        // En cas d'erreur de parsing, utiliser la valeur par défaut
+        return {
+    // Étape 1
+    type: "" as VehicleType | "",
+    marque: "",
+    modele: "",
+    modeleManuel: "", // Nom du modèle si "Autre" est sélectionné
+    carburant: "",
+
+    // Étape 2
+    prix: "",
+    annee: "",
+    km: "",
+    transmission: "",
+    puissance: "", // Puissance en ch
+    puissanceKw: "", // Puissance en kW (optionnel)
+    cvFiscaux: "", // Chevaux fiscaux (pour taxe annuelle)
+    co2: "", // Émissions CO2
+    cylindree: "", // Cylindrée en cc
+    moteur: "", // Architecture moteur (ex: "L6 Bi-Turbo")
+    architectureMoteur: "",
+    description: "", // Ajout description
+    carrosserie: "", // Type de carrosserie
+    couleurExterieure: "", // Couleur extérieure
+    couleurInterieure: "", // Couleur intérieure
+    nombrePlaces: "", // Nombre de places
+
+    // Étape 3
+    photos: [] as string[], // URLs après upload
+    photoFiles: [] as File[], // Fichiers sélectionnés
+    audioFile: null as File | null,
+    audioUrl: null as string | null,
+    carPassUrl: "", // Lien Car-Pass (URL)
+    history: [] as string[],
+
+    // Coordonnées de contact
+    telephone: "", // Numéro de téléphone (format belge +32...)
+    contactEmail: "", // Email de contact (par défaut email utilisateur)
+    contactMethods: [] as string[], // Méthodes acceptées: 'whatsapp', 'email', 'tel'
+
+    // Localisation
+    ville: "", // Ville où se trouve le véhicule
+    codePostal: "", // Code postal belge
+
+    // Champs professionnels (si role === 'pro')
+    tvaNumber: "", // Numéro de TVA
+    garageName: "", // Nom du garage
+    garageAddress: "", // Adresse du garage
+
+    // Champs pour calcul taxes belges (optionnels, pré-remplis si disponibles)
+    co2Wltp: "", // CO2 WLTP (pour Flandre) - Pré-rempli depuis la base si disponible
+    drivetrain: "", // RWD/FWD/AWD/4WD - Pré-rempli depuis la base si disponible
+    topSpeed: "", // Vitesse maximale en km/h - Pré-rempli depuis la base si disponible
+    normeEuro: "", // Norme Euro - Modifiable (par défaut euro6d)
+  };
+      }
+    }
   });
 
-  // Auto-modération "Le Videur"
+  // Sauvegarde automatique du formulaire en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sell-form-draft', JSON.stringify(formData));
+    } catch (error) {
+      // En cas d'erreur de stockage (quota dépassé, etc.), ignorer silencieusement
+      console.warn('Impossible de sauvegarder le brouillon du formulaire:', error);
+    }
+  }, [formData]);
+
+  // Nettoyer le brouillon après soumission réussie
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem('sell-form-draft');
+    } catch {
+      // Ignorer les erreurs de suppression
+    }
+  };
+
   const moderationCheck = useMemo(() => {
     return checkVehicleModeration(
       formData.marque,
@@ -471,7 +554,7 @@ function SellPageContent() {
   // Pré-remplir l'email avec l'email de l'utilisateur
   useEffect(() => {
     if (user?.email && !formData.contactEmail) {
-      setFormData(prev => ({ ...prev, contactEmail: user.email }));
+      setFormData((prev: any) => ({ ...prev, contactEmail: user.email }));
     }
   }, [user?.email]);
 
@@ -520,7 +603,7 @@ function SellPageContent() {
             const co2Exists = specs.co2 !== null && specs.co2 !== undefined;
             setHasCo2Data(co2Exists);
             
-            setFormData((prev) => ({
+            setFormData((prev: any) => ({
               ...prev,
               // Pré-remplir TOUJOURS (même si les champs sont remplis) pour forcer la mise à jour
               // Cela garantit que les données sont toujours à jour quand on change de modèle
@@ -558,7 +641,7 @@ function SellPageContent() {
       // Si "Autre" est sélectionné, vider les champs techniques
       // Cacher le champ CO2 en mode manuel
       setHasCo2Data(false);
-      setFormData((prev) => ({
+      setFormData((prev: any) => ({
         ...prev,
         puissance: "",
         puissanceKw: "",
@@ -919,7 +1002,10 @@ function SellPageContent() {
           router.push("/dashboard");
         } else {
           showToast("Annonce publiée ! En attente de validation par l'admin.", "success");
-          
+
+          // Nettoyer le brouillon sauvegardé
+          clearDraft();
+
           // Rafraîchir avant la redirection pour synchroniser
           startTransition(() => {
             router.refresh();
@@ -1052,7 +1138,7 @@ function SellPageContent() {
   // Toggle Historique
   const toggleHistory = (item: string) => {
     const newHistory = formData.history.includes(item)
-      ? formData.history.filter((h) => h !== item)
+      ? formData.history.filter((h: string) => h !== item)
       : [...formData.history, item];
     setFormData({ ...formData, history: newHistory });
   };
@@ -1182,7 +1268,7 @@ function SellPageContent() {
                   modeleManuel: formData.modeleManuel,
                   carburant: formData.carburant,
                 }}
-                onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                onUpdate={(updates) => setFormData((prev: any) => ({ ...prev, ...updates }))}
                 onTypeChange={handleTypeChange}
                 onMarqueChange={handleMarqueChange}
                 marques={marques}
@@ -1216,7 +1302,7 @@ function SellPageContent() {
                   topSpeed: formData.topSpeed,
                   normeEuro: formData.normeEuro,
                 }}
-                onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                onUpdate={(updates) => setFormData((prev: any) => ({ ...prev, ...updates }))}
                 isManualModel={isManualModel}
                 hasCo2Data={hasCo2Data}
               />
@@ -1232,7 +1318,7 @@ function SellPageContent() {
                   nombrePlaces: formData.nombrePlaces,
                   description: formData.description,
                 }}
-                onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                onUpdate={(updates) => setFormData((prev: any) => ({ ...prev, ...updates }))}
                 descriptionCheck={descriptionCheck}
               />
             )}
@@ -1271,7 +1357,7 @@ function SellPageContent() {
                       garageName: formData.garageName,
                       garageAddress: formData.garageAddress,
                     }}
-                    onUpdate={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                    onUpdate={(updates) => setFormData((prev: any) => ({ ...prev, ...updates }))}
                     onHistoryToggle={toggleHistory}
                     user={user}
                     isEffectivelyBanned={isEffectivelyBanned}
