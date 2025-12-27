@@ -65,31 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        // ⚡ OPTIMISATION : Sur pages publiques, juste vérifier si session existe
+        // ⚡ OPTIMISATION CRITIQUE : Sur pages publiques, AUCUNE requête Supabase
         if (isPublicPage()) {
-          const {
-            data: { user },
-            error,
-          } = await supabase.auth.getUser();
-
-          // Sur pages publiques, on ne charge pas le profil complet
-          // Juste vérifier si une session existe pour éviter les redirections inutiles
-          if (error || !user) {
-            setUser(null);
-          } else {
-            // Session existe, créer un user minimal sans requête DB
-            setUser({
-              id: user.id,
-              email: user.email || "",
-              name: user.email?.split("@")[0] || "Utilisateur",
-              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email?.split("@")[0] || "U")}&background=DC2626&color=fff&bold=true`,
-              role: "particulier", // Rôle par défaut temporaire
-              is_banned: false,
-              ban_reason: null,
-              ban_until: null,
-              is_founder: Boolean(user.user_metadata?.is_founder),
-            });
-          }
+          // Pages publiques : pas de vérification session, pas de requête DB
+          // Évite complètement les timeouts et les blocages
+          setUser(null);
           setIsLoading(false);
           return;
         }

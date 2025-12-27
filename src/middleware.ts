@@ -26,24 +26,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Vérifier le cookie de bypass (accès admin secret)
-  const bypassToken = request.cookies.get("octane_bypass_token");
-  const hasBypassAccess = bypassToken?.value === "granted";
-
-  // Si pas de bypass, rediriger vers coming-soon
-  if (!hasBypassAccess) {
-    // Vérifier que ce n'est pas déjà la page coming-soon (éviter les boucles)
-    if (pathname !== "/coming-soon") {
-      const comingSoonUrl = new URL("/coming-soon", request.url);
-      // Préserver l'URL demandée dans un paramètre pour redirection ultérieure si besoin
-      if (pathname !== "/" && !pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
-        comingSoonUrl.searchParams.set("redirect", pathname);
-      }
-      return NextResponse.redirect(comingSoonUrl);
-    }
-  }
-
-  // Routes publiques (après vérification du bypass) - AUCUNE vérification DB
+  // ⚡ PRIORITÉ : Routes publiques passent DIRECTEMENT sans vérification bypass
   const publicRoutes = [
     "/",
     "/login",
@@ -54,7 +37,7 @@ export async function middleware(request: NextRequest) {
     "/cars",
     "/legal",
     "/auth",
-    "/coming-soon", // Ajouté car c'est une route publique en mode maintenance
+    "/coming-soon", // Route publique en mode maintenance
   ];
 
   // Vérifier si la route est publique - si oui, PAS de vérification DB du tout
@@ -65,6 +48,20 @@ export async function middleware(request: NextRequest) {
   if (isPublicRoute) {
     // ⚡ OPTIMISATION : Routes publiques passent DIRECTEMENT sans DB queries
     return NextResponse.next();
+  }
+
+  // 🔒 APRÈS les routes publiques : vérifier le bypass pour les routes protégées
+  const bypassToken = request.cookies.get("octane_bypass_token");
+  const hasBypassAccess = bypassToken?.value === "granted";
+
+  // Si pas de bypass sur route protégée, rediriger vers coming-soon
+  if (!hasBypassAccess) {
+    const comingSoonUrl = new URL("/coming-soon", request.url);
+    // Préserver l'URL demandée dans un paramètre pour redirection ultérieure si besoin
+    if (pathname !== "/" && !pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
+      comingSoonUrl.searchParams.set("redirect", pathname);
+    }
+    return NextResponse.redirect(comingSoonUrl);
   }
 
   // Routes protégées nécessitant une authentification
@@ -130,22 +127,6 @@ export async function middleware(request: NextRequest) {
 
       // Si pas d'utilisateur ou erreur, rediriger vers login
       if (authError || !user) {
-        // Logger la tentative d'accès non autorisé
-        try {
-          const { logAuditEventServer } = await import("@/lib/supabase/audit-logs");
-          await logAuditEventServer({
-            action_type: "unauthorized_access",
-            resource_type: "route",
-            resource_id: pathname,
-            description: `Tentative d'accès non autorisé à ${pathname}`,
-            status: "blocked",
-            metadata: { pathname, error: authError?.message },
-          }, request);
-        } catch (logError) {
-          // Ne pas bloquer la redirection en cas d'erreur de logging
-          console.error("Erreur lors du logging d'audit:", logError);
-        }
-        
         const loginUrl = new URL("/login", request.url);
         loginUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(loginUrl);
@@ -180,21 +161,6 @@ export async function middleware(request: NextRequest) {
         // Routes admin strictes : uniquement admin (settings, users)
         if (isAdminOnlyRoute) {
           if (!canAccessAdminOnly(userRole)) {
-            // Logger la tentative d'accès non autorisé
-            try {
-              const { logAuditEventServer } = await import("@/lib/supabase/audit-logs");
-              await logAuditEventServer({
-                action_type: "unauthorized_access",
-                resource_type: "route",
-                resource_id: pathname,
-                description: `Tentative d'accès non autorisé à une route admin stricte (${pathname}) par un ${userRole}`,
-                status: "blocked",
-                metadata: { pathname, userRole, requiredRole: "admin" },
-              }, request);
-            } catch (logError) {
-              console.error("Erreur lors du logging d'audit:", logError);
-            }
-            
             // Rediriger selon le rôle
             if (userRole === "moderator" && MODERATOR_RIGHTS.canViewDashboard) {
               // Les modérateurs peuvent accéder au dashboard mais pas aux routes strictes
@@ -210,21 +176,6 @@ export async function middleware(request: NextRequest) {
         } else {
           // Routes admin générales : vérifier avec canAccessAdmin
           if (!canAccessAdmin(userRole)) {
-            // Logger la tentative d'accès non autorisé
-            try {
-              const { logAuditEventServer } = await import("@/lib/supabase/audit-logs");
-              await logAuditEventServer({
-                action_type: "unauthorized_access",
-                resource_type: "route",
-                resource_id: pathname,
-                description: `Tentative d'accès non autorisé à une route admin (${pathname}) par un ${userRole}`,
-                status: "blocked",
-                metadata: { pathname, userRole },
-              }, request);
-            } catch (logError) {
-              console.error("Erreur lors du logging d'audit:", logError);
-            }
-            
             // Rediriger vers la page d'accueil si pas autorisé
             return NextResponse.redirect(new URL("/", request.url));
           }
@@ -239,10 +190,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     } catch (error) {
       // En cas d'erreur, rediriger vers login par sécurité
-      // Log silencieux en production pour éviter l'exposition d'infos
-      if (process.env.NODE_ENV === "development") {
-        console.error("Middleware error:", error);
-      }
+      // Log silencieux pour éviter l'exposition d'infos sensibles
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
