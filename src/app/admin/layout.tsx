@@ -3,7 +3,7 @@
 // Layout Admin - Sidebar de navigation
 // Design harmonisé avec Octane98 : fond gris très sombre, typographie bold
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,24 +43,36 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Protection : Rediriger si pas autorisé
-  useEffect(() => {
-    // Si on est encore en train de charger, ne fais rien pour éviter les boucles
-    if (isLoading) return;
+  // Verrou pour empêcher les redirections multiples (race condition)
+  const isRedirecting = useRef(false);
 
-    // Ne déclenche la redirection QUE si on a fini de charger et que l'utilisateur n'est pas autorisé
-    if (!user || !["admin", "moderator", "support", "editor", "viewer"].includes(user.role)) {
+  // Protection : Rediriger si pas autorisé (avec verrou anti-race condition)
+  useEffect(() => {
+    // Si on charge ou si on est déjà en train de partir, on ne fait rien
+    if (isLoading || isRedirecting.current) return;
+
+    // Vérification des droits
+    const isAuthorized = user && ["admin", "moderator", "support", "editor", "viewer"].includes(user.role);
+
+    if (!isAuthorized) {
+      // ON VERROUILLE IMMÉDIATEMENT pour empêcher toute re-exécution
+      isRedirecting.current = true;
+      console.log("[AdminLayout] Accès refusé. Redirection unique vers home.");
       showToast("Accès refusé - Rôle autorisé requis", "error");
-      router.push("/");
+
+      // Utilise replace pour ne pas casser l'historique de navigation
+      router.replace('/');
     }
-  }, [user, isLoading]); // Retiré router et showToast pour éviter les re-rendus inutiles
+  }, [user, isLoading, router, showToast]);
 
   const handleLogout = async () => {
     await logout();
     router.push("/");
   };
 
+  // Rendu conditionnel strict : Gardien de sécurité
   if (isLoading) {
+    // État de chargement : Spinner propre
     return (
       <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center">
         <div className="text-center">
@@ -71,7 +83,11 @@ export default function AdminLayout({
     );
   }
 
-  if (!user || !["admin", "moderator", "support", "editor", "viewer"].includes(user.role)) {
+  // Vérification finale des droits (après chargement terminé)
+  const isAuthorized = user && ["admin", "moderator", "support", "editor", "viewer"].includes(user.role);
+
+  if (!isAuthorized) {
+    // Non autorisé : Rien (redirection gérée par useEffect)
     return null;
   }
 
