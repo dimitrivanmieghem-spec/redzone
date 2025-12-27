@@ -207,17 +207,12 @@ function LoginContent() {
       
       // Valider que l'URL de redirection est sécurisée (commence par /)
       if (redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")) {
-        try {
-          // Utiliser router.push pour une navigation Next.js native
-          await router.push(redirectUrl);
-        } catch (navError) {
-          console.error("Erreur navigation:", navError);
-          // En cas d'erreur, rediriger vers le dashboard
-          router.push("/dashboard");
-        }
+        // Utiliser window.location.href pour forcer une hard navigation
+        // Cela garantit que le middleware voit bien le nouveau cookie de session
+        window.location.href = redirectUrl;
       } else {
         // En cas d'URL invalide, rediriger vers le dashboard par défaut
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       }
       
       setIsLoading(false);

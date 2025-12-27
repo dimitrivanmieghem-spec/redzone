@@ -61,7 +61,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Routes protégées nécessitant une authentification
-  const protectedRoutes = ["/dashboard", "/favorites", "/sell"];
+  const protectedRoutes = ["/dashboard", "/favorites", "/sell", "/search", "/tribune"];
 
   // Routes admin : admin OU moderator peuvent accéder
   const adminRoutes = ["/admin"];

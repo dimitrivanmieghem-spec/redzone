@@ -46,12 +46,16 @@ export default function MobileNav() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
-  const navItems = [
+  // Navigation limitée si pas de bypass Alpha
+  const navItems = hasAlphaBypass ? [
     { href: "/", label: "Accueil", icon: Home },
     { href: "/search", label: "Explorer", icon: Search },
     { href: "/sell", label: "Vendre", icon: Plus, isPrimary: true },
     { href: "/favorites", label: "Favoris", icon: Heart, badge: favorites.length },
     { href: user ? "/dashboard" : "/login", label: "Profil", icon: User },
+  ] : [
+    { href: "/", label: "Accueil", icon: Home },
+    { href: "/login", label: "Connexion", icon: User },
   ];
 
   const isActive = (href: string) => {
@@ -60,11 +64,6 @@ export default function MobileNav() {
     }
     return pathname?.startsWith(href);
   };
-
-  // Masquer complètement la navigation si pas de bypass Alpha
-  if (!hasAlphaBypass) {
-    return null;
-  }
 
   return (
     <nav className={`fixed bottom-0 left-0 right-0 z-40 block md:hidden safe-area-inset-bottom shadow-2xl transition-transform duration-300 ${
