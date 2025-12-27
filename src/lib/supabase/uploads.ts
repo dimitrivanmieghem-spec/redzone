@@ -331,64 +331,65 @@ export async function uploadImage(file: File, userId?: string | null): Promise<U
     abortController.abort();
   }, 60000); // 60 secondes pour les gros fichiers HD
 
-  try {
-    // Upload vers le bucket 'vehicles' (nouveau bucket officiel)
-    // Utiliser le fichier compressé (ou original en cas d'erreur de compression)
-    const { data, error } = await supabase.storage
-      .from("vehicles")
-      .upload(filePath, fileToUpload, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: fileToUpload.type || 'image/webp', // S'assurer que le type MIME est correct
-        // Pas de signal d'abort ici car Supabase gère déjà le timeout interne
-        // Le timeout de 60s ci-dessus est une sécurité supplémentaire
-      });
+  // Upload vers le bucket 'vehicles' (nouveau bucket officiel)
+  // Utiliser le fichier compressé (ou original en cas d'erreur de compression)
+  const { data, error } = await supabase.storage
+    .from("vehicles")
+    .upload(filePath, fileToUpload, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: fileToUpload.type || 'image/webp', // S'assurer que le type MIME est correct
+      // Pas de signal d'abort ici car Supabase gère déjà le timeout interne
+      // Le timeout de 60s ci-dessus est une sécurité supplémentaire
+    });
 
-    clearTimeout(timeoutId);
+  clearTimeout(timeoutId);
 
-    if (error) {
-      // Détection spécifique des erreurs RLS
-      if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-        console.error('[uploadImage] BLOQUAGE RLS DÉTECTÉ');
-        console.error('   → Vérifiez que la politique "Authenticated users can upload vehicle images" existe sur storage.objects');
-        console.error('   → Le bucket "vehicles" doit être créé et public');
-      }
-      
-      // Détection des erreurs de timeout/abort
-      if (error.message?.includes('aborted') || error.message?.includes('signal') || error.message?.includes('timeout')) {
-        console.error('[uploadImage] TIMEOUT/ABORT DÉTECTÉ');
-        console.error('   → Le fichier est peut-être trop volumineux ou la connexion est lente');
-        console.error('   → Taille du fichier:', `${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
-        throw new Error(`Upload interrompu (timeout). Le fichier est peut-être trop volumineux (${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB). Réessayez avec une image plus petite ou vérifiez votre connexion.`);
-      }
-      
-      throw new Error(`Erreur upload image: ${error.message}`);
+  if (error) {
+    // Détection spécifique des erreurs RLS
+    if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+      console.error('[uploadImage] BLOQUAGE RLS DÉTECTÉ');
+      console.error('   → Vérifiez que la politique "Authenticated users can upload vehicle images" existe sur storage.objects');
+      console.error('   → Le bucket "vehicles" doit être créé et public');
+      return {
+        success: false,
+        error: 'Erreur de permissions. Contactez le support si le problème persiste.'
+      };
     }
 
-    // Récupérer l'URL publique
-    const { data: publicData } = supabase.storage
-      .from("vehicles")
-      .getPublicUrl(data.path);
+    // Détection des erreurs de timeout/abort
+    if (error.message?.includes('aborted') || error.message?.includes('signal') || error.message?.includes('timeout')) {
+      console.error('[uploadImage] TIMEOUT/ABORT DÉTECTÉ');
+      console.error('   → Le fichier est peut-être trop volumineux ou la connexion est lente');
+      console.error('   → Taille du fichier:', `${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+      return {
+        success: false,
+        error: `Upload interrompu (timeout). Le fichier est peut-être trop volumineux (${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB). Réessayez avec une image plus petite.`
+      };
+    }
 
-    console.log('✅ Upload réussi:', publicData.publicUrl);
-    return publicData.publicUrl;
-    const { data: publicData } = supabase.storage
-      .from("vehicles")
-      .getPublicUrl(data.path);
+    return {
+      success: false,
+      error: `Erreur upload image: ${error.message}`
+    };
+  }
 
-    console.log('✅ Upload réussi:', publicData.publicUrl);
-    return { success: true, url: publicData.publicUrl };
+  // Récupérer l'URL publique
+  const { data: publicData } = supabase.storage
+    .from("vehicles")
+    .getPublicUrl(data.path);
+
+  console.log('✅ Upload réussi:', publicData.publicUrl);
+  return { success: true, url: publicData.publicUrl };
 
   } catch (err: any) {
-    clearTimeout(timeoutId);
-
     console.error('[uploadImage] ERREUR:', err);
 
     // Gestion spécifique des erreurs
-    if (err.name === 'AbortError' || abortController.signal.aborted) {
+    if (err.name === 'AbortError') {
       return {
         success: false,
-        error: `Upload interrompu (timeout après 60s). Le fichier est peut-être trop volumineux (${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB). Réessayez avec une image plus petite.`
+        error: `Upload interrompu (timeout). Le fichier est peut-être trop volumineux. Réessayez avec une image plus petite.`
       };
     }
 
@@ -408,8 +409,6 @@ export async function uploadImage(file: File, userId?: string | null): Promise<U
       success: false,
       error: err.message || 'Erreur lors de l\'upload de l\'image. Vérifiez votre connexion.'
     };
-  }
-}
   }
 }
 

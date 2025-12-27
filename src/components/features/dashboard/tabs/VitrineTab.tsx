@@ -100,7 +100,13 @@ export default function VitrineTab({ user }: VitrineTabProps) {
 
     try {
       // Upload de l'image avec compression WebP automatique
-      const imageUrl = await uploadImage(file, authUser.id);
+      const uploadResult = await uploadImage(file, authUser.id);
+
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error);
+      }
+
+      const imageUrl = uploadResult.url;
 
       // Mettre à jour le profil dans la base de données
       const supabase = createClient();
