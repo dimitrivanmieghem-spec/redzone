@@ -95,8 +95,19 @@ export default function PassionPostForm() {
       // 1. Upload des photos si présentes
       let mainImageUrl: string | null = null;
       if (formData.photos.length > 0) {
-        const uploadedUrls = await uploadImages(formData.photos, user.id);
-        mainImageUrl = uploadedUrls[0] || null; // Première photo comme image principale
+        const uploadResults = await uploadImages(formData.photos, user.id);
+
+        // Collecter seulement les URLs des uploads réussis
+        const successfulUrls = uploadResults
+          .filter(result => result.success)
+          .map(result => result.url);
+
+        if (successfulUrls.length > 0) {
+          mainImageUrl = successfulUrls[0]; // Première photo comme image principale
+        } else {
+          // Tous les uploads ont échoué
+          throw new Error("Échec de l'upload des photos. Veuillez réessayer.");
+        }
       }
 
       setIsUploadingPhotos(false);

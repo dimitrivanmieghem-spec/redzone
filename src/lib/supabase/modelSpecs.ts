@@ -4,6 +4,7 @@
 import { createClient } from "./client";
 
 export interface VehicleSpecs {
+  // Champs de base (toujours présents)
   kw: number;
   ch: number;
   cv_fiscaux: number;
@@ -11,13 +12,19 @@ export interface VehicleSpecs {
   cylindree: number;
   moteur: string;
   transmission: 'Manuelle' | 'Automatique' | 'Séquentielle';
+
+  // Champs optionnels pour pré-remplissage amélioré
   default_carrosserie?: string | null;
-  // Nouveaux champs pour pré-remplissage amélioré
   top_speed?: number | null; // Vitesse maximale en km/h
   drivetrain?: 'RWD' | 'FWD' | 'AWD' | '4WD' | null; // Type de transmission
   co2_wltp?: number | null; // CO2 WLTP pour taxes Flandre
   default_color?: string | null; // Couleur extérieure standard
   default_seats?: number | null; // Nombre de places standard
+
+  // Nouveaux champs pour filtrage temporel (générations)
+  year_start?: number | null; // Année de début de production
+  year_end?: number | null; // Année de fin de production (null = actuel)
+  generation?: string | null; // Génération/phase (ex: 'Mk7 Phase 1')
 }
 
 export type VehicleType = 'car' | 'moto';
@@ -299,12 +306,14 @@ export async function searchModels(
  * @param type - Type de véhicule
  * @param brand - Marque
  * @param model - Modèle
+ * @param year - Année optionnelle pour filtrer par génération
  * @returns Spécifications du véhicule ou null
  */
 export async function getModelSpecs(
   type: VehicleType,
   brand: string,
-  model: string
+  model: string,
+  year?: number
 ): Promise<VehicleSpecs | null> {
   const context = 'getModelSpecs';
   const table = 'model_specs_db';
@@ -325,14 +334,25 @@ export async function getModelSpecs(
       async () => {
         // Tentative 1 : Recherche avec ILIKE (plus tolérant pour les espaces et caractères spéciaux)
         // On évite .eq() qui peut causer des erreurs 400 avec les espaces dans les valeurs
-        // Inclure les nouveaux champs pour pré-remplissage amélioré
-        const query = supabase
+        // Inclure les nouveaux champs pour pré-remplissage amélioré + filtrage temporel
+        let query = supabase
           .from(table)
-          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
+          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, year_start, year_end, generation')
           .eq('type', type)
           .ilike('marque', brand.trim())
           .ilike('modele', model.trim())
-          .eq('is_active', true)
+          .eq('is_active', true);
+
+        // Filtrage temporel si année fournie
+        if (year !== undefined && year !== null) {
+          query = query
+            .lte('year_start', year) // L'année de début doit être <= à l'année demandée
+            .or(`year_end.is.null,year_end.gte.${year}`); // L'année de fin doit être null (modèle actuel) OU >= à l'année demandée
+        }
+
+        // Trier par année de début décroissante pour privilégier la version la plus récente pertinente
+        query = query
+          .order('year_start', { ascending: false })
           .limit(1);
         
         // Ajouter un timeout de 8 secondes
@@ -360,7 +380,7 @@ export async function getModelSpecs(
       if (!hasSpaces) {
         const { data: dataExact, error: errorExact } = await supabase
           .from(table)
-          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats')
+          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, year_start, year_end, generation')
           .eq('type', type)
           .eq('marque', brand.trim())
           .eq('modele', model.trim())
@@ -376,7 +396,7 @@ export async function getModelSpecs(
       if (!data) {
         const { data: dataPartial, error: errorPartial } = await supabase
           .from(table)
-          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, marque, modele')
+          .select('kw, ch, cv_fiscaux, co2, cylindree, moteur, transmission, default_carrosserie, top_speed, drivetrain, co2_wltp, default_color, default_seats, year_start, year_end, generation, marque, modele')
           .eq('type', type)
           .eq('is_active', true)
           .ilike('marque', `%${brand.trim()}%`);
@@ -430,6 +450,9 @@ export async function getModelSpecs(
       co2_wltp: specData.co2_wltp ? parseFloat(String(specData.co2_wltp)) : null,
       default_color: specData.default_color || null,
       default_seats: specData.default_seats ? parseInt(String(specData.default_seats)) : null,
+      year_start: specData.year_start ? parseInt(String(specData.year_start)) : null,
+      year_end: specData.year_end ? parseInt(String(specData.year_end)) : null,
+      generation: specData.generation || null,
     };
   } catch (err) {
     logError(context, table, operation, err, { type, brand, model });

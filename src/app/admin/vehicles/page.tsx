@@ -17,7 +17,10 @@ import {
   Phone,
   ChevronDown,
   X,
+  Check,
+  X as CloseIcon,
 } from "lucide-react";
+// Modal temporaire - TODO: Créer composant Dialog réutilisable
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
 import { getVehiculesPaginated, deleteVehicule } from "@/lib/supabase/vehicules";
@@ -40,6 +43,8 @@ export default function VehiclesPage() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [contactingIds, setContactingIds] = useState<Set<string>>(new Set());
   const [openContactMenu, setOpenContactMenu] = useState<string | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicule | null>(null);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
 
   useEffect(() => {
     const loadVehicules = async () => {
@@ -257,13 +262,16 @@ export default function VehiclesPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-4">
-                          <Link
-                            href={`/cars/${vehicule.id}`}
+                          <button
+                            onClick={() => {
+                              setSelectedVehicle(vehicule);
+                              setIsVehicleModalOpen(true);
+                            }}
                             className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-neutral-700"
                           >
                             <Eye size={14} />
                             Voir
-                          </Link>
+                          </button>
                           {/* Bouton Contact Direct */}
                           {(() => {
                             const contactEmail = vehicule.contact_email || (owner ? owner.email : null) || vehicule.guest_email;
@@ -389,6 +397,118 @@ export default function VehiclesPage() {
             >
               <ChevronRight size={20} />
             </button>
+          </div>
+        )}
+
+        {/* Modal de détails du véhicule */}
+        {isVehicleModalOpen && selectedVehicle && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-neutral-900 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto border border-neutral-700">
+              <div className="p-6 border-b border-neutral-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Car className="text-red-500" size={24} />
+                  <h2 className="text-xl font-bold text-white">
+                    {selectedVehicle.brand} {selectedVehicle.model}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setIsVehicleModalOpen(false)}
+                  className="text-neutral-400 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Images */}
+                {selectedVehicle.images && selectedVehicle.images.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-bold mb-3">Images</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {selectedVehicle.images.map((image, index) => (
+                        <div key={index} className="aspect-square bg-neutral-800 rounded-lg overflow-hidden">
+                          <Image
+                            src={image}
+                            alt={`${selectedVehicle.brand} ${selectedVehicle.model}`}
+                            width={200}
+                            height={200}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Informations principales */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="text-white font-bold">Informations générales</h3>
+                    <div className="text-sm text-neutral-300 space-y-1">
+                      <p><span className="font-medium">Marque:</span> {selectedVehicle.brand}</p>
+                      <p><span className="font-medium">Modèle:</span> {selectedVehicle.model}</p>
+                      <p><span className="font-medium">Prix:</span> {selectedVehicle.price.toLocaleString()}€</p>
+                      <p><span className="font-medium">Année:</span> {selectedVehicle.year}</p>
+                      <p><span className="font-medium">Kilométrage:</span> {selectedVehicle.mileage.toLocaleString()} km</p>
+                      <p><span className="font-medium">État:</span> {selectedVehicle.condition}</p>
+                      <p><span className="font-medium">Statut:</span> {selectedVehicle.status}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-white font-bold">Spécifications techniques</h3>
+                    <div className="text-sm text-neutral-300 space-y-1">
+                      <p><span className="font-medium">Carburant:</span> {selectedVehicle.fuel_type}</p>
+                      <p><span className="font-medium">Transmission:</span> {selectedVehicle.transmission}</p>
+                      <p><span className="font-medium">Puissance:</span> {selectedVehicle.power_hp} ch</p>
+                      {selectedVehicle.co2 && <p><span className="font-medium">CO2:</span> {selectedVehicle.co2} g/km</p>}
+                      <p><span className="font-medium">Carrosserie:</span> {selectedVehicle.body_type || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {selectedVehicle.description && (
+                  <div>
+                    <h3 className="text-white font-bold mb-2">Description</h3>
+                    <p className="text-sm text-neutral-300">{selectedVehicle.description}</p>
+                  </div>
+                )}
+
+                {/* Boutons d'action */}
+                <div className="flex gap-3 pt-4 border-t border-neutral-700">
+                  <button
+                    onClick={() => {
+                      // TODO: Implémenter validation
+                      showToast("Fonctionnalité à implémenter", "info");
+                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Check size={16} />
+                    Valider
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      // TODO: Implémenter rejet
+                      showToast("Fonctionnalité à implémenter", "info");
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <X size={16} />
+                    Refuser
+                  </button>
+
+                  <Link
+                    href={`/cars/${selectedVehicle.id}`}
+                    className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg transition-colors"
+                    onClick={() => setIsVehicleModalOpen(false)}
+                  >
+                    Voir la page publique
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
