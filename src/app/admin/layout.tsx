@@ -16,13 +16,11 @@ import {
   MessageSquare,
   FileText,
   BookOpen,
-  AlertTriangle,
   LogOut,
   Gauge,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
-import { useBanSimulation } from "@/contexts/BanSimulationContext";
 
 type TabConfig = {
   id: string;
@@ -39,7 +37,6 @@ export default function AdminLayout({
 }) {
   const { user, isLoading, logout } = useAuth();
   const { showToast } = useToast();
-  const { isSimulatingBan, toggleSimulation } = useBanSimulation();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -171,32 +168,7 @@ export default function AdminLayout({
           {/* Séparateur */}
           <div className="my-4 border-t border-white/10" />
 
-          {/* Toggle Simulation Ban (Admin uniquement) */}
-          {user.role === "admin" && (
-            <div className="p-4 bg-slate-900/50 rounded-xl border border-white/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-amber-500" />
-                  <span className="text-xs font-bold text-slate-300 uppercase">Simuler état banni</span>
-                </div>
-                <button
-                  onClick={toggleSimulation}
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                    isSimulatingBan ? "bg-red-600" : "bg-slate-700"
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
-                      isSimulatingBan ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {isSimulatingBan ? "Mode test actif" : "Mode normal"}
-              </p>
-            </div>
-          )}
+          {/* Fonctionnalité "Simuler état banni" supprimée - inutile */}
         </nav>
 
         {/* Déconnexion */}

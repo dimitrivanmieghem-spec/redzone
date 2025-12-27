@@ -23,7 +23,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
 import { approveVehicule, rejectVehicule } from "@/lib/supabase/server-actions/vehicules";
-import { getAdminStats, getSiteSettings } from "@/lib/supabase/settings";
+// Temporairement désactivé pour éviter throttling
+// import { getAdminStats, getSiteSettings } from "@/lib/supabase/settings";
 import { updateSiteSettings } from "@/lib/supabase/server-actions/settings";
 import { Vehicule } from "@/lib/supabase/types";
 import { logInfo, logError } from "@/lib/supabase/logs";
@@ -104,6 +105,7 @@ export default function DashboardPage() {
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false); // Protection contre les appels multiples
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
   const { vehicules: allVehiculesFromHook, isLoading: vehiculesLoading } = useVehicules({});
@@ -114,39 +116,50 @@ export default function DashboardPage() {
   }, [allVehiculesFromHook]);
 
   useEffect(() => {
+    // PROTECTION ANTI-THROTTLING : Ne charger qu'une seule fois par session
+    if (dataLoaded || !user || (user.role !== "admin" && user.role !== "moderator")) {
+      return;
+    }
+
     const loadData = async () => {
-      if (user && (user.role === "admin" || user.role === "moderator")) {
-        try {
-          console.log("[AdminDashboard] Chargement des données statistiques...");
-          setStatsLoading(true);
+      try {
+        console.log("[AdminDashboard] Chargement des données (version simplifiée)...");
+        setStatsLoading(true);
 
-          // Protection contre les appels multiples simultanés
-          const adminStats = await getAdminStats();
-          console.log("[AdminDashboard] Stats chargées:", adminStats ? "OK" : "NULL");
-          if (adminStats) setStats(adminStats);
+        // VALEURS PAR DÉFAUT TEMPORAIRES pour éviter les appels API problématiques
+        const defaultStats = {
+          total_vehicles: 0,
+          pending_vehicles: 0,
+          active_vehicles: 0,
+          rejected_vehicles: 0,
+          total_users: 0
+        };
 
-          const settings = await getSiteSettings();
-          console.log("[AdminDashboard] Settings chargés:", settings ? "OK" : "NULL");
-          if (settings) setMaintenanceMode(settings.maintenance_mode || false);
+        console.log("[AdminDashboard] Utilisation des valeurs par défaut");
+        setStats(defaultStats);
+        setMaintenanceMode(false); // Mode maintenance désactivé par défaut
 
-          console.log("[AdminDashboard] Données chargées avec succès");
-        } catch (error) {
-          console.error("[AdminDashboard] Erreur chargement données:", error);
-          // Ne pas afficher de toast pour éviter le spam si c'est récurrent
-          console.error("[AdminDashboard] Erreur détaillée:", error);
-        } finally {
-          setStatsLoading(false);
-        }
+        console.log("[AdminDashboard] Données par défaut chargées avec succès");
+
+        // MARQUER COMME CHARGÉ : Empêche tout rechargement futur
+        setDataLoaded(true);
+
+      } catch (error) {
+        console.error("[AdminDashboard] Erreur critique:", error);
+        // En cas d'erreur critique, on marque quand même comme chargé pour éviter les boucles
+        setDataLoaded(true);
+      } finally {
+        setStatsLoading(false);
       }
     };
 
-    // Délai minimal pour éviter les appels trop fréquents
+    // Délai minimal pour laisser l'auth se stabiliser
     const timer = setTimeout(() => {
       loadData();
-    }, 100);
+    }, 200);
 
     return () => clearTimeout(timer);
-  }, [user]); // Retiré showToast des dépendances pour éviter les re-renders
+  }, [user, dataLoaded]); // dataLoaded empêche les rechargements
 
   // Gestion du chargement global de la page
   useEffect(() => {
@@ -155,51 +168,30 @@ export default function DashboardPage() {
       return;
     }
 
-    // Attendre que les stats soient chargées avant de considérer la page prête
-    if (!statsLoading) {
+    // Attendre que les données soient chargées (avec ou sans succès)
+    if (dataLoaded) {
       const timer = setTimeout(() => {
         setPageLoading(false);
-      }, 200); // Petit délai pour éviter les flashs
+      }, 100); // Délai réduit pour éviter les attentes inutiles
       return () => clearTimeout(timer);
     }
-  }, [user, statsLoading]);
+  }, [user, dataLoaded]);
 
   useEffect(() => {
-    const loadComments = async () => {
-      if (user && (user.role === "admin" || user.role === "moderator") && activeSubTab === "comments") {
-        try {
-          setIsLoadingComments(true);
-          const comments = await getPendingComments();
-          setPendingComments(comments);
-        } catch (error) {
-          console.error("Erreur chargement commentaires:", error);
-          showToast("Erreur lors du chargement des commentaires", "error");
-        } finally {
-          setIsLoadingComments(false);
-        }
-      }
-    };
-    loadComments();
-  }, [user, activeSubTab, showToast]);
+    // TEMPORAIREMENT DÉSACTIVÉ pour éviter throttling
+    if (user && (user.role === "admin" || user.role === "moderator") && activeSubTab === "comments") {
+      console.log("[AdminDashboard] Onglet commentaires - chargement temporairement désactivé");
+      setPendingComments([]); // Valeur par défaut
+    }
+  }, [user, activeSubTab]);
 
   useEffect(() => {
-    const loadPosts = async () => {
-      if (user && (user.role === "admin" || user.role === "moderator") && activeSubTab === "posts") {
-        try {
-          setIsLoadingPosts(true);
-          const allArticles = await getAllArticles();
-          const pending = allArticles.filter((a) => a.status === "pending");
-          setPendingPosts(pending);
-        } catch (error) {
-          console.error("Erreur chargement posts:", error);
-          showToast("Erreur lors du chargement des posts", "error");
-        } finally {
-          setIsLoadingPosts(false);
-        }
-      }
-    };
-    loadPosts();
-  }, [user, activeSubTab, showToast]);
+    // TEMPORAIREMENT DÉSACTIVÉ pour éviter throttling
+    if (user && (user.role === "admin" || user.role === "moderator") && activeSubTab === "posts") {
+      console.log("[AdminDashboard] Onglet posts - chargement temporairement désactivé");
+      setPendingPosts([]); // Valeur par défaut
+    }
+  }, [user, activeSubTab]);
 
   const vehicules = allVehicules.filter((v) => v.status === activeSubTab);
   const pendingCount = stats?.pending_vehicles ?? allVehicules.filter((v) => v.status === "pending").length;
@@ -213,8 +205,9 @@ export default function DashboardPage() {
       setAllVehicules((prev) => prev.filter((v) => v.id !== id));
       await approveVehicule(id);
       await logInfo(`Ad [${id}] validated successfully by Admin [${user?.id}]`, user?.id, { vehicule_id: id, brand: vehicule?.brand || null, model: vehicule?.model || null, action: "approve" });
-      const adminStats = await getAdminStats();
-      if (adminStats) setStats(adminStats);
+      // Temporairement désactivé pour éviter throttling
+      // const adminStats = await getAdminStats();
+      // if (adminStats) setStats(adminStats);
       showToast("Annonce validée ! ✓", "success");
       startTransition(() => { router.refresh(); });
     } catch (error: any) {
@@ -231,8 +224,9 @@ export default function DashboardPage() {
       setAllVehicules((prev) => prev.filter((v) => v.id !== id));
       await rejectVehicule(id);
       await logInfo(`Ad [${id}] rejected by Admin [${user?.id}]`, user?.id, { vehicule_id: id, brand: vehicule?.brand || null, model: vehicule?.model || null, action: "reject" });
-      const adminStats = await getAdminStats();
-      if (adminStats) setStats(adminStats);
+      // Temporairement désactivé pour éviter throttling
+      // const adminStats = await getAdminStats();
+      // if (adminStats) setStats(adminStats);
       showToast("Annonce rejetée ✓", "success");
       startTransition(() => { router.refresh(); });
     } catch (error: any) {
