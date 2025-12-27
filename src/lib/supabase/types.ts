@@ -800,6 +800,9 @@ export interface Database {
           transmission: "Manuelle" | "Automatique" | "Séquentielle";
           is_active: boolean; // DEFAULT TRUE
           source: string; // DEFAULT 'vehicleData.ts'
+          year_start: number | null; // Année de début de production
+          year_end: number | null;   // Année de fin de production (null = actuel)
+          generation: string | null; // Génération/Phase (ex: 'Mk7 Phase 1')
         };
         Insert: {
           id?: string;
@@ -817,6 +820,9 @@ export interface Database {
           transmission: "Manuelle" | "Automatique" | "Séquentielle";
           is_active?: boolean;
           source?: string;
+          year_start?: number | null;
+          year_end?: number | null;
+          generation?: string | null;
         };
         Update: {
           id?: string;
@@ -834,6 +840,9 @@ export interface Database {
           transmission?: "Manuelle" | "Automatique" | "Séquentielle";
           is_active?: boolean;
           source?: string;
+          year_start?: number | null;
+          year_end?: number | null;
+          generation?: string | null;
         };
       };
     };
