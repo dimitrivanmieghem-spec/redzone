@@ -1,176 +1,140 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
+// Force Node.js runtime pour stabilité maximale
+export const runtime = 'nodejs';
+
 /**
- * API Route pour l'inscription à la waiting list
- * Utilise la SUPABASE_SERVICE_ROLE_KEY pour contourner les politiques RLS
+ * API Route ULTRA-SIMPLE pour l'inscription à la waiting list
+ * Version minimaliste pour diagnostic de crash
  */
 export async function POST(request: NextRequest) {
-  console.log("[API Subscribe] 🔍 Nouvelle requête POST reçue", {
-    timestamp: new Date().toISOString(),
-    method: request.method,
-    url: request.url,
-  });
-
-  // VÉRIFICATION CRITIQUE : Clé de service présente ?
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("[API Subscribe] ❌ ERREUR FATALE : SUPABASE_SERVICE_ROLE_KEY manquante !");
-    console.error("[API Subscribe] 📋 Variables d'environnement disponibles:", {
-      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      NODE_ENV: process.env.NODE_ENV,
-    });
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Clé de service manquante - Configuration serveur invalide",
-        details: "SUPABASE_SERVICE_ROLE_KEY non trouvée dans les variables d'environnement"
-      },
-      { status: 500 }
-    );
-  }
+  console.log("=== API SUBSCRIBE - DÉBUT ===");
+  console.log("Timestamp:", new Date().toISOString());
+  console.log("Method:", request.method);
+  console.log("URL:", request.url);
 
   try {
-    // Récupération des données JSON
-    let body;
-    try {
-      body = await request.json();
-      console.log("[API Subscribe] 📦 Corps de la requête parsé:", body);
-    } catch (parseError) {
-      console.error("[API Subscribe] ❌ ERREUR parsing JSON:", parseError);
-      return NextResponse.json(
-        { success: false, error: "Corps de requête JSON invalide" },
-        { status: 400 }
-      );
-    }
+    // 1. VÉRIFICATION IMMÉDIATE DE LA CLÉ SERVICE
+  console.log("1. Vérification SUPABASE_SERVICE_ROLE_KEY...");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("❌ SUPABASE_SERVICE_ROLE_KEY ABSENTE !");
+    return NextResponse.json({
+      success: false,
+      error: "Clé de service manquante",
+      step: "env_check"
+    }, { status: 500 });
+  }
+  console.log("✅ SUPABASE_SERVICE_ROLE_KEY présente (longueur:", process.env.SUPABASE_SERVICE_ROLE_KEY.length + ")");
 
-    const { email } = body;
+  // 2. PARSING DU PAYLOAD
+  console.log("2. Parsing du payload JSON...");
+  let body;
+  try {
+    body = await request.json();
+    console.log("✅ Payload parsé:", body);
+  } catch (parseError) {
+    console.error("❌ Erreur parsing JSON:", parseError.message);
+    return NextResponse.json({
+      success: false,
+      error: "JSON invalide",
+      step: "json_parse"
+    }, { status: 400 });
+  }
 
-    // Validation de base
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      console.error("[API Subscribe] ❌ Email invalide:", { email, type: typeof email });
-      return NextResponse.json(
-        { success: false, error: "Adresse email invalide ou manquante" },
-        { status: 400 }
-      );
-    }
+  const { email } = body;
+  console.log("3. Email extrait:", email);
 
-    const normalizedEmail = email.trim().toLowerCase();
+  // 3. VALIDATION DE BASE
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    console.error("❌ Email invalide:", email);
+    return NextResponse.json({
+      success: false,
+      error: "Email invalide",
+      step: "validation"
+    }, { status: 400 });
+  }
 
-    console.log("[API Subscribe] 🚀 Début inscription:", {
+  const normalizedEmail = email.trim().toLowerCase();
+  console.log("✅ Email normalisé:", normalizedEmail);
+
+  // 4. VÉRIFICATION URL SUPABASE
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    console.error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
+    return NextResponse.json({
+      success: false,
+      error: "URL Supabase manquante",
+      step: "url_check"
+    }, { status: 500 });
+  }
+  console.log("✅ URL Supabase présente:", supabaseUrl);
+
+  // 5. CRÉATION CLIENT SUPABASE
+  console.log("5. Création client Supabase...");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+  console.log("✅ Client Supabase créé");
+
+  // 6. INSERTION DANS WAITING_LIST
+  console.log("6. Insertion dans waiting_list...");
+  const { data, error: insertError } = await supabase
+    .from("waiting_list")
+    .insert({
       email: normalizedEmail,
-      originalLength: email.length,
-      normalizedLength: normalizedEmail.length,
-      timestamp: new Date().toISOString(),
+      source: "website",
     });
 
-    // Vérification des variables d'environnement
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  console.log("7. Résultat insertion:");
+  console.log("   - Data:", data);
+  console.log("   - Error:", insertError);
 
-    console.log("[API Subscribe] 🔧 Variables d'environnement:", {
-      supabaseUrlPresent: !!supabaseUrl,
-      serviceKeyPresent: !!serviceKey,
-      serviceKeyLength: serviceKey?.length,
-      serviceKeyPrefix: serviceKey?.substring(0, 10) + "...",
-    });
+  if (insertError) {
+    console.error("❌ ERREUR INSERTION:", insertError.message);
+    console.error("   Code:", insertError.code);
 
-    if (!supabaseUrl) {
-      console.error("[API Subscribe] ❌ NEXT_PUBLIC_SUPABASE_URL manquante");
-      return NextResponse.json(
-        { success: false, error: "URL Supabase manquante" },
-        { status: 500 }
-      );
+    // Gestion doublon
+    if (insertError.code === "23505") {
+      console.log("✅ Doublon détecté (normal)");
+      return NextResponse.json({
+        success: false,
+        error: "Déjà inscrit",
+        isDuplicate: true
+      });
     }
 
-    // Création du client admin avec la service role key
-    console.log("[API Subscribe] 🔑 Création du client Supabase avec service role...");
-    const supabase = createClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    return NextResponse.json({
+      success: false,
+      error: insertError.message || "Erreur insertion",
+      step: "insert"
+    }, { status: 500 });
+  }
 
-    console.log("[API Subscribe] 📝 Tentative d'insertion dans waiting_list...");
-    // Insertion dans la table waiting_list
-    const { data, error: insertError } = await supabase
-      .from("waiting_list")
-      .insert({
-        email: normalizedEmail,
-        source: "website",
-      });
+  // 7. SUCCÈS
+  console.log("✅ INSCRIPTION RÉUSSIE:", normalizedEmail);
+  console.log("=== API SUBSCRIBE - FIN SUCCÈS ===");
 
-    console.log("[API Subscribe] 📊 Résultat de l'insertion:", {
-      data,
-      error: insertError,
-      hasError: !!insertError,
-    });
-
-    if (insertError) {
-      // Gestion spécifique des doublons (code PostgreSQL 23505)
-      if (insertError.code === "23505") {
-        console.log("[API Subscribe] Email déjà présent (doublon):", normalizedEmail);
-        return NextResponse.json({
-          success: false,
-          error: "Vous êtes déjà inscrit à la liste !",
-          isDuplicate: true
-        });
-      }
-
-      // Autre erreur
-      console.error("[API Subscribe] ERREUR insertion:", {
-        email: normalizedEmail,
-        error: insertError.message,
-        code: insertError.code,
-      });
-
-      return NextResponse.json(
-        { success: false, error: insertError.message || "Erreur lors de l'inscription" },
-        { status: 500 }
-      );
-    }
-
-    // Succès
-    console.log("[API Subscribe] ✅ Inscription réussie:", normalizedEmail);
-
-    return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    // LOG DÉTAILLÉ DE L'ERREUR POUR DIAGNOSTIC
-    console.error("=".repeat(80));
-    console.error("[API Subscribe] ❌ ERREUR CRITIQUE DÉTECTÉE");
-    console.error("=".repeat(80));
-    console.error("DÉTAIL ERREUR SERVEUR:", {
-      message: error?.message || "Message d'erreur non disponible",
-      name: error?.name || "Nom d'erreur non disponible",
-      code: error?.code || "Code d'erreur non disponible",
-      stack: error?.stack || "Stack trace non disponible",
-      timestamp: new Date().toISOString(),
-      requestUrl: request.url,
-      requestMethod: request.method,
-    });
+    console.error("=== API SUBSCRIBE - ERREUR CRITIQUE ===");
+    console.error("Message:", error?.message || "Erreur inconnue");
+    console.error("Name:", error?.name || "N/A");
+    console.error("Code:", error?.code || "N/A");
+    console.error("Stack:", error?.stack || "N/A");
+    console.error("Timestamp:", new Date().toISOString());
+    console.error("=====================================");
 
-    // Log supplémentaire pour les erreurs Supabase spécifiques
-    if (error?.code) {
-      console.error("[API Subscribe] 📋 Code d'erreur PostgreSQL/Supabase:", error.code);
-    }
-
-    // Log des headers de la requête pour debug
-    const headers = Object.fromEntries(request.headers.entries());
-    console.error("[API Subscribe] 📋 Headers de la requête:", headers);
-
-    console.error("=".repeat(80));
-
-    // Réponse avec message d'erreur précis
-    return NextResponse.json(
-      {
-        success: false,
-        error: `Erreur serveur: ${error?.message || "Erreur inconnue"}`,
-        code: error?.code || "UNKNOWN_ERROR",
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error?.message || "Erreur serveur inconnue",
+      code: error?.code || "UNKNOWN_ERROR",
+      step: "catch"
+    }, { status: 500 });
   }
 }
