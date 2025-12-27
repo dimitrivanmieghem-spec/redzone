@@ -59,11 +59,17 @@ export default function DashboardPage() {
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Rediriger vers login si non connecté
+  // Rediriger vers login si non connecté (avec délai de sécurité après chargement)
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login?redirect=/dashboard");
-    }
+    // Attendre un minimum de 500ms après la fin du chargement pour laisser le temps à l'auth de se synchroniser
+    const timer = setTimeout(() => {
+      if (!isLoading && !user) {
+        console.log("[Dashboard] Redirection vers login - utilisateur non connecté");
+        router.push("/login?redirect=/dashboard");
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [user, isLoading, router]);
 
   // Synchroniser activeTab avec l'URL (si l'URL change depuis l'extérieur)

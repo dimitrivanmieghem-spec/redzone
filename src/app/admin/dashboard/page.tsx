@@ -103,6 +103,7 @@ export default function DashboardPage() {
     total_users: number;
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
   const { vehicules: allVehiculesFromHook, isLoading: vehiculesLoading } = useVehicules({});
@@ -116,21 +117,52 @@ export default function DashboardPage() {
     const loadData = async () => {
       if (user && (user.role === "admin" || user.role === "moderator")) {
         try {
+          console.log("[AdminDashboard] Chargement des données statistiques...");
           setStatsLoading(true);
+
+          // Protection contre les appels multiples simultanés
           const adminStats = await getAdminStats();
+          console.log("[AdminDashboard] Stats chargées:", adminStats ? "OK" : "NULL");
           if (adminStats) setStats(adminStats);
+
           const settings = await getSiteSettings();
+          console.log("[AdminDashboard] Settings chargés:", settings ? "OK" : "NULL");
           if (settings) setMaintenanceMode(settings.maintenance_mode || false);
+
+          console.log("[AdminDashboard] Données chargées avec succès");
         } catch (error) {
-          console.error("Erreur chargement données:", error);
-          showToast("Erreur lors du chargement des données", "error");
+          console.error("[AdminDashboard] Erreur chargement données:", error);
+          // Ne pas afficher de toast pour éviter le spam si c'est récurrent
+          console.error("[AdminDashboard] Erreur détaillée:", error);
         } finally {
           setStatsLoading(false);
         }
       }
     };
-    loadData();
-  }, [user, showToast]);
+
+    // Délai minimal pour éviter les appels trop fréquents
+    const timer = setTimeout(() => {
+      loadData();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [user]); // Retiré showToast des dépendances pour éviter les re-renders
+
+  // Gestion du chargement global de la page
+  useEffect(() => {
+    if (!user) {
+      setPageLoading(true);
+      return;
+    }
+
+    // Attendre que les stats soient chargées avant de considérer la page prête
+    if (!statsLoading) {
+      const timer = setTimeout(() => {
+        setPageLoading(false);
+      }, 200); // Petit délai pour éviter les flashs
+      return () => clearTimeout(timer);
+    }
+  }, [user, statsLoading]);
 
   useEffect(() => {
     const loadComments = async () => {
@@ -223,6 +255,18 @@ export default function DashboardPage() {
       setIsTogglingMaintenance(false);
     }
   };
+
+  // Afficher un loader si la page est encore en chargement
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto mb-4" />
+          <p className="text-white/70">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-950">
