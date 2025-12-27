@@ -37,34 +37,16 @@ export async function middleware(request: NextRequest) {
   // Appliquer les headers de sécurité à TOUTES les routes
   addSecurityHeaders(response);
 
-  // ===== COUCHE 3 : MAINTENANCE MODE =====
-  // Si mode maintenance actif, rediriger vers coming-soon (sauf routes whitelistées)
-  if (IS_MAINTENANCE) {
-    const maintenanceWhitelist = [
-      "/coming-soon",    // Page de maintenance elle-même
-      "/login",          // Connexion admin
-      "/auth",           // Callbacks OAuth
-      "/admin",          // Accès admin (sera vérifié après)
-      "/register",       // Redirigé vers login
-    ];
-
-    const isWhitelistedForMaintenance = maintenanceWhitelist.some((route) =>
-      pathname === route || pathname.startsWith(`${route}/`)
-    );
-
-    if (!isWhitelistedForMaintenance) {
-      // Rediriger vers coming-soon en mode maintenance
-      return NextResponse.redirect(new URL("/coming-soon", request.url));
-    }
-  }
-
-  // ===== COUCHE 4 : GESTION SPÉCIALE /register =====
+  // ===== COUCHE 3 : GESTION SPÉCIALE /register =====
   if (pathname === "/register") {
     // Inscription INTERDITE en Closed Alpha
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // ===== COUCHE 5 : AUTHENTIFICATION SUPABASE =====
+  // ===== COUCHE 4 : AUTHENTIFICATION SUPABASE (PRÉCOCE POUR MAINTENANCE) =====
+  let user = null;
+  let userRole = null;
+
   try {
     // Créer le client Supabase pour vérifier la session
     const cookieStore = await cookies();
@@ -84,37 +66,96 @@ export async function middleware(request: NextRequest) {
 
     // Vérifier la session utilisateur
     const {
-      data: { user },
+      data: { user: authUser },
       error: authError,
     } = await supabase.auth.getUser();
 
-    // ===== PROTECTION ADMIN =====
+    user = authUser;
+
+    // Si utilisateur connecté, récupérer son rôle pour les décisions de maintenance
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      userRole = profile?.role || null;
+    }
+  } catch (error) {
+    // En cas d'erreur d'auth, considérer comme non connecté
+    user = null;
+    userRole = null;
+  }
+
+  // ===== COUCHE 5 : MAINTENANCE MODE (CLOSED ALPHA) =====
+  // En mode maintenance, seuls les utilisateurs connectés peuvent accéder au site complet
+  if (IS_MAINTENANCE) {
+    if (!user) {
+      // Utilisateurs NON connectés : accès limité
+      const maintenanceWhitelist = [
+        "/coming-soon",    // Page de maintenance elle-même
+        "/login",          // Connexion
+        "/auth",           // Callbacks OAuth
+        "/register",       // Redirigé vers login
+      ];
+
+      const isWhitelistedForMaintenance = maintenanceWhitelist.some((route) =>
+        pathname === route || pathname.startsWith(`${route}/`)
+      );
+
+      if (!isWhitelistedForMaintenance) {
+        // Rediriger les visiteurs non connectés vers coming-soon
+        return NextResponse.redirect(new URL("/coming-soon", request.url));
+      }
+    }
+    // Les utilisateurs connectés passent directement aux contrôles suivants
+  }
+
+  // ===== PROTECTION ADMIN =====
     if (pathname.startsWith("/admin")) {
       // Vérifier si l'utilisateur est authentifié
-      if (authError || !user) {
+      if (!user) {
         const loginUrl = new URL("/login", request.url);
         loginUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(loginUrl);
       }
 
-      // Vérifier si l'utilisateur est banni
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("is_banned, role")
-        .eq("id", user.id)
-        .single();
+      // Recréer le client Supabase pour les vérifications admin
+      try {
+        const cookieStore = await cookies();
+        const { env } = await import("@/lib/env");
+        const supabase = createServerClient(
+          env.NEXT_PUBLIC_SUPABASE_URL,
+          env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          {
+            cookies: {
+              getAll() {
+                return cookieStore.getAll();
+              },
+              setAll() {}, // Lecture seule pour le middleware
+            },
+          },
+        );
 
-      if (profileError) {
-        console.error("Erreur récupération profil dans middleware:", profileError);
-        return NextResponse.redirect(new URL("/login", request.url));
-      }
+        // Vérifier si l'utilisateur est banni
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("is_banned, role")
+          .eq("id", user.id)
+          .single();
 
-      if (profile?.is_banned) {
-        return NextResponse.redirect(new URL("/login?banned=true", request.url));
-      }
+        if (profileError) {
+          console.error("Erreur récupération profil dans middleware:", profileError);
+          return NextResponse.redirect(new URL("/login", request.url));
+        }
 
-      // Vérifier les permissions admin
-      const userRole = profile?.role as UserRole | undefined;
+        if (profile?.is_banned) {
+          return NextResponse.redirect(new URL("/login?banned=true", request.url));
+        }
+
+        // Vérifier les permissions admin
+        const userRole = profile?.role as UserRole | undefined;
       if (!userRole) {
         return NextResponse.redirect(new URL("/", request.url));
       }
@@ -146,8 +187,14 @@ export async function middleware(request: NextRequest) {
         }
       }
 
-      // Autoriser l'accès admin
-      return response;
+        // Autoriser l'accès admin
+        return response;
+
+      } catch (error) {
+        console.error("Erreur vérification admin middleware:", error);
+        // En cas d'erreur, rediriger vers login par sécurité
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
     }
 
     // ===== ROUTES PUBLIQUES (NON ADMIN) =====
@@ -168,8 +215,8 @@ export async function middleware(request: NextRequest) {
     }
 
     // ===== ROUTES PROTÉGÉES (REQUIERT AUTHENTIFICATION) =====
-    // Vérifier si l'utilisateur est authentifié
-    if (authError || !user) {
+    // Vérifier si l'utilisateur est authentifié (user déjà vérifié plus haut)
+    if (!user) {
       const loginUrl = new URL("/login", request.url);
       // Préserver l'URL demandée pour redirection après connexion
       if (pathname !== "/" && !pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
@@ -178,30 +225,47 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Vérifier si l'utilisateur est banni
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_banned, role")
-      .eq("id", user.id)
-      .single();
+    // Recréer le client Supabase pour les vérifications de profil (puisque nous sommes hors du try/catch initial)
+    try {
+      const cookieStore = await cookies();
+      const { env } = await import("@/lib/env");
+      const supabase = createServerClient(
+        env.NEXT_PUBLIC_SUPABASE_URL,
+        env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll();
+            },
+            setAll() {}, // Lecture seule pour le middleware
+          },
+        },
+      );
 
-    if (profileError) {
-      console.error("Erreur récupération profil dans middleware:", profileError);
+      // Vérifier si l'utilisateur est banni
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("is_banned, role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) {
+        console.error("Erreur récupération profil dans middleware:", profileError);
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+
+      if (profile?.is_banned) {
+        return NextResponse.redirect(new URL("/login?banned=true", request.url));
+      }
+
+      // Autoriser l'accès pour tous les utilisateurs authentifiés et non bannis
+      return response;
+
+    } catch (error) {
+      console.error("Erreur vérification profil middleware:", error);
+      // En cas d'erreur, rediriger vers login par sécurité
       return NextResponse.redirect(new URL("/login", request.url));
     }
-
-    if (profile?.is_banned) {
-      return NextResponse.redirect(new URL("/login?banned=true", request.url));
-    }
-
-    // Autoriser l'accès pour tous les utilisateurs authentifiés et non bannis
-    return response;
-
-  } catch (error) {
-    console.error("Erreur middleware:", error);
-    // En cas d'erreur, rediriger vers login par sécurité
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
 }
 
 // ===== FONCTION SÉCURITÉ =====
