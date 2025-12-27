@@ -396,86 +396,94 @@ function SellPageContent() {
           status: vehicule.status
         });
 
-        // Mapping ROBUSTE avec gestion explicite des valeurs null/undefined
+        // MAPPING EXHAUSTIF AVEC SÉCURITÉ NULL (??) - Tous les champs DB couverts
         const mappedData = {
-          // Champs obligatoires avec fallbacks sécurisés
-          type: vehicule.type || "car",
-          marque: vehicule.brand || "",
-          modele: vehicule.is_manual_model ? "__AUTRE__" : (vehicule.model || ""),
-          modeleManuel: vehicule.is_manual_model ? (vehicule.model || "") : "",
-          carburant: vehicule.fuel_type || "essence",
+          // === CHAMPS OBLIGATOIRES ===
+          type: vehicule.type ?? "car",
+          marque: vehicule.brand ?? "",
+          modele: vehicule.is_manual_model ? "__AUTRE__" : (vehicule.model ?? ""),
+          modeleManuel: vehicule.is_manual_model ? (vehicule.model ?? "") : "",
+          carburant: vehicule.fuel_type ?? "essence",
           prix: vehicule.price ? vehicule.price.toString() : "",
           annee: vehicule.year ? vehicule.year.toString() : "",
           km: vehicule.mileage ? vehicule.mileage.toString() : "",
-          transmission: vehicule.transmission || "manuelle",
+          transmission: vehicule.transmission ?? "manuelle",
 
-          // Champs calculés/optionnels
+          // === CHAMPS CALCULÉS/OPTIONNELS ===
           puissance: vehicule.power_hp ? vehicule.power_hp.toString() : "",
-          puissanceKw: "", // Sera calculé automatiquement
+          puissanceKw: "", // Calculé automatiquement
           cvFiscaux: vehicule.fiscal_horsepower ? vehicule.fiscal_horsepower.toString() : "",
           co2: vehicule.co2 ? vehicule.co2.toString() : "",
           cylindree: vehicule.displacement_cc ? vehicule.displacement_cc.toString() : "",
-          moteur: vehicule.engine_architecture || "",
-          architectureMoteur: vehicule.engine_architecture || "",
-          description: vehicule.description || "",
-          carrosserie: vehicule.body_type || (vehicule.type === "car" ? "Berline" : "Sportive"),
+          moteur: vehicule.engine_architecture ?? "",
+          architectureMoteur: vehicule.engine_architecture ?? "",
+          description: vehicule.description ?? "",
+          carrosserie: vehicule.body_type ?? (vehicule.type === "car" ? "Berline" : "Sportive"),
 
-          // Couleurs (avec fallbacks)
-          couleurExterieure: "", // Non disponible dans la DB actuelle
-          couleurInterieure: vehicule.interior_color || "",
+          // === COULEURS ===
+          couleurExterieure: "", // Non disponible dans DB actuelle
+          couleurInterieure: vehicule.interior_color ?? "",
 
-          // Équipement
+          // === ÉQUIPEMENT ===
           nombrePlaces: vehicule.seats_count ? vehicule.seats_count.toString() : "",
 
-          // GESTION ROBUSTE DES PHOTOS (préserve les existantes + permet ajout nouvelles)
+          // === GESTION ROBUSTE DES PHOTOS ===
           photos: (() => {
             const existingPhotos: string[] = [];
 
-            // Récupérer les photos existantes depuis images (array prioritaire)
+            // Priorité 1: Array images (moderne)
             if (vehicule.images && Array.isArray(vehicule.images)) {
-              existingPhotos.push(...vehicule.images.filter(url => url && typeof url === 'string'));
+              existingPhotos.push(...vehicule.images.filter((url): url is string =>
+                typeof url === 'string' && url.trim().length > 0
+              ));
             }
-            // Fallback vers image (single) si pas d'images array
-            else if (vehicule.image && typeof vehicule.image === 'string') {
+            // Fallback: Image unique (legacy)
+            else if (vehicule.image && typeof vehicule.image === 'string' && vehicule.image.trim()) {
               existingPhotos.push(vehicule.image);
             }
 
-            // Filtrer les URLs valides et supprimer les doublons
-            return [...new Set(existingPhotos.filter(url =>
-              url && typeof url === 'string' && url.trim().length > 0
-            ))];
+            // Supprimer les doublons et valider
+            return [...new Set(existingPhotos)];
           })(),
-          photoFiles: [], // Nouveaux fichiers à uploader (s'ajouteront aux existantes)
+          photoFiles: [], // Nouveaux fichiers à uploader
 
-          // Audio
-          audioFile: null, // Pour les nouveaux fichiers
-          audioUrl: vehicule.audio_file || null, // URL existante
+          // === AUDIO ===
+          audioFile: null, // Pour nouveaux fichiers
+          audioUrl: vehicule.audio_file ?? null,
 
-          // Documents
-          carPassUrl: vehicule.car_pass_url || "",
+          // === DOCUMENTS ===
+          carPassUrl: vehicule.car_pass_url ?? "",
 
-          // Historique (array sécurisé)
-          history: Array.isArray(vehicule.history) ? vehicule.history.filter(item => item && typeof item === 'string') : [],
+          // === HISTORIQUE ===
+          history: Array.isArray(vehicule.history)
+            ? vehicule.history.filter((item): item is string =>
+                typeof item === 'string' && item.trim().length > 0
+              )
+            : [],
 
-          // Contact (avec fallbacks intelligents)
-          telephone: vehicule.phone || "",
-          contactEmail: vehicule.contact_email || user?.email || "",
+          // === CONTACT ===
+          telephone: vehicule.phone ?? "",
+          contactEmail: vehicule.contact_email ?? user?.email ?? "",
           contactMethods: Array.isArray(vehicule.contact_methods) ? vehicule.contact_methods : [],
 
-          // Localisation
-          ville: vehicule.city || "",
-          codePostal: vehicule.postal_code || "",
+          // === LOCALISATION ===
+          ville: vehicule.city ?? "",
+          codePostal: vehicule.postal_code ?? "",
 
-          // Champs business (non pré-remplis depuis DB)
+          // === CHAMPS BUSINESS (non pré-remplis) ===
           tvaNumber: "",
           garageName: "",
           garageAddress: "",
 
-          // Champs techniques optionnels (WLTP, etc.)
+          // === CHAMPS TECHNIQUES OPTIONNELS ===
           co2Wltp: vehicule.co2_wltp ? vehicule.co2_wltp.toString() : "",
-          drivetrain: vehicule.drivetrain || "",
+          drivetrain: vehicule.drivetrain ?? "",
           topSpeed: vehicule.top_speed ? vehicule.top_speed.toString() : "",
-          normeEuro: vehicule.euro_standard || "euro6d",
+          normeEuro: vehicule.euro_standard ?? "euro6d",
+
+          // === CHAMPS TECHNIQUES ADDITIONNELS (non dans formulaire actuel) ===
+          // Ces champs existent en DB mais ne sont pas dans le formulaire actuel
+          // Ils seront préservés lors de l'UPDATE grâce au mapping sélectif
         };
 
         console.log("[Sell] Données mappées pour le formulaire:", mappedData);

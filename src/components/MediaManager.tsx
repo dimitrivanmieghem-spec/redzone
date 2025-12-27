@@ -97,9 +97,34 @@ export default function MediaManager({
         }
       }
 
-      const uploadedUrls = await uploadImages(files, userId || null);
-      onPhotosChange([...photos, ...uploadedUrls]);
-      showToast(`${uploadedUrls.length} photo(s) ajoutée(s) avec succès !`, "success");
+      const uploadResults = await uploadImages(files, userId || null);
+
+      // Séparer succès et échecs
+      const successfulUploads: string[] = [];
+      const failedUploads: string[] = [];
+
+      uploadResults.forEach((result, index) => {
+        if (result.success) {
+          successfulUploads.push(result.url);
+        } else {
+          failedUploads.push(`"${files[index].name}": ${result.error}`);
+          console.error(`Upload failed for ${files[index].name}:`, result.error);
+        }
+      });
+
+      // Mettre à jour les photos avec seulement les succès
+      if (successfulUploads.length > 0) {
+        onPhotosChange([...photos, ...successfulUploads]);
+      }
+
+      // Notifications selon les résultats
+      if (successfulUploads.length > 0 && failedUploads.length === 0) {
+        showToast(`${successfulUploads.length} photo(s) ajoutée(s) avec succès !`, "success");
+      } else if (successfulUploads.length > 0 && failedUploads.length > 0) {
+        showToast(`${successfulUploads.length} photo(s) réussie(s), ${failedUploads.length} échouée(s). Vérifiez la console pour les détails.`, "error");
+      } else if (failedUploads.length > 0) {
+        showToast(`Échec de l'upload: ${failedUploads.join(", ")}`, "error");
+      }
     } catch (error: any) {
       console.error("Erreur upload photos:", error);
       const errorMessage = error?.message || error?.error?.message || "Erreur lors de l'upload des photos. Vérifiez votre connexion et réessayez.";

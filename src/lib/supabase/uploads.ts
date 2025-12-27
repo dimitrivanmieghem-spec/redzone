@@ -270,14 +270,24 @@ async function compressImage(file: File): Promise<File> {
  * @param userId - ID de l'utilisateur (optionnel pour les invités)
  * @returns URL publique de l'image
  */
-export async function uploadImage(file: File, userId?: string | null): Promise<string> {
-  console.log('🚀 Uploading to vehicles bucket...', { fileName: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)}MB` });
-  
-  // Valider le fichier AVANT l'upload
-  const validation = validateImageFile(file);
-  if (!validation.valid) {
-    throw new Error(validation.error || "Fichier invalide");
-  }
+// Type de retour pour les uploads avec gestion d'erreur
+export type UploadResult = {
+  success: true;
+  url: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export async function uploadImage(file: File, userId?: string | null): Promise<UploadResult> {
+  try {
+    console.log('🚀 Uploading to vehicles bucket...', { fileName: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)}MB` });
+
+    // Valider le fichier AVANT l'upload
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      return { success: false, error: validation.error || "Fichier invalide" };
+    }
 
   // Séquence d'optimisation : 1. Compression -> 2. Watermark -> 3. Upload
   console.log('📦 Étape 1/3 : Compression de l\'image...');
@@ -362,16 +372,44 @@ export async function uploadImage(file: File, userId?: string | null): Promise<s
 
     console.log('✅ Upload réussi:', publicData.publicUrl);
     return publicData.publicUrl;
+    const { data: publicData } = supabase.storage
+      .from("vehicles")
+      .getPublicUrl(data.path);
+
+    console.log('✅ Upload réussi:', publicData.publicUrl);
+    return { success: true, url: publicData.publicUrl };
+
   } catch (err: any) {
     clearTimeout(timeoutId);
-    
-    // Si c'est une erreur d'abort de notre timeout
+
+    console.error('[uploadImage] ERREUR:', err);
+
+    // Gestion spécifique des erreurs
     if (err.name === 'AbortError' || abortController.signal.aborted) {
-      throw new Error(`Upload interrompu (timeout après 60s). Le fichier est peut-être trop volumineux (${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB). Réessayez avec une image plus petite.`);
+      return {
+        success: false,
+        error: `Upload interrompu (timeout après 60s). Le fichier est peut-être trop volumineux (${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB). Réessayez avec une image plus petite.`
+      };
     }
-    
-    // Re-throw les autres erreurs
-    throw err;
+
+    // Détection des erreurs RLS
+    if (err.message?.includes('row-level security') || err.message?.includes('RLS')) {
+      console.error('[uploadImage] BLOQUAGE RLS DÉTECTÉ');
+      console.error('   → Vérifiez que la politique "Authenticated users can upload vehicle images" existe sur storage.objects');
+      console.error('   → Le bucket "vehicles" doit être créé et public');
+      return {
+        success: false,
+        error: 'Erreur de permissions. Contactez le support si le problème persiste.'
+      };
+    }
+
+    // Erreur réseau ou autre
+    return {
+      success: false,
+      error: err.message || 'Erreur lors de l\'upload de l\'image. Vérifiez votre connexion.'
+    };
+  }
+}
   }
 }
 
@@ -384,7 +422,7 @@ export async function uploadImage(file: File, userId?: string | null): Promise<s
 export async function uploadImages(
   files: File[],
   userId?: string | null
-): Promise<string[]> {
+): Promise<UploadResult[]> {
   const uploads = files.map((file) => uploadImage(file, userId));
   return Promise.all(uploads);
 }
