@@ -919,6 +919,22 @@ function SellPageContent() {
       return;
     }
 
+    // Vérification des uploads : S'assurer que toutes les photos sont des URLs valides
+    const invalidPhotos = formData.photos.filter((photo: any) => {
+      // Une photo valide doit être une string non vide commençant par http ou data:
+      return !photo ||
+             typeof photo !== 'string' ||
+             photo.trim() === '' ||
+             (!photo.startsWith('http') && !photo.startsWith('data:'));
+    });
+
+    if (invalidPhotos.length > 0) {
+      console.error('[Sell] Photos non uploadées détectées:', invalidPhotos);
+      showToast("Erreur d'upload détectée ! Certaines photos n'ont pas été envoyées correctement. Veuillez réessayer.", "error");
+      setIsSubmitting(false); // Permettre de réessayer
+      return;
+    }
+
     // Vérifier le mode simulation banni
     if (isEffectivelyBanned) {
       const message = isSimulatingBan && user?.role === "admin"
@@ -1034,13 +1050,21 @@ function SellPageContent() {
         status: finalStatus
       };
 
-      // Sauvegarder le véhicule (CREATE ou UPDATE selon le mode)
-      const savedVehiculeId = await saveVehicle(
-        isEditMode ? vehiculeId : null, // ID si édition, null si création
-        vehiculeDataWithStatus,
-        user?.id || null,
-        user ? null : contactEmail // userId si connecté, sinon guestEmail
-      );
+      // SAUVEGARDE EN BASE - Try/catch spécifique pour les erreurs DB
+      let savedVehiculeId: string;
+      try {
+        savedVehiculeId = await saveVehicle(
+          isEditMode ? vehiculeId : null, // ID si édition, null si création
+          vehiculeDataWithStatus,
+          user?.id || null,
+          user ? null : contactEmail // userId si connecté, sinon guestEmail
+        );
+      } catch (saveError: any) {
+        console.error('[Sell] Erreur lors de la sauvegarde en base de données:', saveError);
+        showToast(`Erreur lors de la sauvegarde : ${saveError.message || 'Erreur inconnue'}`, "error");
+        setIsSubmitting(false); // Permettre de réessayer
+        return;
+      }
 
       // Notifier les admins de la nouvelle annonce (uniquement en création)
       if (!isEditMode) {
@@ -1069,7 +1093,8 @@ function SellPageContent() {
           console.log("[Sell] Notification admin créée pour la nouvelle annonce:", savedVehiculeId);
         } catch (notificationError) {
           console.error("[Sell] Erreur lors de la création de notification admin:", notificationError);
-          // Ne pas bloquer la soumission si la notification échoue
+          // Ne pas bloquer la soumission si la notification échoue - l'annonce est déjà créée
+          showToast("Annonce créée avec succès mais notification admin échouée.", "error");
         }
       }
 
