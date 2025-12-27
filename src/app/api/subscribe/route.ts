@@ -1,21 +1,17 @@
-"use server";
-
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * API Route alternative pour l'inscription à la waiting list
- * Utilise le client admin (SERVICE_ROLE_KEY) pour contourner les politiques RLS
- *
- * Cette approche garantit que TOUTE la logique reste côté serveur
+ * API Route pour l'inscription à la waiting list
+ * Utilise la SUPABASE_SERVICE_ROLE_KEY pour contourner les politiques RLS
  */
 export async function POST(request: NextRequest) {
   try {
-    // Récupération des données du formulaire
+    // Récupération des données JSON
     const { email } = await request.json();
 
-    // Validation basique
-    if (!email || !email.includes("@")) {
+    // Validation de base
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json(
         { success: false, error: "Adresse email invalide" },
         { status: 400 }
@@ -29,22 +25,27 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
-    // Vérification explicite de la variable d'environnement
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("[API Subscribe] ❌ SUPABASE_SERVICE_ROLE_KEY manquante");
+    // Vérification des variables d'environnement
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+      console.error("[API Subscribe] ❌ Variables d'environnement manquantes");
       return NextResponse.json(
-        {
-          success: false,
-          error: "Configuration serveur invalide. Contactez le support.",
-          code: "ENV_MISSING"
-        },
+        { success: false, error: "Configuration serveur invalide" },
         { status: 500 }
       );
     }
 
-    const supabase = createAdminClient();
+    // Création du client admin avec la service role key
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
 
-    // Insertion avec client admin (contourne RLS)
+    // Insertion dans la table waiting_list
     const { error: insertError } = await supabase
       .from("waiting_list")
       .insert({
@@ -53,39 +54,42 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertError) {
-      // Gestion des doublons
+      // Gestion spécifique des doublons (code PostgreSQL 23505)
       if (insertError.code === "23505") {
         console.log("[API Subscribe] Email déjà présent (doublon):", normalizedEmail);
         return NextResponse.json({
           success: false,
           error: "Vous êtes déjà inscrit à la liste !",
-          code: "23505",
           isDuplicate: true
         });
       }
 
-      console.error("[API Subscribe] ERREUR insertion:", insertError);
+      // Autre erreur
+      console.error("[API Subscribe] ERREUR insertion:", {
+        email: normalizedEmail,
+        error: insertError.message,
+        code: insertError.code,
+      });
+
       return NextResponse.json(
-        {
-          success: false,
-          error: insertError.message || "Erreur lors de l'inscription",
-          code: insertError.code
-        },
+        { success: false, error: insertError.message || "Erreur lors de l'inscription" },
         { status: 500 }
       );
     }
 
+    // Succès
     console.log("[API Subscribe] ✅ Inscription réussie:", normalizedEmail);
 
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    console.error("[API Subscribe] ❌ ERREUR CRITIQUE:", error);
+    console.error("[API Subscribe] ❌ ERREUR CRITIQUE:", {
+      error: error?.message || "Erreur inconnue",
+      stack: error?.stack,
+    });
+
     return NextResponse.json(
-      {
-        success: false,
-        error: error?.message || "Erreur lors de l'inscription"
-      },
+      { success: false, error: "Erreur lors de l'inscription" },
       { status: 500 }
     );
   }

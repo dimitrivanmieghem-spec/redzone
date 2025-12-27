@@ -5,8 +5,6 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { Gauge, Sparkles, Shield, TrendingUp, CheckCircle, Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { subscribeToWaitingList } from "@/app/actions/subscribe";
-import { sendWelcomeEmail } from "@/app/actions/welcome-email";
 
 export default function ComingSoonPage() {
   const [email, setEmail] = useState("");
@@ -26,8 +24,16 @@ export default function ComingSoonPage() {
     setIsSubmitting(true);
     
     try {
-      // Utiliser la Server Action (client admin, contourne RLS)
-      const result = await subscribeToWaitingList(normalizedEmail);
+      // Utiliser l'API Route (client admin, contourne RLS)
+      const response = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+
+      const result = await response.json();
 
       if (!result.success) {
         // Gestion des erreurs
@@ -44,43 +50,18 @@ export default function ComingSoonPage() {
       }
 
       // Insertion réussie - Log pour Netlify
-      console.log("[Coming Soon] ✅ Inscription réussie:", {
+      console.log("[Coming Soon] ✅ Inscription réussie via API Route:", {
         email: normalizedEmail,
         timestamp: new Date().toISOString(),
       });
 
-      // Envoyer l'email de bienvenue (ne bloque pas si échec)
-      let emailSent = false;
-      try {
-        const emailResult = await sendWelcomeEmail(normalizedEmail);
-        emailSent = emailResult.success;
-        
-        if (emailResult.success) {
-          console.log("[Coming Soon] ✅ Email de bienvenue envoyé:", normalizedEmail);
-        } else {
-          console.warn("[Coming Soon] ⚠️ Email de bienvenue non envoyé (non-bloquant):", {
-            email: normalizedEmail,
-            error: emailResult.error,
-          });
-        }
-      } catch (emailError: any) {
-        // L'erreur d'email ne bloque jamais l'inscription
-        console.warn("[Coming Soon] ⚠️ Exception lors de l'envoi d'email (non-bloquant):", {
-          email: normalizedEmail,
-          error: emailError?.message || "Erreur inconnue",
-        });
-      }
+      // TODO: Réimplémenter l'envoi d'email via API Route séparée si nécessaire
 
-      // Succès - Message adapté selon l'envoi d'email
-      showToast(
-        emailSent
-          ? "Inscription réussie ! Vérifiez votre email pour votre message de bienvenue."
-          : "Inscription réussie ! Vous serez informé en avant-première du lancement.",
-        "success"
-      );
+      // Succès
+      showToast("Inscription réussie ! Vous serez informé en avant-première du lancement.", "success");
       setIsSubmitted(true);
       setEmail("");
-      
+
     } catch (error: any) {
       // Erreur inattendue (exception non gérée)
       console.error("[Coming Soon] ❌ ERREUR CRITIQUE inscription:", {
