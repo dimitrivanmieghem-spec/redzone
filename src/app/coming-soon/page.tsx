@@ -4,8 +4,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Gauge, Sparkles, Shield, TrendingUp, CheckCircle, Loader2, ArrowRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
+import { subscribeToWaitingList } from "@/app/actions/subscribe";
 import { sendWelcomeEmail } from "@/app/actions/welcome-email";
 
 export default function ComingSoonPage() {
@@ -26,72 +26,24 @@ export default function ComingSoonPage() {
     setIsSubmitting(true);
     
     try {
-      const supabase = createClient();
-      
-      // Vérifier d'abord si l'email existe déjà (optionnel, mais utile pour UX)
-      // Note: Cette vérification peut échouer avec 42501 (SELECT admin uniquement)
-      // mais l'erreur 23505 lors de l'INSERT gérera toujours les doublons
-      const { data: existing, error: checkError } = await supabase
-        .from("waiting_list")
-        .select("email")
-        .eq("email", normalizedEmail)
-        .single();
+      // Utiliser la Server Action (client admin, contourne RLS)
+      const result = await subscribeToWaitingList(normalizedEmail);
 
-      // Si la vérification réussit et trouve un doublon, arrêter ici
-      if (existing) {
-        showToast("Vous êtes déjà inscrit à la liste !", "info");
-        setIsSubmitted(true);
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Si erreur 42501 (SELECT bloqué), continuer quand même vers l'INSERT
-      // L'erreur 23505 lors de l'INSERT gérera les doublons
-      if (checkError && checkError.code !== "42501") {
-        // Autre erreur que 42501, log mais continuer quand même
-        console.warn("[Coming Soon] ⚠️ Erreur lors de la vérification doublon:", checkError.message);
-      }
-
-      // Insérer dans la base de données (Insert & Forget - pas de SELECT pour éviter erreur 42501)
-      const { error: insertError } = await supabase
-        .from("waiting_list")
-        .insert({
-          email: normalizedEmail,
-          source: "website",
-        });
-
-      if (insertError) {
-        // Gestion des erreurs spécifiques avec logs détaillés
-        if (insertError.code === "23505") {
-          // Doublon (peu probable car on a vérifié avant, mais sécurité)
-          console.log("[Coming Soon] Email déjà présent (doublon):", normalizedEmail);
+      if (!result.success) {
+        // Gestion des erreurs
+        if (result.isDuplicate) {
+          // Doublon
           showToast("Vous êtes déjà inscrit à la liste !", "info");
           setIsSubmitted(true);
-        } else if (insertError.code === "42501") {
-          // Erreur de permissions RLS
-          console.error("[Coming Soon] ERREUR RLS - Politique d'insertion refusée:", {
-            email: normalizedEmail,
-            error: insertError.message,
-            code: insertError.code,
-            hint: insertError.hint,
-          });
-          showToast("Erreur de permissions. Contactez le support.", "error");
         } else {
           // Autre erreur
-          console.error("[Coming Soon] ERREUR insertion waiting_list:", {
-            email: normalizedEmail,
-            error: insertError.message,
-            code: insertError.code,
-            details: insertError.details,
-            hint: insertError.hint,
-          });
-          showToast("Erreur lors de l'inscription. Réessayez plus tard.", "error");
+          showToast(result.error || "Erreur lors de l'inscription. Réessayez plus tard.", "error");
         }
         setIsSubmitting(false);
         return;
       }
 
-      // Insertion réussie - Log pour Netlify (sans ID car pas de SELECT)
+      // Insertion réussie - Log pour Netlify
       console.log("[Coming Soon] ✅ Inscription réussie:", {
         email: normalizedEmail,
         timestamp: new Date().toISOString(),
