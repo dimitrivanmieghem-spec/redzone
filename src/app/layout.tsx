@@ -13,6 +13,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { CookieConsentProvider } from "@/contexts/CookieConsentContext";
 import { BanSimulationProvider } from "@/contexts/BanSimulationContext";
 import BanSimulationBanner from "@/components/BanSimulationBanner";
+import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -104,6 +105,9 @@ export default function RootLayout({
             </BanSimulationProvider>
           </AuthProvider>
         </CookieConsentProvider>
+
+        {/* Google Analytics - Chargé après tous les providers */}
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || ''} />
       </body>
     </html>
   );
