@@ -118,8 +118,7 @@ CREATE POLICY "service_role_unrestricted"
   USING (true)
   WITH CHECK (true);
 
--- Donner la plus haute priorité à cette politique
-ALTER POLICY "service_role_unrestricted" ON waiting_list OWNER TO postgres;
+-- Note: La politique a automatiquement le propriétaire approprié (celui qui l'a créée)
 
 -- ============================================
 -- 6. VÉRIFICATIONS FINALES
