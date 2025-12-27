@@ -35,10 +35,11 @@ function Navbar() {
     setIsMenuOpen(false);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout(); // Attendre que la déconnexion soit complète
     setIsUserMenuOpen(false);
-    router.push("/");
+    // Hard reset pour forcer le nettoyage complet de l'état auth
+    window.location.href = "/coming-soon";
   };
 
   // Charger le compteur de notifications non lues

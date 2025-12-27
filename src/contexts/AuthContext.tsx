@@ -179,21 +179,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from("profiles")
         .select("*")
         .eq("id", supabaseUser.id)
-        .single();
+        .maybeSingle(); // ✅ .maybeSingle() ne crashe pas si pas de résultat
 
-      // MODE DÉGRADÉ : Si erreur ou profil manquant, créer un utilisateur par défaut
-      if (profileError || !profile) {
-        // Log l'erreur pour debugging, mais ne bloque pas
-        if (profileError) {
-          console.warn("Profil non trouvé ou erreur de récupération:", profileError.message);
-        } else {
-          console.warn("Profil manquant pour l'utilisateur:", supabaseUser.id);
-        }
+      // Gestion des cas d'erreur et profils manquants
+      if (profileError) {
+        // Erreur technique (réseau, permissions, etc.)
+        console.warn("Erreur technique lors de la récupération du profil:", profileError.message);
+        throw profileError; // Bloque le processus car c'est une vraie erreur
+      } else if (!profile) {
+        // Pas de profil trouvé (mais pas d'erreur technique) ->
+        // Utilisateur nouvellement inscrit, profil pas encore créé
+        console.log("Profil manquant, utilisation des données de session pour initialisation");
 
         // Créer un utilisateur minimal en mode dégradé avec les infos de base
         const defaultName = supabaseUser.email?.split("@")[0] || "Utilisateur";
         const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(defaultName)}&background=DC2626&color=fff&bold=true`;
-        
+
         // Lire is_founder depuis user_metadata en fallback
         const isFounder = Boolean(
           supabaseUser.user_metadata?.is_founder === true ||

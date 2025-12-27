@@ -45,11 +45,15 @@ export default function AdminLayout({
 
   // Protection : Rediriger si pas autorisé
   useEffect(() => {
-    if (!isLoading && (!user || !["admin", "moderator", "support", "editor", "viewer"].includes(user.role))) {
+    // Si on est encore en train de charger, ne fais rien pour éviter les boucles
+    if (isLoading) return;
+
+    // Ne déclenche la redirection QUE si on a fini de charger et que l'utilisateur n'est pas autorisé
+    if (!user || !["admin", "moderator", "support", "editor", "viewer"].includes(user.role)) {
       showToast("Accès refusé - Rôle autorisé requis", "error");
       router.push("/");
     }
-  }, [user, isLoading, router, showToast]);
+  }, [user, isLoading]); // Retiré router et showToast pour éviter les re-rendus inutiles
 
   const handleLogout = async () => {
     await logout();
