@@ -64,8 +64,37 @@ END $$;
 -- Droits sur la table (Supabase permet généralement ces opérations)
 GRANT ALL PRIVILEGES ON TABLE waiting_list TO service_role;
 
--- Droits sur la séquence d'auto-incrémentation
-GRANT ALL PRIVILEGES ON SEQUENCE waiting_list_id_seq TO service_role;
+-- Gestion de la séquence d'auto-incrémentation (vérification et création si nécessaire)
+DO $$
+BEGIN
+  -- Vérifier si la séquence existe
+  IF EXISTS (
+    SELECT 1 FROM information_schema.sequences
+    WHERE sequence_schema = 'public'
+    AND sequence_name = 'waiting_list_id_seq'
+  ) THEN
+    -- La séquence existe, accorder les droits
+    EXECUTE 'GRANT ALL PRIVILEGES ON SEQUENCE waiting_list_id_seq TO service_role';
+    RAISE NOTICE '✅ Droits accordés sur séquence existante waiting_list_id_seq';
+  ELSE
+    -- La séquence n'existe pas, essayer de trouver une séquence liée à la colonne id
+    DECLARE
+      seq_name TEXT;
+    BEGIN
+      SELECT pg_get_serial_sequence('waiting_list', 'id') INTO seq_name;
+
+      IF seq_name IS NOT NULL THEN
+        EXECUTE 'GRANT ALL PRIVILEGES ON SEQUENCE ' || seq_name || ' TO service_role';
+        RAISE NOTICE '✅ Droits accordés sur séquence détectée: %', seq_name;
+      ELSE
+        RAISE NOTICE 'ℹ️ Aucune séquence trouvée pour waiting_list.id - opération normale pour Supabase';
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE NOTICE 'ℹ️ Impossible de déterminer la séquence - opération normale pour certains setups Supabase';
+    END;
+  END IF;
+END $$;
 
 -- Confirmation des droits accordés
 DO $$
