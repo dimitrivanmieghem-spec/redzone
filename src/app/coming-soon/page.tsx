@@ -29,28 +29,36 @@ export default function ComingSoonPage() {
       const supabase = createClient();
       
       // Vérifier d'abord si l'email existe déjà (optionnel, mais utile pour UX)
-      const { data: existing } = await supabase
+      // Note: Cette vérification peut échouer avec 42501 (SELECT admin uniquement)
+      // mais l'erreur 23505 lors de l'INSERT gérera toujours les doublons
+      const { data: existing, error: checkError } = await supabase
         .from("waiting_list")
         .select("email")
         .eq("email", normalizedEmail)
         .single();
 
+      // Si la vérification réussit et trouve un doublon, arrêter ici
       if (existing) {
         showToast("Vous êtes déjà inscrit à la liste !", "info");
         setIsSubmitted(true);
         setIsSubmitting(false);
         return;
       }
+      
+      // Si erreur 42501 (SELECT bloqué), continuer quand même vers l'INSERT
+      // L'erreur 23505 lors de l'INSERT gérera les doublons
+      if (checkError && checkError.code !== "42501") {
+        // Autre erreur que 42501, log mais continuer quand même
+        console.warn("[Coming Soon] ⚠️ Erreur lors de la vérification doublon:", checkError.message);
+      }
 
-      // Insérer dans la base de données
-      const { data: insertData, error: insertError } = await supabase
+      // Insérer dans la base de données (Insert & Forget - pas de SELECT pour éviter erreur 42501)
+      const { error: insertError } = await supabase
         .from("waiting_list")
         .insert({
           email: normalizedEmail,
           source: "website",
-        })
-        .select()
-        .single();
+        });
 
       if (insertError) {
         // Gestion des erreurs spécifiques avec logs détaillés
@@ -83,10 +91,9 @@ export default function ComingSoonPage() {
         return;
       }
 
-      // Insertion réussie - Log pour Netlify
+      // Insertion réussie - Log pour Netlify (sans ID car pas de SELECT)
       console.log("[Coming Soon] ✅ Inscription réussie:", {
         email: normalizedEmail,
-        id: insertData?.id,
         timestamp: new Date().toISOString(),
       });
 
@@ -159,18 +166,18 @@ export default function ComingSoonPage() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white relative overflow-hidden">
-      {/* Hero Background - Même style que la page d'accueil */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* Image de fond - Hero Octane98 */}
+      {/* Hero Background - Optimisé Mobile-First */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Image de fond - Hero Octane98 - Optimisée pour mobile vertical */}
         <div className="absolute inset-0 z-0">
           <Image
             src="/hero-bg.png"
             alt="Octane98 - Le sanctuaire du moteur thermique"
             fill
-            className="object-cover opacity-60"
+            className="object-cover object-center md:object-center lg:object-center opacity-60"
             priority
-            sizes="100vw"
-            unoptimized
+            quality={85}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
           />
         </div>
 
@@ -180,127 +187,129 @@ export default function ComingSoonPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(220,38,38,0.1),transparent_70%)]" />
         </div>
 
-        {/* Overlay pour améliorer la lisibilité du texte */}
-        <div className="absolute inset-0 z-0 bg-black/40" />
+        {/* Overlay pour améliorer la lisibilité du texte - Plus prononcé sur mobile */}
+        <div className="absolute inset-0 z-0 bg-black/50 md:bg-black/40" />
 
-        {/* Contenu central */}
-        <div className="relative z-10 w-full px-4 py-12">
+        {/* Contenu central - Mobile-First avec scroll vertical */}
+        <div className="relative z-10 w-full px-4 py-6 md:py-12 overflow-y-auto max-h-screen">
           <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
             className="max-w-4xl mx-auto text-center"
           >
-        {/* Logo et Titre */}
-        <motion.div variants={itemVariants} className="mb-12">
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-2xl shadow-red-900/50">
-              <Gauge className="text-white" size={40} />
-            </div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tight">
-              Octane<span className="text-red-600">98</span>
-            </h1>
-          </div>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-white mb-4 tracking-tight">
-            Le sanctuaire du moteur thermique arrive.
-          </h2>
-          <p className="text-xl md:text-2xl text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-            La première marketplace belge dédiée aux puristes de la performance. Calculateur de taxes précis, annonces certifiées, et mélodies mécaniques.
-          </p>
-        </motion.div>
+            {/* Logo et Titre - Typographie adaptée mobile */}
+            <motion.div variants={itemVariants} className="mb-6 md:mb-12">
+              <div className="flex items-center justify-center gap-2 md:gap-4 mb-4 md:mb-6">
+                <div className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-2xl shadow-red-900/50">
+                  <Gauge className="text-white w-7 h-7 md:w-10 md:h-10" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl md:text-6xl lg:text-7xl font-black text-white tracking-tight">
+                  Octane<span className="text-red-600">98</span>
+                </h1>
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black text-white mb-3 md:mb-4 tracking-tight px-2">
+                Le sanctuaire du moteur thermique arrive.
+              </h2>
+              <p className="text-sm sm:text-base md:text-xl lg:text-2xl text-neutral-300 md:text-neutral-400 max-w-2xl mx-auto leading-relaxed px-2">
+                La première marketplace belge dédiée aux puristes de la performance. Calculateur de taxes précis, annonces certifiées, et mélodies mécaniques.
+              </p>
+            </motion.div>
 
-        {/* Formulaire d'inscription */}
-        <motion.div variants={itemVariants} className="mb-16">
-          <form onSubmit={handleSubmit} className="max-w-md mx-auto">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="votre@email.com"
-                disabled={isSubmitting || isSubmitted}
-                className="flex-1 px-6 py-4 bg-neutral-900 border-2 border-neutral-800 rounded-2xl text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600 transition-all text-lg"
-                required
-              />
-              <button
-                type="submit"
-                disabled={isSubmitting || isSubmitted}
-                className="px-8 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-900/50 hover:shadow-red-900/70 hover:scale-105"
+            {/* Formulaire d'inscription - Full width mobile avec card glassmorphism */}
+            <motion.div variants={itemVariants} className="mb-8 md:mb-16">
+              <div className="bg-neutral-900/70 backdrop-blur-md rounded-2xl border border-neutral-800/50 p-4 md:p-6 shadow-xl">
+                <form onSubmit={handleSubmit} className="w-full">
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="votre@email.com"
+                      disabled={isSubmitting || isSubmitted}
+                      className="w-full min-h-[44px] px-4 py-3 md:px-6 md:py-4 bg-neutral-800/80 backdrop-blur-sm border-2 border-neutral-700 rounded-xl md:rounded-2xl text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600 transition-all text-base md:text-lg touch-manipulation"
+                      required
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || isSubmitted}
+                      className="w-full min-h-[44px] px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 active:scale-[0.98] text-white font-black rounded-xl md:rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-900/50 hover:shadow-red-900/70 touch-manipulation"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="animate-spin w-5 h-5" />
+                          <span className="text-sm md:text-base">Inscription...</span>
+                        </>
+                      ) : isSubmitted ? (
+                        <>
+                          <CheckCircle className="w-5 h-5" />
+                          <span className="text-sm md:text-base">Inscrit !</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm md:text-base">Devenir Membre Fondateur</span>
+                          <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {isSubmitted && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-green-400 mt-3 md:mt-4 text-xs md:text-sm font-medium"
+                    >
+                      ✓ Vous serez informé en avant-première du lancement
+                    </motion.p>
+                  )}
+                </form>
+              </div>
+            </motion.div>
+
+            {/* Section "Pourquoi Octane98 ?" - Cards optimisées mobile */}
+            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mb-6 md:mb-12">
+              <motion.div
+                variants={itemVariants}
+                className="bg-neutral-900/70 backdrop-blur-md rounded-xl md:rounded-2xl border border-neutral-800/50 p-5 md:p-8 hover:border-red-600/50 transition-all shadow-lg"
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} />
-                    Inscription...
-                  </>
-                ) : isSubmitted ? (
-                  <>
-                    <CheckCircle size={20} />
-                    Inscrit !
-                  </>
-                ) : (
-                  <>
-                    Devenir Membre Fondateur
-                    <ArrowRight size={20} />
-                  </>
-                )}
-              </button>
-            </div>
-            {isSubmitted && (
-              <motion.p
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-green-400 mt-4 text-sm font-medium"
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-red-600/20 rounded-xl md:rounded-2xl flex items-center justify-center mb-4 md:mb-6 mx-auto border border-red-600/30">
+                  <Sparkles className="text-red-600 w-6 h-6 md:w-8 md:h-8" />
+                </div>
+                <h3 className="text-base md:text-xl font-black text-white mb-2 md:mb-3">Expertise Thermique</h3>
+                <p className="text-xs md:text-base text-neutral-300 md:text-neutral-400 leading-relaxed">
+                  Notre plateforme est dédiée exclusivement aux véhicules thermiques de caractère. Chaque annonce est vérifiée par des passionnés qui connaissent la vraie valeur mécanique.
+                </p>
+              </motion.div>
+
+              <motion.div
+                variants={itemVariants}
+                className="bg-neutral-900/70 backdrop-blur-md rounded-xl md:rounded-2xl border border-neutral-800/50 p-5 md:p-8 hover:border-red-600/50 transition-all shadow-lg"
               >
-                ✓ Vous serez informé en avant-première du lancement
-              </motion.p>
-            )}
-          </form>
-        </motion.div>
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-red-600/20 rounded-xl md:rounded-2xl flex items-center justify-center mb-4 md:mb-6 mx-auto border border-red-600/30">
+                  <Shield className="text-red-600 w-6 h-6 md:w-8 md:h-8" />
+                </div>
+                <h3 className="text-base md:text-xl font-black text-white mb-2 md:mb-3">Transparence Fiscale</h3>
+                <p className="text-xs md:text-base text-neutral-300 md:text-neutral-400 leading-relaxed">
+                  Calculateur de taxes belge ultra-précis. Connaissez instantanément le coût réel d'immatriculation avant d'acheter. Plus de surprises à la douane.
+                </p>
+              </motion.div>
 
-        {/* Section "Pourquoi Octane98 ?" */}
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          <motion.div
-            variants={itemVariants}
-            className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl border border-neutral-800 p-8 hover:border-red-600/50 transition-all"
-          >
-            <div className="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mb-6 mx-auto border border-red-600/30">
-              <Sparkles className="text-red-600" size={32} />
-            </div>
-            <h3 className="text-xl font-black text-white mb-3">Expertise Thermique</h3>
-            <p className="text-neutral-400 leading-relaxed">
-              Notre plateforme est dédiée exclusivement aux véhicules thermiques de caractère. Chaque annonce est vérifiée par des passionnés qui connaissent la vraie valeur mécanique.
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={itemVariants}
-            className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl border border-neutral-800 p-8 hover:border-red-600/50 transition-all"
-          >
-            <div className="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mb-6 mx-auto border border-red-600/30">
-              <Shield className="text-red-600" size={32} />
-            </div>
-            <h3 className="text-xl font-black text-white mb-3">Transparence Fiscale</h3>
-            <p className="text-neutral-400 leading-relaxed">
-              Calculateur de taxes belge ultra-précis. Connaissez instantanément le coût réel d'immatriculation avant d'acheter. Plus de surprises à la douane.
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={itemVariants}
-            className="bg-neutral-900/50 backdrop-blur-sm rounded-2xl border border-neutral-800 p-8 hover:border-red-600/50 transition-all"
-          >
-            <div className="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mb-6 mx-auto border border-red-600/30">
-              <TrendingUp className="text-red-600" size={32} />
-            </div>
-            <h3 className="text-xl font-black text-white mb-3">Passion Puriste</h3>
-            <p className="text-neutral-400 leading-relaxed">
-              Rejoignez une communauté qui respire la mécanique. Partagez les sonorités de votre moteur, l'histoire de votre véhicule, et connectez-vous avec d'autres puristes.
-            </p>
-          </motion.div>
-        </motion.div>
+              <motion.div
+                variants={itemVariants}
+                className="bg-neutral-900/70 backdrop-blur-md rounded-xl md:rounded-2xl border border-neutral-800/50 p-5 md:p-8 hover:border-red-600/50 transition-all shadow-lg"
+              >
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-red-600/20 rounded-xl md:rounded-2xl flex items-center justify-center mb-4 md:mb-6 mx-auto border border-red-600/30">
+                  <TrendingUp className="text-red-600 w-6 h-6 md:w-8 md:h-8" />
+                </div>
+                <h3 className="text-base md:text-xl font-black text-white mb-2 md:mb-3">Passion Puriste</h3>
+                <p className="text-xs md:text-base text-neutral-300 md:text-neutral-400 leading-relaxed">
+                  Rejoignez une communauté qui respire la mécanique. Partagez les sonorités de votre moteur, l'histoire de votre véhicule, et connectez-vous avec d'autres puristes.
+                </p>
+              </motion.div>
+            </motion.div>
 
             {/* Footer */}
-            <motion.div variants={itemVariants} className="text-neutral-400 text-sm mt-8">
+            <motion.div variants={itemVariants} className="text-neutral-400 text-xs md:text-sm mt-4 md:mt-8 pb-4 md:pb-0">
               <p>Bientôt disponible en Belgique 🇧🇪</p>
             </motion.div>
           </motion.div>
