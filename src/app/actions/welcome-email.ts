@@ -159,7 +159,8 @@ export async function sendWelcomeEmail(email: string): Promise<{ success: boolea
                 <h1 class="title">Bienvenue chez les puristes !</h1>
                 
                 <p class="text">
-                  Félicitations ! Vous faites maintenant partie des <span class="highlight">Membres Fondateurs</span> d'Octane98.
+                  Félicitations ! Vous faites partie des <span class="highlight">500 premiers membres fondateurs</span> d'Octane98.
+                  Vous bénéficierez d'<span class="highlight">avantages exclusifs à vie</span> dès notre lancement officiel.
                 </p>
                 
                 <p class="text">

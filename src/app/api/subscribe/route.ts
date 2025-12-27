@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { sendWelcomeEmail } from "@/app/actions/welcome-email";
 
 // Force Node.js runtime pour stabilité maximale
 export const runtime = 'nodejs';
@@ -115,8 +116,27 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 
-  // 7. SUCCÈS
+  // 7. SUCCÈS - ENVOI EMAIL DE BIENVENUE
   console.log("✅ INSCRIPTION RÉUSSIE:", normalizedEmail);
+
+  // Envoi de l'email de bienvenue (ne bloque pas l'inscription si échec)
+  if (process.env.RESEND_API_KEY) {
+    console.log("📧 Envoi email de bienvenue...");
+    try {
+      const emailResult = await sendWelcomeEmail(normalizedEmail);
+      if (emailResult.success) {
+        console.log("✅ Email de bienvenue envoyé avec succès");
+      } else {
+        console.warn("⚠️ Échec envoi email de bienvenue:", emailResult.error);
+      }
+    } catch (emailError: any) {
+      console.warn("⚠️ Exception lors de l'envoi d'email:", emailError?.message);
+      // Ne pas bloquer l'inscription pour autant
+    }
+  } else {
+    console.log("📧 RESEND_API_KEY non configurée - email en mode simulation");
+  }
+
   console.log("=== API SUBSCRIBE - FIN SUCCÈS ===");
 
   return NextResponse.json({ success: true });
