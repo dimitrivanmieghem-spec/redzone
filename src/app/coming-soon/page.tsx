@@ -31,9 +31,9 @@ export default function ComingSoonPage() {
   const [calculatorInputs, setCalculatorInputs] = useState({
     region: "wallonie" as "wallonie" | "flandre",
     annee: new Date().getFullYear(),
-    puissanceKw: 0,
-    co2: 0,
-    cvFiscaux: 0,
+    puissanceKw: 150, // Valeur d'exemple pour montrer le calculateur
+    co2: 150,
+    cvFiscaux: 11, // Valeur d'exemple pour montrer le calculateur
     carburant: "essence" as string
   });
 
@@ -304,6 +304,9 @@ export default function ComingSoonPage() {
                   Découvrez le coût réel d&apos;immatriculation de votre véhicule en Belgique.
                   <strong className="text-red-500"> Précis et gratuit.</strong>
                 </p>
+                <p className="text-sm text-slate-400 mt-2">
+                  💡 Valeurs d&apos;exemple pré-remplies - Modifiez-les selon votre véhicule
+                </p>
               </div>
 
               {/* Formulaire d'entrée du calculateur */}
@@ -415,7 +418,7 @@ export default function ComingSoonPage() {
               </div>
 
               {/* Affichage du résultat du calculateur */}
-              {showCalculator && calculatorInputs.puissanceKw > 0 && calculatorInputs.cvFiscaux > 0 && (
+              {showCalculator && (
                 <div className="max-w-4xl mx-auto">
                   <Suspense fallback={
                     <div className="bg-slate-900/50 backdrop-blur-sm rounded-3xl p-8 border border-white/10 flex items-center justify-center min-h-[400px]">
