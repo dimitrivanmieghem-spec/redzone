@@ -93,7 +93,7 @@ export async function getBrands(type: VehicleType = 'car', retries = 2): Promise
         
         // Ajouter un timeout de 8 secondes (réduit pour éviter les blocages)
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 8000);
+          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 30000);
         });
         
         const queryPromise = query;
@@ -159,7 +159,7 @@ export async function getModels(type: VehicleType, brand: string, retries = 2): 
         
         // Ajouter un timeout de 8 secondes (réduit pour éviter les blocages)
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 8000);
+          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 30000);
         });
         
         const queryPromise = query;
@@ -337,7 +337,7 @@ export async function getModelSpecs(
         
         // Ajouter un timeout de 8 secondes
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 8000);
+          setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 30000);
         });
         
         const queryPromise = query.maybeSingle();

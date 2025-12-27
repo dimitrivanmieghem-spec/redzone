@@ -26,18 +26,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ⚡ PRIORITÉ : Routes publiques passent DIRECTEMENT sans vérification bypass
+  // ⚡ PRIORITÉ : Routes publiques MINIMALES passent DIRECTEMENT sans vérification bypass
   const publicRoutes = [
-    "/",
-    "/login",
-    "/register",
-    "/forgot-password",
-    "/reset-password",
-    "/search",
-    "/cars",
-    "/legal",
-    "/auth",
-    "/coming-soon", // Route publique en mode maintenance
+    "/login",           // Connexion obligatoire pour accès
+    "/register",        // Inscription obligatoire
+    "/forgot-password", // Réinitialisation mot de passe
+    "/reset-password",  // Reset mot de passe
+    "/auth",            // Callbacks OAuth
+    "/coming-soon",     // Page de maintenance (toujours accessible)
   ];
 
   // Vérifier si la route est publique - si oui, PAS de vérification DB du tout

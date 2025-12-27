@@ -35,7 +35,7 @@ function SellPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { isSimulatingBan } = useBanSimulation();
   // useCookieConsent n'est plus utilisé dans ce fichier
 
@@ -57,6 +57,13 @@ function SellPageContent() {
       router.push("/dashboard");
     }
   }, [isEffectivelyBanned, isSimulatingBan, user?.role, router, showToast]);
+
+  // 🔒 PROTECTION : Rediriger les non-connectés vers login
+  useEffect(() => {
+    if (!user && !isLoading) {
+      router.push('/login?redirect=/sell');
+    }
+  }, [user, isLoading, router]);
 
   // Vérification du quota au chargement (uniquement pour les utilisateurs connectés et en mode création)
   useEffect(() => {
@@ -479,7 +486,7 @@ function SellPageContent() {
         // Ajouter un timeout pour éviter les blocages
         const brandsPromise = getBrands(formData.type as VehicleType);
         const timeoutPromise = new Promise<string[]>((_, reject) => {
-          setTimeout(() => reject(new Error("Timeout: Le chargement des marques prend trop de temps")), 12000);
+          setTimeout(() => reject(new Error("Timeout: Le chargement des marques prend trop de temps")), 30000);
         });
         
         // Utiliser getBrands qui utilise déjà le client browser avec timeout
