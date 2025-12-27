@@ -386,49 +386,100 @@ function SellPageContent() {
           return;
         }
 
-        // Pré-remplir le formulaire avec les données du véhicule (convertir colonnes anglaises vers françaises pour le formulaire)
-        setFormData({
-          type: vehicule.type || "",
+        // Pré-remplir le formulaire avec les données du véhicule (mapping robuste avec valeurs par défaut)
+        console.log("[Sell] Chargement données véhicule en mode édition:", {
+          id: vehiculeId,
+          marque: vehicule.brand,
+          modele: vehicule.model,
+          prix: vehicule.price,
+          annee: vehicule.year,
+          status: vehicule.status
+        });
+
+        // Mapping ROBUSTE avec gestion explicite des valeurs null/undefined
+        const mappedData = {
+          // Champs obligatoires avec fallbacks sécurisés
+          type: vehicule.type || "car",
           marque: vehicule.brand || "",
           modele: vehicule.is_manual_model ? "__AUTRE__" : (vehicule.model || ""),
-          modeleManuel: vehicule.is_manual_model ? vehicule.model : "",
-          carburant: vehicule.fuel_type || "",
-          prix: vehicule.price?.toString() || "",
-          annee: vehicule.year?.toString() || "",
-          km: vehicule.mileage?.toString() || "",
-          transmission: vehicule.transmission || "",
-          puissance: vehicule.power_hp?.toString() || "",
-          puissanceKw: "", // Calculer si nécessaire
-          cvFiscaux: vehicule.fiscal_horsepower?.toString() || "",
-          co2: vehicule.co2?.toString() || "",
-          cylindree: vehicule.displacement_cc?.toString() || "",
+          modeleManuel: vehicule.is_manual_model ? (vehicule.model || "") : "",
+          carburant: vehicule.fuel_type || "essence",
+          prix: vehicule.price ? vehicule.price.toString() : "",
+          annee: vehicule.year ? vehicule.year.toString() : "",
+          km: vehicule.mileage ? vehicule.mileage.toString() : "",
+          transmission: vehicule.transmission || "manuelle",
+
+          // Champs calculés/optionnels
+          puissance: vehicule.power_hp ? vehicule.power_hp.toString() : "",
+          puissanceKw: "", // Sera calculé automatiquement
+          cvFiscaux: vehicule.fiscal_horsepower ? vehicule.fiscal_horsepower.toString() : "",
+          co2: vehicule.co2 ? vehicule.co2.toString() : "",
+          cylindree: vehicule.displacement_cc ? vehicule.displacement_cc.toString() : "",
           moteur: vehicule.engine_architecture || "",
           architectureMoteur: vehicule.engine_architecture || "",
           description: vehicule.description || "",
-          carrosserie: vehicule.body_type || "",
-          couleurExterieure: "", // Pas dans le type actuel
+          carrosserie: vehicule.body_type || (vehicule.type === "car" ? "Berline" : "Sportive"),
+
+          // Couleurs (avec fallbacks)
+          couleurExterieure: "", // Non disponible dans la DB actuelle
           couleurInterieure: vehicule.interior_color || "",
-          nombrePlaces: vehicule.seats_count?.toString() || "",
-          photos: vehicule.images && Array.isArray(vehicule.images) ? vehicule.images : (vehicule.image ? [vehicule.image] : []),
-          photoFiles: [],
-          audioFile: null,
-          audioUrl: vehicule.audio_file || null,
+
+          // Équipement
+          nombrePlaces: vehicule.seats_count ? vehicule.seats_count.toString() : "",
+
+          // GESTION ROBUSTE DES PHOTOS (préserve les existantes + permet ajout nouvelles)
+          photos: (() => {
+            const existingPhotos: string[] = [];
+
+            // Récupérer les photos existantes depuis images (array prioritaire)
+            if (vehicule.images && Array.isArray(vehicule.images)) {
+              existingPhotos.push(...vehicule.images.filter(url => url && typeof url === 'string'));
+            }
+            // Fallback vers image (single) si pas d'images array
+            else if (vehicule.image && typeof vehicule.image === 'string') {
+              existingPhotos.push(vehicule.image);
+            }
+
+            // Filtrer les URLs valides et supprimer les doublons
+            return [...new Set(existingPhotos.filter(url =>
+              url && typeof url === 'string' && url.trim().length > 0
+            ))];
+          })(),
+          photoFiles: [], // Nouveaux fichiers à uploader (s'ajouteront aux existantes)
+
+          // Audio
+          audioFile: null, // Pour les nouveaux fichiers
+          audioUrl: vehicule.audio_file || null, // URL existante
+
+          // Documents
           carPassUrl: vehicule.car_pass_url || "",
-          history: vehicule.history && Array.isArray(vehicule.history) ? vehicule.history : [],
+
+          // Historique (array sécurisé)
+          history: Array.isArray(vehicule.history) ? vehicule.history.filter(item => item && typeof item === 'string') : [],
+
+          // Contact (avec fallbacks intelligents)
           telephone: vehicule.phone || "",
           contactEmail: vehicule.contact_email || user?.email || "",
-          contactMethods: vehicule.contact_methods && Array.isArray(vehicule.contact_methods) ? vehicule.contact_methods : [],
+          contactMethods: Array.isArray(vehicule.contact_methods) ? vehicule.contact_methods : [],
+
+          // Localisation
           ville: vehicule.city || "",
           codePostal: vehicule.postal_code || "",
+
+          // Champs business (non pré-remplis depuis DB)
           tvaNumber: "",
           garageName: "",
           garageAddress: "",
-          // Champs optionnels (pré-remplis si disponibles)
-          co2Wltp: vehicule.co2_wltp?.toString() || "",
+
+          // Champs techniques optionnels (WLTP, etc.)
+          co2Wltp: vehicule.co2_wltp ? vehicule.co2_wltp.toString() : "",
           drivetrain: vehicule.drivetrain || "",
-          topSpeed: vehicule.top_speed?.toString() || "",
+          topSpeed: vehicule.top_speed ? vehicule.top_speed.toString() : "",
           normeEuro: vehicule.euro_standard || "euro6d",
-        });
+        };
+
+        console.log("[Sell] Données mappées pour le formulaire:", mappedData);
+        setFormData(mappedData);
 
         // Définir hasCo2Data si CO2 existe
         if (vehicule.co2 !== null && vehicule.co2 !== undefined) {
@@ -589,11 +640,14 @@ function SellPageContent() {
     return "";
   };
 
-  // Pré-remplissage automatique quand un modèle est sélectionné
+  // Pré-remplissage automatique quand un modèle est sélectionné OU quand l'année change
   useEffect(() => {
     if (formData.type && formData.marque && formData.modele && !isManualModel) {
+      // Récupérer l'année si elle est fournie (pour filtrage temporel)
+      const year = formData.annee ? parseInt(formData.annee) : undefined;
+
       // Ajouter un timeout pour éviter les blocages
-      const specsPromise = getModelSpecs(formData.type as VehicleType, formData.marque, formData.modele);
+      const specsPromise = getModelSpecs(formData.type as VehicleType, formData.marque, formData.modele, year);
       const timeoutPromise = new Promise<null>((resolve) => {
         setTimeout(() => {
           console.warn('⚠️ [Sell] Timeout lors de la récupération des specs');
@@ -663,7 +717,7 @@ function SellPageContent() {
         topSpeed: "",
       }));
     }
-  }, [formData.type, formData.marque, formData.modele, isManualModel, showToast]);
+  }, [formData.type, formData.marque, formData.modele, formData.annee, isManualModel, showToast]);
 
   // Constantes pour validation carburant (thermique uniquement)
   const VALID_CARBURANTS = ["essence", "e85", "lpg"] as const;
@@ -890,8 +944,17 @@ function SellPageContent() {
         condition: "Occasion" as "Neuf" | "Occasion",
         euro_standard: formData.normeEuro || "euro6d",
         car_pass: !!formData.carPassUrl, // true si URL fournie
-        image: formData.photos[0] || "",
-        images: formData.photos.length > 0 ? formData.photos : null,
+        // GESTION INTELLIGENTE DES PHOTOS : Existantes + Nouvelles
+        image: (() => {
+          // Première photo comme image principale (legacy support)
+          const allPhotos = formData.photos || [];
+          return allPhotos.length > 0 ? allPhotos[0] : "";
+        })(),
+        images: (() => {
+          const allPhotos = formData.photos || [];
+          // Retourner null si pas de photos, sinon le tableau complet
+          return allPhotos.length > 0 ? allPhotos : null;
+        })(),
         description: formData.description || null,
         engine_architecture: formData.moteur || formData.architectureMoteur || null,
         admission: null,
@@ -917,13 +980,90 @@ function SellPageContent() {
         top_speed: formData.topSpeed ? parseInt(formData.topSpeed) : null,
       };
 
+      // LOGIQUE DE SAUVEGARDE ROBUSTE : CREATE vs UPDATE
+      let finalStatus: "pending_validation" | "active";
+
+      if (isEditMode) {
+        // MODE ÉDITION : Logique prudente pour éviter les abus
+        const vehiculeOriginal = await getVehiculeById(vehiculeId!);
+
+        if (!vehiculeOriginal) {
+          throw new Error("Véhicule original introuvable");
+        }
+
+        // Vérifier si des champs SENSIBLES ont été modifiés
+        const sensitiveFieldsChanged =
+          vehiculeOriginal.brand !== formData.marque ||
+          vehiculeOriginal.model !== (isManualModel ? formData.modeleManuel : formData.modele) ||
+          vehiculeOriginal.price !== parseFloat(formData.prix) ||
+          vehiculeOriginal.year !== parseInt(formData.annee);
+
+        if (sensitiveFieldsChanged) {
+          // Champs sensibles modifiés → Re-validation requise
+          finalStatus = "pending_validation";
+          console.log("[Sell] Champs sensibles modifiés - Re-validation requise");
+        } else {
+          // Modifications mineures → Conserver le statut actuel (sauf si rejeté)
+          if (vehiculeOriginal.status === "rejected") {
+            finalStatus = "pending_validation"; // Rejeté → Re-validation requise
+          } else if (vehiculeOriginal.status === "active") {
+            finalStatus = "active"; // Actif → Rester actif (modifications mineures)
+          } else {
+            // pending, waiting_email_verification, pending_validation → Re-validation par sécurité
+            finalStatus = "pending_validation";
+          }
+          console.log("[Sell] Modifications mineures - Statut conservé:", finalStatus);
+        }
+      } else {
+        // MODE CRÉATION : Toujours en attente de validation
+        finalStatus = "pending_validation";
+        console.log("[Sell] Nouvelle annonce - Statut: pending_validation");
+      }
+
+      // Ajouter le statut final aux données du véhicule
+      const vehiculeDataWithStatus = {
+        ...vehiculeData,
+        status: finalStatus
+      };
+
       // Sauvegarder le véhicule (CREATE ou UPDATE selon le mode)
       const savedVehiculeId = await saveVehicle(
         isEditMode ? vehiculeId : null, // ID si édition, null si création
-        vehiculeData,
+        vehiculeDataWithStatus,
         user?.id || null,
         user ? null : contactEmail // userId si connecté, sinon guestEmail
       );
+
+      // Notifier les admins de la nouvelle annonce (uniquement en création)
+      if (!isEditMode) {
+        try {
+          const { createClient } = await import("@/lib/supabase/client");
+          const supabase = createClient();
+
+          // Créer une notification pour tous les admins
+          await supabase.from('notifications').insert({
+            user_id: null, // null = notification globale (tous les admins la verront)
+            type: 'vehicle_validation',
+            title: 'Nouvelle annonce en attente',
+            message: `Le véhicule ${formData.marque} ${formData.modele} (${formData.annee}) est en attente de validation.`,
+            link: `/admin/vehicles`,
+            is_read: false,
+            metadata: {
+              vehicle_id: savedVehiculeId,
+              brand: formData.marque,
+              model: formData.modele,
+              year: formData.annee,
+              price: parseFloat(formData.prix),
+              created_by: user?.id || 'guest'
+            }
+          });
+
+          console.log("[Sell] Notification admin créée pour la nouvelle annonce:", savedVehiculeId);
+        } catch (notificationError) {
+          console.error("[Sell] Erreur lors de la création de notification admin:", notificationError);
+          // Ne pas bloquer la soumission si la notification échoue
+        }
+      }
 
       // Mettre à jour le profil utilisateur avec les données business (si Pro et champs remplis)
       if (user && user.role === "pro" && (formData.tvaNumber || formData.garageName || formData.garageAddress)) {
