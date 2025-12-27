@@ -34,8 +34,9 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
     console.log("✅ Payload parsé:", body);
-  } catch (parseError) {
-    console.error("❌ Erreur parsing JSON:", parseError.message);
+  } catch (parseError: unknown) {
+    const errorMessage = parseError instanceof Error ? parseError.message : "Erreur inconnue";
+    console.error("❌ Erreur parsing JSON:", errorMessage);
     return NextResponse.json({
       success: false,
       error: "JSON invalide",
