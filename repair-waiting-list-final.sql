@@ -65,7 +65,10 @@ DROP POLICY IF EXISTS "service_role_unrestricted" ON waiting_list;
 DROP POLICY IF EXISTS "Anyone can subscribe to waiting list" ON waiting_list;
 DROP POLICY IF EXISTS "Only admins can view waiting list" ON waiting_list;
 
-RAISE NOTICE '✅ Anciennes politiques supprimées';
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Anciennes politiques supprimées';
+END $$;
 
 -- ============================================
 -- 4. POLITIQUE RLS POUR SERVICE_ROLE
